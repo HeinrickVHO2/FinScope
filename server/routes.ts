@@ -424,7 +424,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Usuário não encontrado" });
       }
 
-      const { password, ...userWithoutPassword } = updated;
+      // Create a new object without password to avoid read-only property errors
+      const userWithoutPassword = {
+        id: updated.id,
+        email: updated.email,
+        fullName: updated.fullName,
+        plan: updated.plan,
+        trialStart: updated.trialStart,
+        trialEnd: updated.trialEnd,
+        createdAt: updated.createdAt,
+      };
       res.json(userWithoutPassword);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -448,7 +457,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Usuário não encontrado" });
       }
 
-      const { password, ...userWithoutPassword } = updated;
+      // Create a new object without password to avoid read-only property errors
+      const userWithoutPassword = {
+        id: updated.id,
+        email: updated.email,
+        fullName: updated.fullName,
+        plan: updated.plan,
+        trialStart: updated.trialStart,
+        trialEnd: updated.trialEnd,
+        createdAt: updated.createdAt,
+      };
       res.json(userWithoutPassword);
     } catch (error) {
       res.status(400).json({ error: (error as Error).message });
