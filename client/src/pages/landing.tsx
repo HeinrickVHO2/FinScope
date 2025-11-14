@@ -61,24 +61,6 @@ export default function LandingPage() {
 
   const plans = [
     {
-      name: "Free",
-      price: "Grátis",
-      description: "Para começar a organizar suas finanças",
-      features: [
-        "1 conta financeira",
-        "Dashboard básico",
-        "Transações ilimitadas",
-        "Categorização manual"
-      ],
-      limitations: [
-        "Sem relatórios",
-        "Sem exportação",
-        "Sem alertas automáticos"
-      ],
-      cta: "Começar Grátis",
-      highlighted: false
-    },
-    {
       name: "Pro",
       price: "R$ 14,90",
       period: "/mês",
@@ -304,7 +286,7 @@ export default function LandingPage() {
               Comece com 10 dias grátis. Sem compromisso, cancele quando quiser.
             </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto justify-items-center">
             {plans.map((plan, index) => (
               <Card 
                 key={index} 
