@@ -49,7 +49,10 @@ export default function LoginPage() {
         description: "Redirecionando para o dashboard...",
       });
       
-      setLocation("/dashboard");
+      // Small delay to ensure auth context is fully updated
+      setTimeout(() => {
+        setLocation("/dashboard");
+      }, 100);
     } catch (error) {
       toast({
         title: "Erro ao fazer login",

@@ -49,7 +49,10 @@ export default function SignupPage() {
         description: "Bem-vindo ao FinScope! Seu teste grátis de 10 dias começou.",
       });
       
-      setLocation("/dashboard");
+      // Small delay to ensure auth context is fully updated
+      setTimeout(() => {
+        setLocation("/dashboard");
+      }, 100);
     } catch (error) {
       toast({
         title: "Erro ao criar conta",
