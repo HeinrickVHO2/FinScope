@@ -1,0 +1,221 @@
+{
+  "projectName": "FinScope",
+  "appConcept": "Uma plataforma B2C que combina Gestão Financeira Pessoal com Gestão Simples de Microempreendimentos. Unifica dashboards financeiros, categorização inteligente de gastos, metas, lembretes de pagamentos, emissões de notas/boletos simples, fluxo de caixa pessoal/negócio e ferramentas de organização. O foco é entregar muito valor rapidamente, sem IA pesada, priorizando UX clara e recursos automatizados. O modelo de negócio é Trial de 10 dias + assinatura mensal via PIX automático da Cakto.",
+  
+  "techStack": {
+    "frontend": "Next.js 14 + React + TypeScript + TailwindCSS",
+    "backend": "Next.js Server Actions + Supabase Edge Functions (quando necessário)",
+    "database": "Supabase (PostgreSQL + Auth + RLS)",
+    "storage": "Supabase Storage",
+    "payments": "Cakto (Checkout Flutuante, Billing Automático, PIX Agendado e API Webhooks)",
+    "realtime": "Supabase Realtime",
+    "monitoring": "Vercel Analytics"
+  },
+
+  "designSystem": {
+    "aesthetic": "Moderno, minimalista e premium, inspirando confiança financeira. Layout clean, ícones finos, muito espaço em branco e microanimações suaves.",
+    "colorPalette": {
+      "primary": "#1C64F2",
+      "secondary": "#10B981",
+      "accent": "#F1F5F9",
+      "danger": "#EF4444",
+      "text": "#1E293B",
+      "white": "#FFFFFF"
+    },
+    "typography": {
+      "headers": "Poppins, Bold",
+      "body": "Inter, Regular"
+    },
+    "iconography": "Ícones minimalistas estilo Lucide, gráficos limpos e dashboards simples de visualizar."
+  },
+
+  "pricingModel": {
+    "freeMode": "Acesso gratuito extremamente limitado: 1 conta cadastrada (pessoal ou CNPJ), sem dashboards avançados, sem exportação, sem alertas inteligentes.",
+    "trial": "10 dias de acesso completo após criar a conta e autorizar o PIX automático via Cakto.",
+    "plans": [
+      {
+        "planName": "Pro",
+        "price": 29.90,
+        "features": [
+          "Até 3 contas financeiras (pessoal + MEI + reserva)",
+          "Dashboard financeiro básico",
+          "Fluxo de caixa mensal",
+          "Categorização manual de transações",
+          "Alertas simples de pagamento",
+          "Exportação CSV",
+          "Suporte via e-mail"
+        ]
+      },
+      {
+        "planName": "Premium",
+        "price": 47.90,
+        "features": [
+          "Contas ilimitadas",
+          "Dashboard avançado (comparação, projeção, saúde financeira)",
+          "Categorização inteligente sem IA cara (regras automáticas definidas pelo usuário)",
+          "Relatórios PDF",
+          "Alertas avançados",
+          "Gestão simples MEI",
+          "Organização financeira completa",
+          "Acesso antecipado a novos módulos",
+          "Backup automático"
+        ]
+      }
+    ]
+  },
+
+  "supabaseEntities": [
+    {
+      "table": "users",
+      "fields": [
+        "id (uuid, pk)",
+        "email",
+        "full_name",
+        "created_at",
+        "cakto_customer_id",
+        "cakto_subscription_id",
+        "trial_start",
+        "trial_end",
+        "plan ('free' | 'pro' | 'premium')"
+      ]
+    },
+    {
+      "table": "accounts",
+      "fields": [
+        "id (uuid)",
+        "user_id (fk)",
+        "name",
+        "type ('pessoal','empresa')",
+        "initial_balance",
+        "created_at"
+      ]
+    },
+    {
+      "table": "transactions",
+      "fields": [
+        "id (uuid)",
+        "user_id (fk)",
+        "account_id (fk)",
+        "description",
+        "type ('entrada','saida')",
+        "amount",
+        "category",
+        "date",
+        "auto_rule_applied (boolean)"
+      ]
+    },
+    {
+      "table": "rules",
+      "fields": [
+        "id (uuid)",
+        "user_id (fk)",
+        "rule_name",
+        "contains (string keyword)",
+        "category_result",
+        "created_at"
+      ]
+    }
+  ],
+
+  "pages": [
+    {
+      "pageName": "Landing Page",
+      "layout": [
+        "Hero com headline: 'Controle completo das suas finanças pessoais e do seu negócio em um só lugar.'",
+        "Sessão sobre benefícios",
+        "Cards dos planos",
+        "Botão CTA: 'Criar conta grátis (10 dias)'",
+        "Explicação de como o PIX automático funciona (via Cakto)"
+      ]
+    },
+    {
+      "pageName": "Auth Pages",
+      "includes": [
+        "Login (Supabase Auth)",
+        "Cadastro (coleta nome, email e autorização Cakto)",
+        "Esqueci minha senha"
+      ]
+    },
+    {
+      "pageName": "Dashboard Geral (Home)",
+      "layout": [
+        "Saldo total",
+        "Resumo do mês",
+        "Top categorias",
+        "Alertas e lembretes",
+        "Indicador de progresso do plano/trial"
+      ]
+    },
+    {
+      "pageName": "Gestão de Contas",
+      "layout": [
+        "Listagem de contas",
+        "Adicionar conta",
+        "Limite visual no plano Free",
+        "Gráficos simples por conta"
+      ]
+    },
+    {
+      "pageName": "Transações",
+      "layout": [
+        "Tabela com filtros avançados",
+        "Formulário de nova transação",
+        "Tags e categorias",
+        "Aplicação automática de regras"
+      ]
+    },
+    {
+      "pageName": "Regras Automáticas (Premium)",
+      "layout": [
+        "Criar regra",
+        "Se descrição contém 'ifood' → categoria Alimentação",
+        "Listar regras",
+        "Ativar/desativar"
+      ]
+    },
+    {
+      "pageName": "Gestão MEI",
+      "layout": [
+        "Controle de entradas e despesas do negócio",
+        "Fluxo de caixa da empresa",
+        "Relatórios básicos",
+        "Controle de notas e comprovantes"
+      ]
+    },
+    {
+      "pageName": "Configurações",
+      "layout": [
+        "Plano atual",
+        "Dados pessoais",
+        "Upgrade/Downgrade",
+        "Desativar assinatura",
+        "Preferências"
+      ]
+    }
+  ],
+
+  "integrations": {
+    "cakto": {
+      "features": [
+        "Checkout flutuante dentro do app",
+        "Criação automática de cliente Cakto no cadastro",
+        "Criar assinatura com trial de 10 dias",
+        "PIX automático agendado pós-trial",
+        "Webhook recebendo eventos de pagamento",
+        "Bloquear acesso se pagamento falhar por X dias",
+        "Downgrade automático para Free caso necessário"
+      ]
+    },
+    "supabase": {
+      "auth": "E-mail e senha",
+      "rowLevelSecurity": "Ativar RLS com policies por user_id",
+      "realtime": "Atualização instantânea de dashboards",
+      "storage": "Comprovantes e recibos",
+      "edgeFunctions": [
+        "Processar webhooks da Cakto",
+        "Gerar relatórios PDF",
+        "Gerar exportações CSV"
+      ]
+    }
+  }
+}
