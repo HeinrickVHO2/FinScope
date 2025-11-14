@@ -51,7 +51,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }),
       cookie: {
         httpOnly: true,
-        secure: true, // Required for HTTPS (Replit deployments are always HTTPS)
+        secure: isProduction, // Only require HTTPS in production (development uses HTTP)
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         sameSite: "lax",
       },
