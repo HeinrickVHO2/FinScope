@@ -417,6 +417,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== CACKTO PAYMENT ROUTES =====
+
+  // Create checkout session (called before user signup)
+  app.post("/api/checkout/create", async (req, res) => {
+    try {
+      const { email, fullName, plan } = req.body;
+      
+      if (!email || !fullName || !plan) {
+        return res.status(400).json({ error: "Email, nome completo e plano são obrigatórios" });
+      }
+
+      if (!["pro", "premium"].includes(plan)) {
+        return res.status(400).json({ error: "Plano inválido. Escolha 'pro' ou 'premium'" });
+      }
+
+      // TODO: Implement Cackto API integration here
+      // For now, return a placeholder response
+      res.json({
+        success: true,
+        checkoutUrl: "https://checkout.cakto.com.br/placeholder",
+        message: "Integração com Cackto em desenvolvimento"
+      });
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
+
+  // Webhook endpoint to receive Cackto payment events
+  app.post("/api/webhooks/cackto", async (req, res) => {
+    try {
+      const event = req.body;
+      
+      console.log("[Cackto Webhook] Received event:", event.event || event.type);
+      
+      // Validate webhook signature (TODO: implement when we have API key)
+      
+      const eventType = event.event || event.type;
+      
+      switch (eventType) {
+        case "payment.approved":
+          console.log("[Cackto] Payment approved:", event.order_id);
+          // TODO: Create user account and activate trial
+          break;
+          
+        case "payment.pending":
+          console.log("[Cackto] Payment pending:", event.order_id);
+          break;
+          
+        case "payment.rejected":
+          console.log("[Cackto] Payment rejected:", event.order_id);
+          break;
+          
+        case "subscription.renewed":
+          console.log("[Cackto] Subscription renewed:", event.order_id);
+          // TODO: Extend subscription period
+          break;
+          
+        case "subscription.cancelled":
+          console.log("[Cackto] Subscription cancelled:", event.order_id);
+          // TODO: Downgrade user to free plan
+          break;
+          
+        default:
+          console.log("[Cackto] Unknown event type:", eventType);
+      }
+      
+      // Always return 200 to acknowledge receipt
+      res.status(200).json({ received: true });
+    } catch (error) {
+      console.error("[Cackto Webhook] Error:", error);
+      // Still return 200 to avoid retries
+      res.status(200).json({ received: true, error: (error as Error).message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

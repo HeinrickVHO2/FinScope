@@ -54,7 +54,7 @@ export default function SettingsPage() {
     },
     {
       name: "Pro",
-      price: "R$ 29,90/mês",
+      price: "R$ 14,90/mês",
       current: currentPlan === "pro",
       features: [
         "Até 3 contas",
@@ -65,7 +65,7 @@ export default function SettingsPage() {
     },
     {
       name: "Premium",
-      price: "R$ 47,90/mês",
+      price: "R$ 29,90/mês",
       current: currentPlan === "premium",
       recommended: true,
       features: [

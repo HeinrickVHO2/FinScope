@@ -69,7 +69,7 @@ export default function LandingPage() {
     },
     {
       name: "Pro",
-      price: "R$ 29,90",
+      price: "R$ 14,90",
       period: "/mês",
       description: "Ideal para controle pessoal completo",
       features: [
@@ -87,7 +87,7 @@ export default function LandingPage() {
     },
     {
       name: "Premium",
-      price: "R$ 47,90",
+      price: "R$ 29,90",
       period: "/mês",
       description: "Solução completa para pessoa física e MEI",
       features: [
