@@ -6,6 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recha
 import { useQuery } from "@tanstack/react-query";
 import type { Transaction } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLocation } from "wouter";
 
 interface DashboardMetrics {
   totalBalance: number;
@@ -20,6 +21,8 @@ interface CategoryData {
 }
 
 export default function DashboardPage() {
+  const [, setLocation] = useLocation();
+
   // Fetch dashboard metrics
   const { data: metrics, isLoading: metricsLoading } = useQuery<DashboardMetrics>({
     queryKey: ["/api/dashboard/metrics"],
@@ -62,7 +65,7 @@ export default function DashboardPage() {
             Visão geral das suas finanças
           </p>
         </div>
-        <Button data-testid="button-add-transaction">
+        <Button onClick={() => setLocation("/transactions")} data-testid="button-add-transaction">
           <Plus className="mr-2 h-4 w-4" />
           Nova Transação
         </Button>

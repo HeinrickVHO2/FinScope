@@ -9,11 +9,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, type InsertUser } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 export default function SignupPage() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { refetchUser } = useAuth();
 
   const form = useForm<InsertUser>({
     resolver: zodResolver(insertUserSchema),
@@ -39,14 +41,15 @@ export default function SignupPage() {
         throw new Error(error.error || "Erro ao criar conta");
       }
 
+      // Update auth context with new user data
+      await refetchUser();
+      
       toast({
         title: "Conta criada com sucesso!",
         description: "Bem-vindo ao FinScope! Seu teste grátis de 10 dias começou.",
       });
       
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 500);
+      setLocation("/dashboard");
     } catch (error) {
       toast({
         title: "Erro ao criar conta",

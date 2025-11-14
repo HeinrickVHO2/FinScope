@@ -10,11 +10,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginData } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { refetchUser } = useAuth();
 
   const form = useForm<LoginData>({
     resolver: zodResolver(loginSchema),
@@ -39,14 +41,15 @@ export default function LoginPage() {
         throw new Error(error.error || "Erro ao fazer login");
       }
 
+      // Update auth context with new user data
+      await refetchUser();
+      
       toast({
         title: "Login realizado!",
         description: "Redirecionando para o dashboard...",
       });
       
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 500);
+      setLocation("/dashboard");
     } catch (error) {
       toast({
         title: "Erro ao fazer login",

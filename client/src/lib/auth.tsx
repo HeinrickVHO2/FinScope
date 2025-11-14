@@ -21,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function fetchCurrentUser() {
+    setIsLoading(true);
     try {
       const response = await fetch("/api/auth/me", {
         credentials: "include",
