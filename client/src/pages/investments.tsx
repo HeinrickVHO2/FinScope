@@ -101,7 +101,7 @@ export default function InvestmentsPage() {
 
   // Create transaction mutation
   const transactionMutation = useMutation({
-    mutationFn: async (data: InsertInvestmentTransaction) => {
+    mutationFn: async (data: any) => {
       return apiRequest("POST", "/api/investments/transactions", data);
     },
     onSuccess: () => {
