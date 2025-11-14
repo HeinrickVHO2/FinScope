@@ -1,0 +1,81 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.accounts (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL,
+  name text NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['pessoal'::text, 'empresa'::text])),
+  initial_balance numeric NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT accounts_pkey PRIMARY KEY (id),
+  CONSTRAINT accounts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.investment_goals (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  investment_id uuid NOT NULL,
+  target_amount numeric NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT investment_goals_pkey PRIMARY KEY (id),
+  CONSTRAINT investment_goals_investment_id_fkey FOREIGN KEY (investment_id) REFERENCES public.investments(id)
+);
+CREATE TABLE public.investment_transactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  investment_id uuid NOT NULL,
+  source_account_id uuid NOT NULL,
+  type character varying NOT NULL CHECK (type::text = ANY (ARRAY['deposit'::character varying, 'withdrawal'::character varying]::text[])),
+  amount numeric NOT NULL,
+  date timestamp with time zone NOT NULL,
+  note text,
+  created_at timestamp with time zone DEFAULT now(),
+  user_id uuid NOT NULL,
+  CONSTRAINT investment_transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT investment_transactions_investment_id_fkey FOREIGN KEY (investment_id) REFERENCES public.investments(id),
+  CONSTRAINT investment_transactions_source_account_id_fkey FOREIGN KEY (source_account_id) REFERENCES public.accounts(id),
+  CONSTRAINT investment_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.investments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  name character varying NOT NULL,
+  type character varying NOT NULL CHECK (type::text = ANY (ARRAY['reserva-emergencia'::character varying, 'cdb'::character varying, 'renda-fixa'::character varying, 'renda-variavel'::character varying]::text[])),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT investments_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.rules (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL,
+  rule_name text NOT NULL,
+  contains text NOT NULL,
+  category_result text NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT rules_pkey PRIMARY KEY (id),
+  CONSTRAINT rules_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.transactions (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL,
+  account_id uuid NOT NULL,
+  description text NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['entrada'::text, 'saida'::text])),
+  amount numeric NOT NULL,
+  category text NOT NULL,
+  date timestamp with time zone NOT NULL,
+  auto_rule_applied boolean DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT transactions_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id)
+);
+CREATE TABLE public.users (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  email text NOT NULL UNIQUE,
+  password text NOT NULL,
+  full_name text NOT NULL,
+  plan text NOT NULL DEFAULT 'free'::text CHECK (plan = ANY (ARRAY['free'::text, 'pro'::text, 'premium'::text])),
+  trial_start timestamp with time zone,
+  trial_end timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT users_pkey PRIMARY KEY (id)
+);
