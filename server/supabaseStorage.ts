@@ -810,6 +810,7 @@ export class SupabaseStorage implements IStorage {
 
   async createInvestmentTransaction(transaction: InsertInvestmentTransaction): Promise<InvestmentTransaction> {
     // Create the investment transaction
+    // Note: Using standard Supabase client - schema cache should be updated via NOTIFY
     const { data: invTxData, error: invTxError } = await supabase
       .from("investment_transactions")
       .insert({

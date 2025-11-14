@@ -106,7 +106,7 @@ export default function InvestmentsPage() {
   // Create transaction mutation
   const transactionMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("POST", "/api/investments/transactions", data);
+      return apiRequest("POST", `/api/investments/${data.investmentId}/transactions`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/investments"] });
