@@ -2,101 +2,7 @@
 
 ## Overview
 
-FinScope is a B2C financial management platform that combines personal finance tracking with simplified microenterprise (MEI) management. The application provides unified financial dashboards, intelligent expense categorization, goals tracking, and comprehensive transaction management for both personal and business accounts.
-
-The platform follows a freemium model with tiered subscriptions (Free, Pro, Premium), offering a 10-day trial period with full access to premium features. It's designed with a modern, minimalist aesthetic inspired by fintech leaders like Nubank, Stripe Dashboard, and Linear.
-
-## Recent Changes
-
-**November 14, 2025 - Investment Transactions FULLY WORKING**
-
-✅ **Critical Supabase PostgREST Schema Cache Issue RESOLVED**
-- Created `reload_postgrest_schema()` SQL function using SECURITY DEFINER with pg_notify
-- Function enables remote PostgREST schema cache reload without dashboard access
-- Fixed missing `user_id` column in `investment_transactions` table (UUID with FK to users)
-- Fixed missing `current_amount` column in `investments` table (NUMERIC(10,2) default 0)
-- Fixed investment type constraint: changed from hyphen format to underscore (reserva-emergencia → reserva_emergencia)
-- All schema changes followed by reload_postgrest_schema() call to ensure PostgREST sees updates
-- Investment transactions now work end-to-end: create transaction → update investment balance → sync account balance
-
-✅ **Investment Transaction Feature Complete**
-- POST /api/investments/:id/transactions creates transaction and updates balances atomically
-- Backend automatically updates investment.current_amount when transaction is created
-- Backend creates corresponding account transaction (saida) for deposit type
-- Frontend invalidates all relevant caches (["/api/investments"], ["/api/accounts"], ["/api/dashboard/*"])
-- UI updates in real-time showing new investment balances
-- E2E test confirmed: transaction creation, balance update, dashboard chart rendering all working
-
-✅ **Schema Management Best Practices Established**
-- Created reusable `reload_postgrest_schema()` function for future schema changes
-- Added proper indexes on foreign key columns (user_id) for query performance
-- All constraints properly validated before applying (check existing data first)
-- Documented pattern: DDL change → reload_postgrest_schema() → verify with SELECT
-
-**November 14, 2025 - Investment Dashboard Visualization Complete**
-
-✅ **Dashboard Investment Chart Implementation**
-- Added PieChart visualization showing investment allocation by type using Recharts
-- Implemented "Alocação de Investimentos" card with responsive chart (250px height)
-- Chart displays colored slices for each investment type with percentage labels
-- Legend shows human-readable investment type names (mapped via INVESTMENT_TYPES)
-- Tooltip shows formatted currency values (R$ with 2 decimal precision)
-- Chart renders correctly even with R$ 0,00 investments (shows allocation distribution)
-- Dashboard section visibility changed from `totalInvested > 0` to `byType.length > 0`
-- Fixed `getInvestmentsSummary` to never return null (uses `parseFloat(...) || 0` pattern)
-- Added RESTful POST route `/api/investments/:id/transactions` for investment transactions
-- E2E test confirmed: chart renders with 24 SVGs, 33 paths, proper legend and labels
-
-✅ **Investment Feature Implementation**
-- Created 3 new database tables: investments, investment_goals, investment_transactions
-- Built complete investment management page at /investments route
-- Implemented investment CRUD operations with type categorization (Reserva Emergência, CDB, Renda Fixa, Renda Variável)
-- Added investment transaction system (deposits/withdrawals) with account balance integration
-- Built investment goals tracking with progress bars and target amounts
-- Integrated investment summary cards in dashboard showing total invested by type
-- Added CSV export functionality for all transactions
-- **Critical Fix**: Resolved PostgREST schema cache issue requiring `NOTIFY pgrst, 'reload schema'` after DDL changes
-- Confirmed E2E test success: investment creation, goal setting, and persistence working correctly
-
-✅ **Supabase Integration Complete**
-- Installed @supabase/supabase-js package for PostgreSQL integration
-- Created Supabase client with service role key authentication (`server/supabase.ts`)
-- Implemented SupabaseStorage class replacing MemStorage (`server/supabaseStorage.ts`)
-- Migrated storage layer to use Supabase PostgreSQL instead of in-memory Maps
-- Created database schema with 7 tables: users, accounts, transactions, rules, investments, investment_goals, investment_transactions
-- Configured Row Level Security (RLS) policies for all tables
-- Added database indexes for optimized query performance
-- Set up automatic cascade deletion for related records
-- All CRUD operations now persist to real PostgreSQL database
-- Data survives server restarts (true persistence achieved)
-
-**November 14, 2025 - MVP Core Features Completed**
-
-✅ **Backend Implementation** (Task 2)
-- Implemented 20+ RESTful API endpoints for authentication, accounts, transactions, and dashboard
-- Added bcrypt password hashing with secure session-based authentication
-- Implemented express-session with MemoryStore for HTTP-only cookie sessions
-- Built complete storage interface with in-memory implementation (IStorage)
-- Added plan-based limit enforcement (Free: 1 account, Pro: 3 accounts, Premium: unlimited)
-- Implemented dashboard aggregation endpoints for financial metrics and category analysis
-- Applied strict Zod validation for all API inputs with 2-decimal precision for monetary values
-
-✅ **Frontend-Backend Integration** (Task 3)
-- Connected all pages to backend APIs using TanStack Query
-- Implemented AuthProvider with session-based authentication (no localStorage/JWTs)
-- Built Login/Signup pages with proper error handling and form validation
-- Completed Dashboard with real-time metrics, charts, and recent transactions
-- Built Accounts page with CRUD operations and plan limit enforcement
-- Built Transactions page with full CRUD, filtering, search, and categorization
-- Added comprehensive loading states using Skeleton components
-- Fixed critical security issues: removed client-side userId (server session only)
-- Fixed date serialization to use ISO strings for backend compatibility
-- Verified credentials: "include" on all API requests for cookie-based auth
-
-✅ **End-to-End Testing**
-- Passed comprehensive E2E tests covering signup → account creation → transaction management → dashboard metrics → logout
-- Verified plan limits, balance calculations, and data persistence across all features
-- Confirmed session persistence and proper authentication flow
+FinScope is a B2C financial management platform offering personal finance tracking and microenterprise (MEI) management. It provides unified financial dashboards, intelligent expense categorization, goals tracking, and comprehensive transaction management for both personal and business accounts. The platform operates on a freemium model with tiered subscriptions and a 10-day trial period. Its design is minimalist, inspired by leading fintech applications.
 
 ## User Preferences
 
@@ -106,157 +12,41 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Architecture
 
-**Framework & Build System**
-- React 18 with TypeScript for type-safe component development
-- Vite as the build tool and development server with HMR (Hot Module Replacement)
-- Client-side routing using Wouter (lightweight alternative to React Router)
-- Component composition using Radix UI primitives for accessible, unstyled components
-
-**State Management**
-- TanStack Query (React Query) for server state management, caching, and data synchronization
-- React Context API for authentication state and user session management
-- Local component state with React hooks for UI interactions
-
-**UI Component System**
-- Shadcn/ui component library with "new-york" style preset
-- Tailwind CSS for utility-first styling with custom design tokens
-- Class Variance Authority (CVA) for type-safe component variants
-- Design system enforces trust-focused financial UI with generous whitespace and clear hierarchy
-
-**Typography & Design Tokens**
-- Headers: Poppins Bold (600-700 weight) for titles and emphasis
-- Body: Inter Regular (400 weight) for content, Medium (500) for financial data
-- Custom color palette with HSL-based theming supporting light/dark modes
-- Consistent spacing primitives (2, 4, 6, 8, 12, 16, 20, 24) for visual rhythm
-
-**Form Management**
-- React Hook Form with Zod validation for type-safe form handling
-- Schema validation shared between frontend and backend
-- Integrated error handling and display through form components
+**Framework & Build System:** React 18 with TypeScript, Vite for build and HMR, Wouter for client-side routing.
+**State Management:** TanStack Query for server state, React Context for authentication, React hooks for local component state.
+**UI Component System:** Shadcn/ui with "new-york" style preset, Tailwind CSS for utility styling, CVA for type-safe variants. Design emphasizes trust with generous whitespace.
+**Typography & Design Tokens:** Poppins Bold for headers, Inter Regular for body text. Custom HSL-based color palette for light/dark modes, consistent spacing primitives.
+**Form Management:** React Hook Form with Zod validation for type-safe forms, shared schemas between frontend and backend, integrated error handling.
 
 ### Backend Architecture
 
-**Server Framework**
-- Express.js running on Node.js with TypeScript
-- ESM (ECMAScript Modules) for modern import/export syntax
-- Session-based authentication using express-session with memory store
-- Custom middleware for request logging and error handling
-
-**API Design Pattern**
-- RESTful API endpoints under `/api` prefix
-- Resource-based routing (users, accounts, transactions, rules)
-- Authentication middleware protecting private routes
-- JSON request/response format with consistent error handling
-
-**Authentication & Authorization**
-- Session-based authentication with HTTP-only cookies
-- Password hashing using bcrypt for secure credential storage
-- Role-based access through plan tiers (free, pro, premium)
-- Trial period tracking with start/end timestamps
-
-**Data Layer Architecture**
-- Supabase PostgreSQL database for persistent storage (production-ready)
-- Interface-based storage abstraction (`IStorage`) with SupabaseStorage implementation
-- Type-safe data models with Drizzle ORM schema definitions
-- Numeric decimal handling converted to strings for precision in financial calculations
-- Supabase client using service role key for backend operations
-- Row Level Security (RLS) enabled for all tables with user-scoped policies
-
-**Business Logic**
-- Plan limits enforcement (account limits, feature gating by tier)
-- Automatic categorization rules for Premium users
-- Dashboard metrics aggregation (total balance, monthly income/expenses, net cash flow)
-- Category-based spending analysis and visualization data
+**Server Framework:** Express.js on Node.js with TypeScript, ESM for modern syntax, express-session for session-based authentication, custom middleware.
+**API Design Pattern:** RESTful API under `/api`, resource-based routing, authentication middleware for private routes, JSON request/response with consistent error handling.
+**Authentication & Authorization:** Session-based authentication with HTTP-only cookies, bcrypt for password hashing, role-based access via plan tiers, trial period tracking.
+**Data Layer Architecture:** Supabase PostgreSQL, `IStorage` interface with `SupabaseStorage` implementation, Drizzle ORM for type-safe models, numeric decimals as strings for precision, Supabase client with service role key, Row Level Security (RLS).
+**Business Logic:** Plan limit enforcement, automatic categorization rules, dashboard metrics aggregation, category-based spending analysis.
 
 ### Data Storage Solutions
 
-**Database Configuration (Supabase PostgreSQL)**
-- Supabase PostgreSQL database with managed infrastructure
-- Drizzle ORM schema definitions (TypeScript with type inference)
-- Environment variables: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
-- Service role key used for backend database operations (bypasses RLS)
-
-**Schema Design**
-- **Users Table**: Authentication credentials, plan tier, trial period tracking
-- **Accounts Table**: Financial accounts (personal or business type), initial balance
-- **Transactions Table**: Financial entries with amount, category, type (entrada/saida), date
-- **Rules Table**: User-defined categorization rules (Premium feature) with pattern matching
-
-**Data Models**
-- Decimal precision (10,2) for all monetary values
-- UUID-based primary keys using PostgreSQL `uuid_generate_v4()`
-- Timestamps (TIMESTAMPTZ) for audit trails with automatic timezone handling
-- Foreign key relationships with CASCADE deletion for data consistency
-
-**Current Implementation**
-- SupabaseStorage class implementing IStorage interface
-- All CRUD operations using Supabase client with proper error handling
-- Row Level Security (RLS) policies protecting user data isolation
-- Database indexes on user_id, account_id, date for query optimization
-- True data persistence - survives server restarts
-- Full data validation through Zod schemas before database operations
-
-**Security Features**
-- Row Level Security (RLS) enabled on all tables
-- User-scoped policies: users can only access their own data
-- Service role key used only on backend (never exposed to frontend)
-- Automatic user authentication check via auth.uid() in RLS policies
-- Secure password hashing with bcrypt before database storage
-
-### External Dependencies
-
-**UI Component Library**
-- Radix UI primitives (@radix-ui/*) - 25+ accessible component primitives
-- Recharts for data visualization (pie charts, bar charts, line graphs)
-- Lucide React for consistent icon system
-- CMDK for command palette functionality
-
-**Development Tools**
-- Replit-specific plugins for development experience (cartographer, dev-banner, runtime-error-modal)
-- TypeScript compiler for type checking
-- PostCSS with Autoprefixer for CSS processing
-
-**Form & Validation**
-- React Hook Form for performant form state management
-- Zod for runtime type validation and schema definition
-- @hookform/resolvers for seamless integration
-
-**Styling & Theming**
-- Tailwind CSS 3.x with custom configuration
-- tailwind-merge and clsx for conditional class composition
-- CSS variables for theme customization (light/dark mode support)
-
-**Database & Storage**
-- @supabase/supabase-js for PostgreSQL database operations
-- Supabase PostgreSQL for persistent data storage with RLS
-- Type-safe database queries with proper error handling
-
-**Session Management**
-- express-session for server-side session handling
-- memorystore (in-memory session store) for development
-- connect-pg-simple prepared for production PostgreSQL session storage
-
-**Password Security**
-- bcrypt for secure password hashing with salt rounds
-
-**Payment Integration (Planned)**
-- Cakto payment gateway for Brazilian market (PIX, automatic billing)
-- Webhook handling for subscription lifecycle events
-
-**Monitoring & Analytics (Planned)**
-- Vercel Analytics for production monitoring
+**Database Configuration:** Supabase PostgreSQL, Drizzle ORM schema definitions (TypeScript), environment variables for Supabase credentials.
+**Schema Design:** Tables include Users, Accounts, Transactions, Rules, Investments, Investment_Goals, Investment_Transactions.
+**Data Models:** Decimal precision (10,2) for monetary values, UUID-based primary keys, Timestamps (TIMESTAMPTZ), foreign key relationships with CASCADE deletion.
+**Current Implementation:** `SupabaseStorage` class, Supabase client for CRUD operations, RLS for user data isolation, database indexes for query optimization, Zod validation before database operations, true data persistence.
+**Security Features:** RLS on all tables with user-scoped policies, service role key used only on backend, secure password hashing with bcrypt.
 
 ### Development Environment
 
-**Build & Deployment**
-- Development: tsx for running TypeScript directly with watch mode
-- Production build: Vite for client, esbuild for server bundling
-- Environment variable configuration for database and session secrets
-- Separate client and server build outputs
+**Build & Deployment:** `tsx` for development, Vite for client build, esbuild for server bundling, environment variable configuration, separate client/server builds.
+**File Structure:** `/client` (React frontend), `/server` (Express backend), `/shared` (shared schemas/types), `/migrations` (Drizzle migration files), path aliases (`@/`, `@shared/`, `@assets/`).
 
-**File Structure**
-- `/client` - React frontend with pages, components, hooks
-- `/server` - Express backend with routes and storage layer
-- `/shared` - Shared schema definitions and types
-- `/migrations` - Database migration files (Drizzle)
-- Path aliases configured for clean imports (@/, @shared/, @assets/)
+## External Dependencies
+
+**UI Component Library:** Radix UI primitives, Recharts for data visualization, Lucide React for icons, CMDK for command palette.
+**Development Tools:** Replit-specific plugins, TypeScript compiler, PostCSS with Autoprefixer.
+**Form & Validation:** React Hook Form, Zod, @hookform/resolvers.
+**Styling & Theming:** Tailwind CSS 3.x, tailwind-merge, clsx, CSS variables for theme customization.
+**Database & Storage:** @supabase/supabase-js for PostgreSQL, Supabase PostgreSQL.
+**Session Management:** express-session, memorystore (development).
+**Password Security:** bcrypt.
+**Payment Integration (Planned):** Cakto payment gateway (PIX, automatic billing), webhook handling.
+**Monitoring & Analytics (Planned):** Vercel Analytics.

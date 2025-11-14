@@ -809,80 +809,35 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createInvestmentTransaction(transaction: InsertInvestmentTransaction): Promise<InvestmentTransaction> {
-    // Create the investment transaction
-    // Schema cache has been reloaded via reload_postgrest_schema() function
-    const { data: invTxData, error: invTxError } = await supabase
-      .from("investment_transactions")
-      .insert({
-        user_id: transaction.userId,
-        investment_id: transaction.investmentId,
-        source_account_id: transaction.sourceAccountId,
-        amount: transaction.amount.toString(),
-        type: transaction.type,
-        date: transaction.date.toISOString(),
-        note: transaction.note || null,
-      })
-      .select()
-      .single();
+    // Use atomic stored procedure to ensure all operations succeed or fail together
+    // This prevents partial writes (transaction without balance update, etc.)
+    const { data, error } = await supabase.rpc('create_investment_transaction', {
+      p_user_id: transaction.userId,
+      p_investment_id: transaction.investmentId,
+      p_source_account_id: transaction.sourceAccountId,
+      p_amount: transaction.amount,
+      p_type: transaction.type,
+      p_date: transaction.date.toISOString(),
+      p_note: transaction.note || null,
+    });
 
-    if (invTxError || !invTxData) {
-      throw new Error(invTxError?.message || "Erro ao criar transação de investimento");
+    if (error) {
+      throw new Error(error.message || "Erro ao criar transação de investimento");
     }
 
-    // Update investment current amount
-    const investment = await this.getInvestment(transaction.investmentId);
-    console.log("💰 [Investment Transaction] Retrieved investment:", JSON.stringify(investment));
-    
-    if (investment) {
-      const currentAmount = parseFloat(investment.currentAmount);
-      const txAmount = transaction.amount;
-      const newAmount = transaction.type === "deposit" 
-        ? currentAmount + txAmount 
-        : currentAmount - txAmount;
-
-      console.log(`💰 [Investment Transaction] Updating amount: ${currentAmount} ${transaction.type === 'deposit' ? '+' : '-'} ${txAmount} = ${newAmount}`);
-
-      const { data: updateData, error: updateError } = await supabase
-        .from("investments")
-        .update({ current_amount: newAmount.toString() })
-        .eq("id", transaction.investmentId)
-        .select();
-
-      if (updateError) {
-        console.error("❌ [Investment Transaction] Error updating investment amount:", updateError);
-      } else {
-        console.log("✅ [Investment Transaction] Updated investment amount:", updateData);
-      }
-    } else {
-      console.error("❌ [Investment Transaction] Investment not found!");
-    }
-
-    // Create corresponding transaction in transactions table (money leaving account)
-    if (transaction.type === "deposit") {
-      const txDescription = transaction.note || `Investimento em ${investment?.name || 'investimento'}`;
-      await supabase
-        .from("transactions")
-        .insert({
-          user_id: transaction.userId,
-          account_id: transaction.sourceAccountId,
-          description: txDescription,
-          type: "saida",
-          amount: transaction.amount.toString(),
-          category: "Investimentos",
-          date: transaction.date.toISOString(),
-        });
-    }
+    // Parse JSON response from stored procedure
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
 
     return {
-      id: invTxData.id,
-      userId: invTxData.user_id,
-      investmentId: invTxData.investment_id,
-      sourceAccountId: invTxData.source_account_id,
-      amount: invTxData.amount,
-      type: invTxData.type,
-      date: new Date(invTxData.date),
-      note: invTxData.note,
-      createdAt: new Date(invTxData.created_at),
+      id: result.id,
+      userId: result.userId,
+      investmentId: result.investmentId,
+      sourceAccountId: result.sourceAccountId,
+      amount: result.amount,
+      type: result.type,
+      date: new Date(result.date),
+      note: result.note,
+      createdAt: new Date(result.createdAt),
     };
   }
 
