@@ -6,6 +6,36 @@ FinScope is a B2C financial management platform that combines personal finance t
 
 The platform follows a freemium model with tiered subscriptions (Free, Pro, Premium), offering a 10-day trial period with full access to premium features. It's designed with a modern, minimalist aesthetic inspired by fintech leaders like Nubank, Stripe Dashboard, and Linear.
 
+## Recent Changes
+
+**November 14, 2025 - MVP Core Features Completed**
+
+✅ **Backend Implementation** (Task 2)
+- Implemented 20+ RESTful API endpoints for authentication, accounts, transactions, and dashboard
+- Added bcrypt password hashing with secure session-based authentication
+- Implemented express-session with MemoryStore for HTTP-only cookie sessions
+- Built complete storage interface with in-memory implementation (IStorage)
+- Added plan-based limit enforcement (Free: 1 account, Pro: 3 accounts, Premium: unlimited)
+- Implemented dashboard aggregation endpoints for financial metrics and category analysis
+- Applied strict Zod validation for all API inputs with 2-decimal precision for monetary values
+
+✅ **Frontend-Backend Integration** (Task 3)
+- Connected all pages to backend APIs using TanStack Query
+- Implemented AuthProvider with session-based authentication (no localStorage/JWTs)
+- Built Login/Signup pages with proper error handling and form validation
+- Completed Dashboard with real-time metrics, charts, and recent transactions
+- Built Accounts page with CRUD operations and plan limit enforcement
+- Built Transactions page with full CRUD, filtering, search, and categorization
+- Added comprehensive loading states using Skeleton components
+- Fixed critical security issues: removed client-side userId (server session only)
+- Fixed date serialization to use ISO strings for backend compatibility
+- Verified credentials: "include" on all API requests for cookie-based auth
+
+✅ **End-to-End Testing**
+- Passed comprehensive E2E tests covering signup → account creation → transaction management → dashboard metrics → logout
+- Verified plan limits, balance calculations, and data persistence across all features
+- Confirmed session persistence and proper authentication flow
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
