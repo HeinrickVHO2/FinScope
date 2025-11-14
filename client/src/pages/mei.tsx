@@ -1,34 +1,93 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, DollarSign, TrendingDown, FileText, Lock } from "lucide-react";
+import { TrendingUp, DollarSign, TrendingDown, FileText, Lock, ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Account, Transaction } from "@shared/schema";
 
 export default function MEIPage() {
-  // Mock data - will be replaced with real data in Task 3
-  const currentPlan = "free"; // This would come from user context
+  const { user, isLoading: authLoading } = useAuth();
+  
+  // Fetch accounts and transactions
+  const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
+    queryKey: ["/api/accounts"],
+  });
+
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
+    queryKey: ["/api/transactions"],
+  });
+
+  if (authLoading || accountsLoading || transactionsLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-20 w-full" />
+        <div className="grid gap-4 md:grid-cols-3">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return null;
+  }
+
+  const currentPlan = user.plan;
   const isPremium = currentPlan === "premium";
 
+  // Filter business accounts and transactions
+  const businessAccounts = accounts.filter(acc => acc.type === "empresa");
+  const businessAccountIds = new Set(businessAccounts.map(acc => acc.id));
+  const businessTransactions = transactions.filter(t => businessAccountIds.has(t.accountId));
+
+  // Calculate business metrics
+  const revenue = businessTransactions
+    .filter(t => t.type === "entrada")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+  
+  const expenses = businessTransactions
+    .filter(t => t.type === "saida")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
   const businessMetrics = {
-    revenue: 12450.00,
-    expenses: 3820.00,
-    netProfit: 8630.00,
+    revenue,
+    expenses,
+    netProfit: revenue - expenses,
   };
 
-  const monthlyData = [
-    { month: "Jul", receitas: 8500, despesas: 3200 },
-    { month: "Ago", receitas: 9200, despesas: 3500 },
-    { month: "Set", receitas: 10100, despesas: 3800 },
-    { month: "Out", receitas: 11200, despesas: 4100 },
-    { month: "Nov", receitas: 10800, despesas: 3900 },
-    { month: "Dez", receitas: 12450, despesas: 3820 },
-  ];
+  // Group transactions by month for chart (sorted chronologically)
+  const monthlyDataMap = new Map<string, { month: string; receitas: number; despesas: number; timestamp: number }>();
+  
+  businessTransactions.forEach(t => {
+    const date = new Date(t.date);
+    const month = date.toLocaleDateString('pt-BR', { month: 'short' });
+    const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const current = monthlyDataMap.get(yearMonth) || { month, receitas: 0, despesas: 0, timestamp: date.getTime() };
+    
+    if (t.type === "entrada") {
+      current.receitas += Number(t.amount);
+    } else {
+      current.despesas += Number(t.amount);
+    }
+    
+    monthlyDataMap.set(yearMonth, current);
+  });
 
-  const recentBusinessTransactions = [
-    { id: "1", description: "Venda Produto A", category: "Vendas", amount: 850.00, date: "2025-01-10" },
-    { id: "2", description: "Material de Escritório", category: "Despesas", amount: -120.00, date: "2025-01-09" },
-    { id: "3", description: "Serviço Prestado", category: "Vendas", amount: 1200.00, date: "2025-01-08" },
-  ];
+  const monthlyData = Array.from(monthlyDataMap.values())
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .slice(-6) // Last 6 months
+    .map(({ month, receitas, despesas }) => ({ month, receitas, despesas }));
+
+  // Get recent business transactions
+  const recentBusinessTransactions = businessTransactions
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
 
   if (!isPremium) {
     return (
@@ -189,39 +248,46 @@ export default function MEIPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {recentBusinessTransactions.map((transaction, index) => (
-              <div 
-                key={transaction.id} 
-                className="flex items-center justify-between p-3 rounded-lg hover-elevate"
-                data-testid={`business-transaction-${index}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                    transaction.amount > 0 ? "bg-secondary/10" : "bg-destructive/10"
-                  }`}>
-                    <FileText className={`h-5 w-5 ${transaction.amount > 0 ? "text-secondary" : "text-destructive"}`} />
-                  </div>
-                  <div>
-                    <p className="font-medium" data-testid={`text-business-description-${index}`}>
-                      {transaction.description}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs" data-testid={`badge-business-category-${index}`}>
-                        {transaction.category}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(transaction.date).toLocaleDateString('pt-BR')}
-                      </span>
+            {recentBusinessTransactions.map((transaction, index) => {
+              const isIncome = transaction.type === "entrada";
+              return (
+                <div 
+                  key={transaction.id} 
+                  className="flex items-center justify-between p-3 rounded-lg hover-elevate"
+                  data-testid={`business-transaction-${index}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                      isIncome ? "bg-secondary/10" : "bg-destructive/10"
+                    }`}>
+                      {isIncome ? (
+                        <ArrowUpRight className="h-5 w-5 text-secondary" />
+                      ) : (
+                        <ArrowDownRight className="h-5 w-5 text-destructive" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium" data-testid={`text-business-description-${index}`}>
+                        {transaction.description}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs" data-testid={`badge-business-category-${index}`}>
+                          {transaction.category}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
                     </div>
                   </div>
+                  <div className={`text-right font-semibold ${
+                    isIncome ? "text-secondary" : "text-foreground"
+                  }`} data-testid={`text-business-amount-${index}`}>
+                    {isIncome ? "+" : "-"}R$ {Number(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </div>
                 </div>
-                <div className={`text-right font-semibold ${
-                  transaction.amount > 0 ? "text-secondary" : "text-foreground"
-                }`} data-testid={`text-business-amount-${index}`}>
-                  {transaction.amount > 0 ? "+" : ""}R$ {Math.abs(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>

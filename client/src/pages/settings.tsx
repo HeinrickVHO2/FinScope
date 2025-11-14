@@ -5,17 +5,40 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Check, Crown } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const [fullName, setFullName] = useState("João Silva");
-  const [email, setEmail] = useState("joao@email.com");
+  const { user, isLoading } = useAuth();
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   
-  // Mock data - will be replaced with real data in Task 3
-  const currentPlan = "free";
-  const trialDaysLeft = 8;
+  useEffect(() => {
+    if (user) {
+      setFullName(user.fullName);
+      setEmail(user.email);
+    }
+  }, [user]);
+
+  // DashboardLayout already handles auth redirect, but we need loading state
+  // while user data is being fetched within the authenticated session
+  if (isLoading || !user) {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-60 w-full" />
+      </div>
+    );
+  }
+  
+  const currentPlan = user.plan;
+  const trialDaysLeft = user.trialEnd 
+    ? Math.ceil((new Date(user.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : 0;
   const isOnTrial = trialDaysLeft > 0;
 
   const plans = [
@@ -56,9 +79,12 @@ export default function SettingsPage() {
   ];
 
   const handleSaveProfile = () => {
+    // TODO: Implement real profile update API call
+    // For now, just show feedback that feature is not yet implemented
     toast({
-      title: "Perfil atualizado!",
-      description: "Suas informações foram salvas com sucesso.",
+      title: "Recurso em desenvolvimento",
+      description: "A atualização de perfil será implementada em breve.",
+      variant: "default",
     });
   };
 
