@@ -20,7 +20,7 @@ export const accounts = pgTable("accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
-  type: text("type").notNull(), // 'pessoal' | 'empresa'
+  type: text("type").notNull(), // 'pf' | 'pj' | 'mei'
   initialBalance: decimal("initial_balance", { precision: 10, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -95,7 +95,7 @@ export const insertUserSchema = createInsertSchema(users, {
 
 export const insertAccountSchema = createInsertSchema(accounts, {
   name: z.string().min(1, "Nome da conta é obrigatório"),
-  type: z.enum(["pessoal", "empresa"], { errorMap: () => ({ message: "Tipo inválido" }) }),
+  type: z.enum(["pf", "pj", "mei"], { errorMap: () => ({ message: "Tipo inválido" }) }),
   initialBalance: z.coerce.number().min(0, "Saldo deve ser positivo").refine(
     (val) => Number.isFinite(val) && Math.round(val * 100) === val * 100,
     "Saldo deve ter no máximo 2 casas decimais"

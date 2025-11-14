@@ -51,11 +51,11 @@ export default function AccountsPage() {
 
   const canAddAccount = accounts.length < planLimit;
 
-  const form = useForm({
-    resolver: zodResolver(insertAccountSchema.omit({ userId: true })),
+  const form = useForm<Omit<InsertAccount, 'userId'>>({
+    resolver: zodResolver(insertAccountSchema),
     defaultValues: {
       name: "",
-      type: "pessoal" as const,
+      type: "pf" as const,
       initialBalance: 0,
     },
   });
@@ -108,7 +108,7 @@ export default function AccountsPage() {
     },
   });
 
-  async function onSubmit(data: InsertAccount) {
+  async function onSubmit(data: Omit<InsertAccount, 'userId'>) {
     createMutation.mutate(data);
   }
 
@@ -185,8 +185,11 @@ export default function AccountsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="pessoal">Pessoal</SelectItem>
-                          <SelectItem value="empresa">Empresa (MEI)</SelectItem>
+                          <SelectItem value="pf">Pessoa Física (PF)</SelectItem>
+                          <SelectItem value="pj">Pessoa Jurídica (PJ)</SelectItem>
+                          {currentPlan === "premium" && (
+                            <SelectItem value="mei">MEI (Premium)</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -270,7 +273,7 @@ export default function AccountsPage() {
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
                 <div className="flex items-start gap-3">
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    {account.type === "empresa" ? (
+                    {account.type === "mei" || account.type === "pj" ? (
                       <Building2 className="h-5 w-5 text-primary" />
                     ) : (
                       <Wallet className="h-5 w-5 text-primary" />
@@ -281,7 +284,7 @@ export default function AccountsPage() {
                       {account.name}
                     </CardTitle>
                     <Badge variant="secondary" className="mt-1">
-                      {account.type === "empresa" ? "MEI" : "Pessoal"}
+                      {account.type === "mei" ? "MEI" : account.type === "pj" ? "PJ" : "PF"}
                     </Badge>
                   </div>
                 </div>
