@@ -27,8 +27,6 @@ declare module 'express-session' {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Trust proxy - required for cookies to work behind Replit's proxy
   app.set('trust proxy', 1);
-  
-  app.use(express.json());
 
   // Configure session with proper settings
   const SessionStore = MemoryStore(session);
@@ -67,11 +65,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create session and save it
       req.session.userId = user.id;
+      
+      console.log('[DEBUG] Session before save:', req.session.id, 'userId:', req.session.userId);
+      
       req.session.save((err) => {
         if (err) {
+          console.error('[ERROR] Failed to save session:', err);
           return res.status(500).json({ error: "Erro ao criar sessão" });
         }
 
+        console.log('[DEBUG] Session saved successfully, ID:', req.session.id);
+        
         // Don't send password back
         const { password, ...userWithoutPassword } = user;
         
