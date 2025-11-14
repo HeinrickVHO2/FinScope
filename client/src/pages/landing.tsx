@@ -1,7 +1,15 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { 
   TrendingUp, 
   PieChart, 
@@ -11,10 +19,13 @@ import {
   Wallet, 
   FileText,
   Check,
-  ArrowRight
+  ArrowRight,
+  Menu
 } from "lucide-react";
 
 export default function LandingPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const benefits = [
     {
       icon: PieChart,
@@ -116,6 +127,8 @@ export default function LandingPage() {
             <TrendingUp className="h-6 w-6 text-primary" />
             <span className="text-xl font-poppins font-bold">FinScope</span>
           </div>
+          
+          {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
             <a href="#beneficios" className="text-sm font-medium hover:text-primary transition-colors" data-testid="link-benefits">
               Benefícios
@@ -130,6 +143,62 @@ export default function LandingPage() {
               <Button data-testid="button-signup-header">Criar Conta</Button>
             </Link>
           </nav>
+
+          {/* Mobile Navigation */}
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild className="md:hidden">
+              <Button variant="ghost" size="icon" data-testid="button-mobile-menu">
+                <Menu className="h-6 w-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[300px]">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  <span className="font-poppins">FinScope</span>
+                </SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-4 mt-8">
+                <a 
+                  href="#beneficios" 
+                  className="text-base font-medium hover:text-primary transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                  data-testid="link-benefits-mobile"
+                >
+                  Benefícios
+                </a>
+                <a 
+                  href="#planos" 
+                  className="text-base font-medium hover:text-primary transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                  data-testid="link-pricing-mobile"
+                >
+                  Planos
+                </a>
+                <div className="border-t pt-4 mt-2 space-y-3">
+                  <Link href="/login">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start" 
+                      onClick={() => setMobileMenuOpen(false)}
+                      data-testid="button-login-mobile"
+                    >
+                      Entrar
+                    </Button>
+                  </Link>
+                  <Link href="/signup">
+                    <Button 
+                      className="w-full justify-start"
+                      onClick={() => setMobileMenuOpen(false)}
+                      data-testid="button-signup-mobile"
+                    >
+                      Criar Conta
+                    </Button>
+                  </Link>
+                </div>
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
       </header>
 
