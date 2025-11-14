@@ -883,7 +883,7 @@ export class SupabaseStorage implements IStorage {
     const byType: { type: string; amount: number; goal?: number }[] = [];
 
     for (const investment of investments) {
-      const amount = parseFloat(investment.currentAmount);
+      const amount = parseFloat(investment.currentAmount || "0") || 0;
       totalInvested += amount;
 
       const goal = await this.getInvestmentGoal(investment.id);
@@ -891,7 +891,7 @@ export class SupabaseStorage implements IStorage {
       byType.push({
         type: investment.type,
         amount,
-        goal: goal ? parseFloat(goal.targetAmount) : undefined,
+        goal: goal ? (parseFloat(goal.targetAmount) || 0) : undefined,
       });
     }
 

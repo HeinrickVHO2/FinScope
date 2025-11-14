@@ -164,7 +164,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Investments Section */}
-      {investments && investments.totalInvested > 0 && (
+      {investments && investments.byType.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-poppins font-bold" data-testid="text-investments-section-title">Investimentos</h2>

@@ -589,7 +589,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create investment transaction (transfer money to/from investment)
+  // Create investment transaction (RESTful route)
+  app.post("/api/investments/:id/transactions", requireAuth, async (req: any, res) => {
+    try {
+      const investment = await storage.getInvestment(req.params.id);
+      if (!investment || investment.userId !== req.session.userId) {
+        return res.status(404).json({ error: "Investimento não encontrado" });
+      }
+
+      const data = insertInvestmentTransactionSchema.parse({ 
+        ...req.body, 
+        investmentId: req.params.id,
+        userId: req.session.userId 
+      });
+      const transaction = await storage.createInvestmentTransaction(data);
+      res.json(transaction);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  // Create investment transaction (legacy route - kept for backwards compatibility)
   app.post("/api/investment-transactions", requireAuth, async (req: any, res) => {
     try {
       const data = insertInvestmentTransactionSchema.parse({ ...req.body, userId: req.session.userId });

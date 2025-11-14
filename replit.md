@@ -8,7 +8,19 @@ The platform follows a freemium model with tiered subscriptions (Free, Pro, Prem
 
 ## Recent Changes
 
-**November 14, 2025 - Investment Tracking System Complete**
+**November 14, 2025 - Investment Dashboard Visualization Complete**
+
+✅ **Dashboard Investment Chart Implementation**
+- Added PieChart visualization showing investment allocation by type using Recharts
+- Implemented "Alocação de Investimentos" card with responsive chart (250px height)
+- Chart displays colored slices for each investment type with percentage labels
+- Legend shows human-readable investment type names (mapped via INVESTMENT_TYPES)
+- Tooltip shows formatted currency values (R$ with 2 decimal precision)
+- Chart renders correctly even with R$ 0,00 investments (shows allocation distribution)
+- Dashboard section visibility changed from `totalInvested > 0` to `byType.length > 0`
+- Fixed `getInvestmentsSummary` to never return null (uses `parseFloat(...) || 0` pattern)
+- Added RESTful POST route `/api/investments/:id/transactions` for investment transactions
+- E2E test confirmed: chart renders with 24 SVGs, 33 paths, proper legend and labels
 
 ✅ **Investment Feature Implementation**
 - Created 3 new database tables: investments, investment_goals, investment_transactions
