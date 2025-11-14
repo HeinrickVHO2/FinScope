@@ -135,8 +135,8 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="container py-20 md:py-32">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <div className="space-y-6">
+        <div className="grid lg:grid-cols-2 gap-12 items-center max-w-7xl mx-auto">
+          <div className="space-y-6 text-center lg:text-left">
             <Badge variant="secondary" className="w-fit" data-testid="badge-hero">
               Teste grátis por 10 dias
             </Badge>
