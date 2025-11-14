@@ -8,14 +8,25 @@ The platform follows a freemium model with tiered subscriptions (Free, Pro, Prem
 
 ## Recent Changes
 
-**November 14, 2025 - Supabase Integration Complete**
+**November 14, 2025 - Investment Tracking System Complete**
 
-✅ **Supabase Migration** (Task 4 - In Progress)
+✅ **Investment Feature Implementation**
+- Created 3 new database tables: investments, investment_goals, investment_transactions
+- Built complete investment management page at /investments route
+- Implemented investment CRUD operations with type categorization (Reserva Emergência, CDB, Renda Fixa, Renda Variável)
+- Added investment transaction system (deposits/withdrawals) with account balance integration
+- Built investment goals tracking with progress bars and target amounts
+- Integrated investment summary cards in dashboard showing total invested by type
+- Added CSV export functionality for all transactions
+- **Critical Fix**: Resolved PostgREST schema cache issue requiring `NOTIFY pgrst, 'reload schema'` after DDL changes
+- Confirmed E2E test success: investment creation, goal setting, and persistence working correctly
+
+✅ **Supabase Integration Complete**
 - Installed @supabase/supabase-js package for PostgreSQL integration
 - Created Supabase client with service role key authentication (`server/supabase.ts`)
 - Implemented SupabaseStorage class replacing MemStorage (`server/supabaseStorage.ts`)
 - Migrated storage layer to use Supabase PostgreSQL instead of in-memory Maps
-- Created database schema with 4 tables: users, accounts, transactions, rules
+- Created database schema with 7 tables: users, accounts, transactions, rules, investments, investment_goals, investment_transactions
 - Configured Row Level Security (RLS) policies for all tables
 - Added database indexes for optimized query performance
 - Set up automatic cascade deletion for related records

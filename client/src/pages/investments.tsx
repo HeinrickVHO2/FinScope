@@ -176,7 +176,6 @@ export default function InvestmentsPage() {
 
   async function onCreateSubmit(data: InsertInvestment) {
     console.log("🔍 [Investment Create] Form data:", data);
-    console.log("🔍 [Investment Create] Form errors:", createForm.formState.errors);
     createMutation.mutate(data);
   }
 
@@ -217,7 +216,12 @@ export default function InvestmentsPage() {
             Gerencie seus investimentos e acompanhe suas metas
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            createForm.reset();
+          }
+        }}>
           <DialogTrigger asChild>
             <Button data-testid="button-create-investment">
               <Plus className="mr-2 h-4 w-4" />
@@ -257,11 +261,8 @@ export default function InvestmentsPage() {
                     <FormItem>
                       <FormLabel>Tipo de Investimento</FormLabel>
                       <Select 
-                        onValueChange={(value) => {
-                          console.log("🎯 [Select] Value changed to:", value);
-                          field.onChange(value);
-                        }} 
-                        value={field.value}
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-investment-type">
