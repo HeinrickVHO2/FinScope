@@ -1,5 +1,16 @@
 # FinScope - Financial Management Platform
 
+## Recent Changes (November 14, 2025)
+
+**Investment Transactions - COMPLETE & SECURE**
+- ✅ Implemented atomic investment transactions using PostgreSQL stored procedure
+- ✅ Fixed critical PostgREST schema cache issues (created `reload_postgrest_schema()` function)
+- ✅ Added missing database columns: `user_id` in investment_transactions, `current_amount` in investments
+- ✅ Fixed security vulnerability: validates account ownership to prevent unauthorized debits
+- ✅ All operations wrapped in single atomic transaction (no partial writes possible)
+- ✅ E2E tests passing: transaction creation, balance updates, dashboard visualization
+- ✅ Investment feature fully integrated: create/update investments, track goals, view dashboard charts
+
 ## Overview
 
 FinScope is a B2C financial management platform offering personal finance tracking and microenterprise (MEI) management. It provides unified financial dashboards, intelligent expense categorization, goals tracking, and comprehensive transaction management for both personal and business accounts. The platform operates on a freemium model with tiered subscriptions and a 10-day trial period. Its design is minimalist, inspired by leading fintech applications.
