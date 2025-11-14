@@ -154,9 +154,10 @@ export default function InvestmentsPage() {
     mutationFn: async (data: { investmentId: string; targetAmount: string }) => {
       return apiRequest("POST", "/api/investments/goals", data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/investments/goals"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/investments"] });
+    onSuccess: async () => {
+      // Force refetch instead of just invalidating (due to staleTime: Infinity)
+      await queryClient.refetchQueries({ queryKey: ["/api/investments/goals"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/dashboard/investments"] });
       goalForm.reset();
       setIsGoalDialogOpen(false);
       setSelectedInvestment(null);
@@ -213,6 +214,9 @@ export default function InvestmentsPage() {
     transactionMutation.mutate(apiData);
   }
 
+  // Map goals by investment ID - MUST be before functions that use it
+  const goalsMap = new Map(goals?.map(g => [g.investmentId, g]) || []);
+
   function handleDelete(id: string) {
     if (confirm("Tem certeza que deseja deletar este investimento?")) {
       deleteMutation.mutate(id);
@@ -243,9 +247,6 @@ export default function InvestmentsPage() {
       targetAmount: data.targetAmount,
     });
   }
-
-  // Map goals by investment ID
-  const goalsMap = new Map(goals?.map(g => [g.investmentId, g]) || []);
 
   return (
     <div className="p-6 space-y-6">
