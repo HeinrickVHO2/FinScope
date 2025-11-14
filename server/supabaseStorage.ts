@@ -831,6 +831,8 @@ export class SupabaseStorage implements IStorage {
 
     // Update investment current amount
     const investment = await this.getInvestment(transaction.investmentId);
+    console.log("💰 [Investment Transaction] Retrieved investment:", JSON.stringify(investment));
+    
     if (investment) {
       const currentAmount = parseFloat(investment.currentAmount);
       const txAmount = transaction.amount;
@@ -838,10 +840,21 @@ export class SupabaseStorage implements IStorage {
         ? currentAmount + txAmount 
         : currentAmount - txAmount;
 
-      await supabase
+      console.log(`💰 [Investment Transaction] Updating amount: ${currentAmount} ${transaction.type === 'deposit' ? '+' : '-'} ${txAmount} = ${newAmount}`);
+
+      const { data: updateData, error: updateError } = await supabase
         .from("investments")
         .update({ current_amount: newAmount.toString() })
-        .eq("id", transaction.investmentId);
+        .eq("id", transaction.investmentId)
+        .select();
+
+      if (updateError) {
+        console.error("❌ [Investment Transaction] Error updating investment amount:", updateError);
+      } else {
+        console.log("✅ [Investment Transaction] Updated investment amount:", updateData);
+      }
+    } else {
+      console.error("❌ [Investment Transaction] Investment not found!");
     }
 
     // Create corresponding transaction in transactions table (money leaving account)

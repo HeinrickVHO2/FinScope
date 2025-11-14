@@ -8,6 +8,31 @@ The platform follows a freemium model with tiered subscriptions (Free, Pro, Prem
 
 ## Recent Changes
 
+**November 14, 2025 - Investment Transactions FULLY WORKING**
+
+✅ **Critical Supabase PostgREST Schema Cache Issue RESOLVED**
+- Created `reload_postgrest_schema()` SQL function using SECURITY DEFINER with pg_notify
+- Function enables remote PostgREST schema cache reload without dashboard access
+- Fixed missing `user_id` column in `investment_transactions` table (UUID with FK to users)
+- Fixed missing `current_amount` column in `investments` table (NUMERIC(10,2) default 0)
+- Fixed investment type constraint: changed from hyphen format to underscore (reserva-emergencia → reserva_emergencia)
+- All schema changes followed by reload_postgrest_schema() call to ensure PostgREST sees updates
+- Investment transactions now work end-to-end: create transaction → update investment balance → sync account balance
+
+✅ **Investment Transaction Feature Complete**
+- POST /api/investments/:id/transactions creates transaction and updates balances atomically
+- Backend automatically updates investment.current_amount when transaction is created
+- Backend creates corresponding account transaction (saida) for deposit type
+- Frontend invalidates all relevant caches (["/api/investments"], ["/api/accounts"], ["/api/dashboard/*"])
+- UI updates in real-time showing new investment balances
+- E2E test confirmed: transaction creation, balance update, dashboard chart rendering all working
+
+✅ **Schema Management Best Practices Established**
+- Created reusable `reload_postgrest_schema()` function for future schema changes
+- Added proper indexes on foreign key columns (user_id) for query performance
+- All constraints properly validated before applying (check existing data first)
+- Documented pattern: DDL change → reload_postgrest_schema() → verify with SELECT
+
 **November 14, 2025 - Investment Dashboard Visualization Complete**
 
 ✅ **Dashboard Investment Chart Implementation**
