@@ -809,52 +809,25 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createInvestmentTransaction(transaction: InsertInvestmentTransaction): Promise<InvestmentTransaction> {
-    // BYPASS PostgREST schema cache by using raw SQL via rpc
-    // This is necessary because PostgREST cache is not updating on remote Supabase
-    const txId = crypto.randomUUID();
-    const { data: rawData, error: rpcError } = await supabase.rpc('exec_sql', {
-      sql: `
-        INSERT INTO investment_transactions (
-          id, user_id, investment_id, source_account_id, amount, type, date, note, created_at
-        ) VALUES (
-          $1, $2, $3, $4, $5::numeric(10,2), $6, $7::timestamptz, $8, NOW()
-        )
-        RETURNING id, user_id, investment_id, source_account_id, amount::text, type, date, note, created_at
-      `,
-      params: [
-        txId,
-        transaction.userId,
-        transaction.investmentId,
-        transaction.sourceAccountId,
-        transaction.amount.toString(),
-        transaction.type,
-        transaction.date.toISOString(),
-        transaction.note || null
-      ]
-    });
+    // Create the investment transaction
+    // Schema cache has been reloaded via reload_postgrest_schema() function
+    const { data: invTxData, error: invTxError } = await supabase
+      .from("investment_transactions")
+      .insert({
+        user_id: transaction.userId,
+        investment_id: transaction.investmentId,
+        source_account_id: transaction.sourceAccountId,
+        amount: transaction.amount.toString(),
+        type: transaction.type,
+        date: transaction.date.toISOString(),
+        note: transaction.note || null,
+      })
+      .select()
+      .single();
 
-    if (rpcError) {
-      console.error("❌ RPC Error:", rpcError);
-      // Fallback to direct client insert (will fail with schema cache error but we try anyway)
-      const { data: invTxData, error: invTxError } = await supabase
-        .from("investment_transactions")
-        .insert({
-          user_id: transaction.userId,
-          investment_id: transaction.investmentId,
-          source_account_id: transaction.sourceAccountId,
-          amount: transaction.amount.toString(),
-          type: transaction.type,
-          date: transaction.date.toISOString(),
-          note: transaction.note || null,
-        })
-        .select()
-        .single();
-
-      if (invTxError || !invTxData) {
-        throw new Error(invTxError?.message || "Erro ao criar transação de investimento");
-      }
-      
-      const invTxData_typed = invTxData as any;
+    if (invTxError || !invTxData) {
+      throw new Error(invTxError?.message || "Erro ao criar transação de investimento");
+    }
 
     // Update investment current amount
     const investment = await this.getInvestment(transaction.investmentId);
