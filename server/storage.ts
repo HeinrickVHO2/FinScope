@@ -81,6 +81,10 @@ export interface IStorage {
     totalInvested: number;
     byType: { type: string; amount: number; goal?: number }[];
   }>;
+  getIncomeExpensesData(userId: string): Promise<{
+    income: number;
+    expenses: number;
+  }>;
 }
 
 // MemStorage is deprecated - use SupabaseStorage instead

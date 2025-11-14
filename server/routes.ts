@@ -457,6 +457,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dashboard/income-expenses", requireAuth, async (req: any, res) => {
+    try {
+      const data = await storage.getIncomeExpensesData(req.session.userId);
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar receitas e despesas" });
+    }
+  });
+
   // ===== INVESTMENT ROUTES =====
 
   // Get all investments

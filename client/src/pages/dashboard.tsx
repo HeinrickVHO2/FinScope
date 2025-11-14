@@ -3,7 +3,7 @@ import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, Plus, P
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { type Transaction, INVESTMENT_TYPES } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,6 +26,11 @@ interface InvestmentsSummary {
   byType: { type: string; amount: number; goal?: number }[];
 }
 
+interface IncomeExpensesData {
+  income: number;
+  expenses: number;
+}
+
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
 
@@ -42,6 +47,11 @@ export default function DashboardPage() {
   // Fetch investments summary
   const { data: investments, isLoading: investmentsLoading } = useQuery<InvestmentsSummary>({
     queryKey: ["/api/dashboard/investments"],
+  });
+
+  // Fetch income vs expenses data
+  const { data: incomeExpenses, isLoading: incomeExpensesLoading } = useQuery<IncomeExpensesData>({
+    queryKey: ["/api/dashboard/income-expenses"],
   });
 
   // Fetch recent transactions
@@ -162,6 +172,56 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Income vs Expenses Chart */}
+      <Card data-testid="card-income-expenses-chart">
+        <CardHeader>
+          <CardTitle className="font-poppins">Receitas x Despesas</CardTitle>
+          <CardDescription>Comparativo de entradas e saídas</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {incomeExpensesLoading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : incomeExpenses ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart
+                data={[
+                  {
+                    name: "Receitas",
+                    valor: incomeExpenses.income,
+                    fill: "hsl(var(--chart-1))",
+                  },
+                  {
+                    name: "Despesas",
+                    valor: incomeExpenses.expenses,
+                    fill: "hsl(var(--chart-2))",
+                  },
+                ]}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip
+                  formatter={(value: number) =>
+                    `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                  }
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "var(--radius)",
+                  }}
+                />
+                <Bar dataKey="valor" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">
+              Nenhum dado encontrado
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Investments Section */}
       {investments && investments.byType.length > 0 && (

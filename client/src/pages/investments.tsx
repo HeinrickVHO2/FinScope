@@ -59,7 +59,7 @@ export default function InvestmentsPage() {
     resolver: zodResolver(insertInvestmentSchema),
     defaultValues: {
       name: "",
-      type: "reserva-emergencia",
+      type: "reserva_emergencia",
     },
   });
 

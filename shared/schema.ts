@@ -55,7 +55,7 @@ export const investments = pgTable("investments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
-  type: text("type").notNull(), // 'reserva-emergencia' | 'cdb' | 'renda-fixa' | 'renda-variavel'
+  type: text("type").notNull(), // 'reserva_emergencia' | 'cdb' | 'renda_fixa' | 'renda_variavel'
   currentAmount: decimal("current_amount", { precision: 10, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -154,7 +154,7 @@ export const updateRuleSchema = z.object({
 
 export const insertInvestmentSchema = createInsertSchema(investments, {
   name: z.string().min(1, "Nome do investimento é obrigatório"),
-  type: z.enum(["reserva-emergencia", "cdb", "renda-fixa", "renda-variavel"], { 
+  type: z.enum(["reserva_emergencia", "cdb", "renda_fixa", "renda_variavel"], { 
     errorMap: () => ({ message: "Tipo inválido" }) 
   }),
 }).omit({
@@ -267,8 +267,8 @@ export const CATEGORIES = [
 
 // Investment types
 export const INVESTMENT_TYPES = [
-  { value: "reserva-emergencia", label: "Reserva de Emergência" },
+  { value: "reserva_emergencia", label: "Reserva de Emergência" },
   { value: "cdb", label: "CDB" },
-  { value: "renda-fixa", label: "Renda Fixa" },
-  { value: "renda-variavel", label: "Renda Variável" },
+  { value: "renda_fixa", label: "Renda Fixa" },
+  { value: "renda_variavel", label: "Renda Variável" },
 ] as const;

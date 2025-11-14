@@ -869,4 +869,29 @@ export class SupabaseStorage implements IStorage {
       byType,
     };
   }
+
+  // Income vs Expenses aggregation
+  async getIncomeExpensesData(userId: string): Promise<{
+    income: number;
+    expenses: number;
+  }> {
+    const transactions = await this.getTransactionsByUserId(userId);
+    
+    let income = 0;
+    let expenses = 0;
+
+    for (const tx of transactions) {
+      const amount = parseFloat(tx.amount) || 0;
+      if (tx.type === 'entrada') {
+        income += amount;
+      } else if (tx.type === 'saida') {
+        expenses += amount;
+      }
+    }
+
+    return {
+      income: Number(income.toFixed(2)),
+      expenses: Number(expenses.toFixed(2)),
+    };
+  }
 }
