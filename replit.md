@@ -8,6 +8,20 @@ The platform follows a freemium model with tiered subscriptions (Free, Pro, Prem
 
 ## Recent Changes
 
+**November 14, 2025 - Supabase Integration Complete**
+
+✅ **Supabase Migration** (Task 4 - In Progress)
+- Installed @supabase/supabase-js package for PostgreSQL integration
+- Created Supabase client with service role key authentication (`server/supabase.ts`)
+- Implemented SupabaseStorage class replacing MemStorage (`server/supabaseStorage.ts`)
+- Migrated storage layer to use Supabase PostgreSQL instead of in-memory Maps
+- Created database schema with 4 tables: users, accounts, transactions, rules
+- Configured Row Level Security (RLS) policies for all tables
+- Added database indexes for optimized query performance
+- Set up automatic cascade deletion for related records
+- All CRUD operations now persist to real PostgreSQL database
+- Data survives server restarts (true persistence achieved)
+
 **November 14, 2025 - MVP Core Features Completed**
 
 ✅ **Backend Implementation** (Task 2)
@@ -93,10 +107,12 @@ Preferred communication style: Simple, everyday language.
 - Trial period tracking with start/end timestamps
 
 **Data Layer Architecture**
-- In-memory storage implementation (development/prototype phase)
-- Interface-based storage abstraction (`IStorage`) for easy database migration
+- Supabase PostgreSQL database for persistent storage (production-ready)
+- Interface-based storage abstraction (`IStorage`) with SupabaseStorage implementation
 - Type-safe data models with Drizzle ORM schema definitions
 - Numeric decimal handling converted to strings for precision in financial calculations
+- Supabase client using service role key for backend operations
+- Row Level Security (RLS) enabled for all tables with user-scoped policies
 
 **Business Logic**
 - Plan limits enforcement (account limits, feature gating by tier)
@@ -106,11 +122,11 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage Solutions
 
-**Database Configuration (Prepared for PostgreSQL)**
-- Drizzle ORM configured for PostgreSQL dialect
-- Schema defined in TypeScript with type inference
-- Migration system ready via `drizzle-kit`
-- Connection configuration via `DATABASE_URL` environment variable
+**Database Configuration (Supabase PostgreSQL)**
+- Supabase PostgreSQL database with managed infrastructure
+- Drizzle ORM schema definitions (TypeScript with type inference)
+- Environment variables: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+- Service role key used for backend database operations (bypasses RLS)
 
 **Schema Design**
 - **Users Table**: Authentication credentials, plan tier, trial period tracking
@@ -120,14 +136,24 @@ Preferred communication style: Simple, everyday language.
 
 **Data Models**
 - Decimal precision (10,2) for all monetary values
-- UUID-based primary keys using PostgreSQL `gen_random_uuid()`
-- Timestamps for audit trails (createdAt fields)
-- Foreign key relationships maintained through userId references
+- UUID-based primary keys using PostgreSQL `uuid_generate_v4()`
+- Timestamps (TIMESTAMPTZ) for audit trails with automatic timezone handling
+- Foreign key relationships with CASCADE deletion for data consistency
 
 **Current Implementation**
-- In-memory storage using TypeScript Maps for rapid prototyping
-- Data persistence not yet implemented (sessions stored in memory)
-- Full data validation through Zod schemas before storage operations
+- SupabaseStorage class implementing IStorage interface
+- All CRUD operations using Supabase client with proper error handling
+- Row Level Security (RLS) policies protecting user data isolation
+- Database indexes on user_id, account_id, date for query optimization
+- True data persistence - survives server restarts
+- Full data validation through Zod schemas before database operations
+
+**Security Features**
+- Row Level Security (RLS) enabled on all tables
+- User-scoped policies: users can only access their own data
+- Service role key used only on backend (never exposed to frontend)
+- Automatic user authentication check via auth.uid() in RLS policies
+- Secure password hashing with bcrypt before database storage
 
 ### External Dependencies
 
@@ -151,6 +177,11 @@ Preferred communication style: Simple, everyday language.
 - Tailwind CSS 3.x with custom configuration
 - tailwind-merge and clsx for conditional class composition
 - CSS variables for theme customization (light/dark mode support)
+
+**Database & Storage**
+- @supabase/supabase-js for PostgreSQL database operations
+- Supabase PostgreSQL for persistent data storage with RLS
+- Type-safe database queries with proper error handling
 
 **Session Management**
 - express-session for server-side session handling
