@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Plus, TrendingUp, Target, ArrowUpRight, ArrowDownRight, Edit, Trash2 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -33,9 +34,19 @@ const transactionFormSchema = z.object({
 
 type TransactionFormData = z.infer<typeof transactionFormSchema>;
 
+// Goal form schema
+const goalFormSchema = z.object({
+  targetAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+    message: "Meta deve ser maior que zero",
+  }),
+});
+
+type GoalFormData = z.infer<typeof goalFormSchema>;
+
 export default function InvestmentsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
+  const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false);
   const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null);
   const { toast } = useToast();
 
@@ -72,6 +83,14 @@ export default function InvestmentsPage() {
       type: "deposit",
       amount: "",
       date: new Date().toISOString().split('T')[0],
+    },
+  });
+
+  // Goal form
+  const goalForm = useForm<GoalFormData>({
+    resolver: zodResolver(goalFormSchema),
+    defaultValues: {
+      targetAmount: "",
     },
   });
 
@@ -138,6 +157,9 @@ export default function InvestmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/investments/goals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/investments"] });
+      goalForm.reset();
+      setIsGoalDialogOpen(false);
+      setSelectedInvestment(null);
       toast({
         title: "Meta atualizada",
         description: "Meta de investimento atualizada com sucesso",
@@ -201,6 +223,25 @@ export default function InvestmentsPage() {
     setSelectedInvestment(investment);
     transactionForm.setValue("investmentId", investment.id);
     setIsTransactionDialogOpen(true);
+  }
+
+  function openGoalDialog(investment: Investment) {
+    setSelectedInvestment(investment);
+    const existingGoal = goalsMap.get(investment.id);
+    if (existingGoal) {
+      goalForm.setValue("targetAmount", existingGoal.targetAmount);
+    } else {
+      goalForm.reset();
+    }
+    setIsGoalDialogOpen(true);
+  }
+
+  async function onGoalSubmit(data: GoalFormData) {
+    if (!selectedInvestment) return;
+    updateGoalMutation.mutate({
+      investmentId: selectedInvestment.id,
+      targetAmount: data.targetAmount,
+    });
   }
 
   // Map goals by investment ID
@@ -365,27 +406,36 @@ export default function InvestmentsPage() {
                       <Plus className="mr-1 h-3 w-3" />
                       Transação
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => {
-                        const targetAmount = prompt("Digite a meta (R$):", goal?.targetAmount || "");
-                        if (targetAmount) {
-                          updateGoalMutation.mutate({ investmentId: investment.id, targetAmount });
-                        }
-                      }}
-                      data-testid={`button-edit-goal-${investment.id}`}
-                    >
-                      <Target className="h-3 w-3" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="destructive"
-                      onClick={() => handleDelete(investment.id)}
-                      data-testid={`button-delete-${investment.id}`}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => openGoalDialog(investment)}
+                          data-testid={`button-edit-goal-${investment.id}`}
+                        >
+                          <Target className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{goal ? "Editar meta" : "Definir meta"}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          size="sm" 
+                          variant="destructive"
+                          onClick={() => handleDelete(investment.id)}
+                          data-testid={`button-delete-${investment.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Deletar investimento</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </CardContent>
               </Card>
@@ -496,6 +546,59 @@ export default function InvestmentsPage() {
                 </Button>
                 <Button type="submit" disabled={transactionMutation.isPending} data-testid="button-submit-transaction">
                   {transactionMutation.isPending ? "Registrando..." : "Registrar"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Goal Dialog */}
+      <Dialog open={isGoalDialogOpen} onOpenChange={(open) => {
+        setIsGoalDialogOpen(open);
+        if (!open) {
+          setSelectedInvestment(null);
+          goalForm.reset();
+        }
+      }}>
+        <DialogContent data-testid="dialog-investment-goal">
+          <DialogHeader>
+            <DialogTitle className="font-poppins">
+              {selectedInvestment && goalsMap.get(selectedInvestment.id) ? "Editar Meta de Investimento" : "Definir Meta de Investimento"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedInvestment && (
+                <>Estabeleça uma meta financeira para <strong>{selectedInvestment.name}</strong></>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...goalForm}>
+            <form onSubmit={goalForm.handleSubmit(onGoalSubmit)} className="space-y-4">
+              <FormField
+                control={goalForm.control}
+                name="targetAmount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Valor da Meta (R$)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="10000.00" 
+                        data-testid="input-goal-amount"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsGoalDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={updateGoalMutation.isPending} data-testid="button-submit-goal">
+                  {updateGoalMutation.isPending ? "Salvando..." : "Salvar Meta"}
                 </Button>
               </div>
             </form>
