@@ -597,17 +597,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Investimento não encontrado" });
       }
 
-      const data = insertInvestmentTransactionSchema.parse({ 
+      console.log("📝 [Investment Transaction] Request body:", JSON.stringify(req.body, null, 2));
+      console.log("📝 [Investment Transaction] Investment ID:", req.params.id);
+      console.log("📝 [Investment Transaction] User ID:", req.session.userId);
+
+      const dataToValidate = { 
         ...req.body, 
         investmentId: req.params.id,
         userId: req.session.userId 
-      });
+      };
+      
+      console.log("📝 [Investment Transaction] Data to validate:", JSON.stringify(dataToValidate, null, 2));
+      
+      const data = insertInvestmentTransactionSchema.parse(dataToValidate);
       const transaction = await storage.createInvestmentTransaction(data);
       res.json(transaction);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("❌ [Investment Transaction] Validation error:", JSON.stringify(error.errors, null, 2));
         return res.status(400).json({ error: "Dados inválidos", details: error.errors });
       }
+      console.error("❌ [Investment Transaction] Error:", error);
       res.status(400).json({ error: (error as Error).message });
     }
   });
