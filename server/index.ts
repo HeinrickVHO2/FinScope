@@ -16,6 +16,15 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
+// Disable caching for API routes to prevent 304 responses that break TanStack Query
+app.set('etag', false);
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
