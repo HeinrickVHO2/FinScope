@@ -237,6 +237,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         userId: req.session.userId,
       });
+
+      // Validate MEI restriction: only Premium users can create MEI accounts
+      if (data.type === 'mei') {
+        const user = await storage.getUser(req.session.userId);
+        if (!user || user.plan !== 'premium') {
+          return res.status(403).json({ 
+            error: "Conta MEI disponível apenas para plano Premium" 
+          });
+        }
+      }
+
       const account = await storage.createAccount(data);
       res.json(account);
     } catch (error) {
