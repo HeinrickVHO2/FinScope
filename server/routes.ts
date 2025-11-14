@@ -76,8 +76,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log('[DEBUG] Session saved successfully, ID:', req.session.id);
         
-        // Don't send password back
-        const { password, ...userWithoutPassword } = user;
+        // Create a new object without password to avoid read-only property errors
+        const userWithoutPassword = {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          plan: user.plan,
+          trialStart: user.trialStart,
+          trialEnd: user.trialEnd,
+          createdAt: user.createdAt,
+        };
         
         res.json({ user: userWithoutPassword });
       });
@@ -107,7 +115,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         req.session.userId = user.id;
         
-        const { password, ...userWithoutPassword } = user;
+        // Create a new object without password to avoid read-only property errors
+        const userWithoutPassword = {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          plan: user.plan,
+          trialStart: user.trialStart,
+          trialEnd: user.trialEnd,
+          createdAt: user.createdAt,
+        };
         res.json({ user: userWithoutPassword });
       });
     } catch (error) {
@@ -126,7 +143,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Usuário não encontrado" });
       }
 
-      const { password, ...userWithoutPassword } = user;
+      // Create a new object without password to avoid read-only property errors
+      const userWithoutPassword = {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        plan: user.plan,
+        trialStart: user.trialStart,
+        trialEnd: user.trialEnd,
+        createdAt: user.createdAt,
+      };
       res.json(userWithoutPassword);
     } catch (error) {
       res.status(500).json({ error: "Erro interno" });
