@@ -2,6 +2,15 @@
 
 ## Recent Changes (November 14, 2025)
 
+**Dashboard & Account Model Improvements - PRODUCTION READY ✅**
+- ✅ Fixed investment type labels: changed from hyphen to underscore (reserva_emergencia, renda_fixa, renda_variavel)
+- ✅ Charts now display professional labels: "Reserva de Emergência", "CDB", "Renda Fixa", "Renda Variável"
+- ✅ Added Income vs Expenses bar chart to dashboard with proper aggregation
+- ✅ Refactored account model: 'pessoal'/'empresa' → 'pf'/'pj'/'mei' (Pessoa Física, Pessoa Jurídica, MEI)
+- ✅ MEI accounts restricted to Premium users (enforced at backend API level)
+- ✅ Database migration completed: accounts constraint updated to accept new types
+- ✅ Fixed Select component bug in account creation form (defaultValue → value)
+
 **Investment Transactions - PRODUCTION READY ✅**
 - ✅ Implemented atomic investment transactions using PostgreSQL stored procedure with SELECT FOR UPDATE locking
 - ✅ Fixed critical PostgREST schema cache issues (created `reload_postgrest_schema()` function)

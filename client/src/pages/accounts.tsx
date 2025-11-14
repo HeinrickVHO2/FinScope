@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +59,17 @@ export default function AccountsPage() {
       initialBalance: 0,
     },
   });
+
+  // Reset form when dialog opens to ensure proper initialization
+  useEffect(() => {
+    if (isDialogOpen) {
+      form.reset({
+        name: "",
+        type: "pf" as const,
+        initialBalance: 0,
+      });
+    }
+  }, [isDialogOpen, form]);
 
   // Create account mutation
   const createMutation = useMutation({
@@ -178,7 +189,7 @@ export default function AccountsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tipo de Conta</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-account-type">
                             <SelectValue placeholder="Selecione o tipo" />
