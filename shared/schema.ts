@@ -102,6 +102,7 @@ export const insertAccountSchema = createInsertSchema(accounts, {
   ),
 }).omit({
   id: true,
+  userId: true,
   createdAt: true,
 });
 

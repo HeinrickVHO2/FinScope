@@ -233,13 +233,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create account
   app.post("/api/accounts", requireAuth, async (req: any, res) => {
     try {
-      const data = insertAccountSchema.parse({
-        ...req.body,
-        userId: req.session.userId,
-      });
+      // Parse the request body without userId first
+      const validatedData = insertAccountSchema.parse(req.body);
 
       // Validate MEI restriction: only Premium users can create MEI accounts
-      if (data.type === 'mei') {
+      if (validatedData.type === 'mei') {
         const user = await storage.getUser(req.session.userId);
         if (!user || user.plan !== 'premium') {
           return res.status(403).json({ 
@@ -248,7 +246,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const account = await storage.createAccount(data);
+      // Add userId from session after validation
+      const dataWithUserId = {
+        ...validatedData,
+        userId: req.session.userId,
+      };
+
+      const account = await storage.createAccount(dataWithUserId);
       res.json(account);
     } catch (error) {
       if (error instanceof z.ZodError) {

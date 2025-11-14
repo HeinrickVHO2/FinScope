@@ -51,7 +51,7 @@ export default function AccountsPage() {
 
   const canAddAccount = accounts.length < planLimit;
 
-  const form = useForm<Omit<InsertAccount, 'userId'>>({
+  const form = useForm<InsertAccount>({
     resolver: zodResolver(insertAccountSchema),
     defaultValues: {
       name: "",
@@ -119,7 +119,10 @@ export default function AccountsPage() {
     },
   });
 
-  async function onSubmit(data: Omit<InsertAccount, 'userId'>) {
+  async function onSubmit(data: InsertAccount) {
+    console.log("Form submitted with data:", data);
+    console.log("Form errors:", form.formState.errors);
+    console.log("Form is valid:", form.formState.isValid);
     createMutation.mutate(data);
   }
 
@@ -189,7 +192,7 @@ export default function AccountsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tipo de Conta</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value ?? "pf"}>
                         <FormControl>
                           <SelectTrigger data-testid="select-account-type">
                             <SelectValue placeholder="Selecione o tipo" />
