@@ -2,6 +2,17 @@
 
 ## Recent Changes (November 14, 2025)
 
+**Investment Goals UX + Landing Page Improvements - PRODUCTION READY ✅**
+- ✅ Replaced browser prompt() with proper Dialog form for investment goal creation/editing
+- ✅ Added Tooltip components on icon-only buttons (Target, Delete) for better accessibility
+- ✅ Fixed critical cache bug: changed from invalidateQueries() to refetchQueries() to handle staleTime: Infinity
+- ✅ Fixed hoisting bug: moved goalsMap initialization before function definitions
+- ✅ Investment goals now update UI immediately after creation/editing
+- ✅ Landing page: removed Free plan, kept only Pro (R$14,90) and Premium (R$29,90) with 10-day trial
+- ✅ Landing page: added mobile-responsive navigation with Sheet-based hamburger menu
+- ✅ Landing page: fixed pricing grid layout (md:grid-cols-2 with justify-items-center) for balanced appearance
+- ✅ All E2E tests passing: mobile/desktop navigation, goal creation workflow
+
 **Dashboard & Account Model Improvements - PRODUCTION READY ✅**
 - ✅ Fixed investment type labels: changed from hyphen to underscore (reserva_emergencia, renda_fixa, renda_variavel)
 - ✅ Charts now display professional labels: "Reserva de Emergência", "CDB", "Renda Fixa", "Renda Variável"
