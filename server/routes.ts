@@ -25,6 +25,9 @@ declare module 'express-session' {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Trust proxy - required for cookies to work behind Replit's proxy
+  app.set('trust proxy', 1);
+  
   app.use(express.json());
 
   // Configure session with proper settings
@@ -62,13 +65,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const data = insertUserSchema.parse(req.body);
       const user = await storage.createUser(data);
       
-      // Create session
+      // Create session and save it
       req.session.userId = user.id;
+      req.session.save((err) => {
+        if (err) {
+          return res.status(500).json({ error: "Erro ao criar sessão" });
+        }
 
-      // Don't send password back
-      const { password, ...userWithoutPassword } = user;
-      
-      res.json({ user: userWithoutPassword });
+        // Don't send password back
+        const { password, ...userWithoutPassword } = user;
+        
+        res.json({ user: userWithoutPassword });
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Dados inválidos", details: error.errors });
