@@ -120,6 +120,40 @@ export default function TransactionsPage() {
     }
   }
 
+  async function handleExport() {
+    try {
+      const response = await fetch('/api/export/transactions', {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao exportar transações');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transacoes_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Exportação concluída",
+        description: "Suas transações foram exportadas com sucesso",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao exportar",
+        description: "Não foi possível exportar as transações",
+        variant: "destructive",
+      });
+    }
+  }
+
   const filteredTransactions = transactions.filter(t => {
     const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === "all" || t.type === filterType;
@@ -136,7 +170,7 @@ export default function TransactionsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" data-testid="button-export">
+          <Button variant="outline" data-testid="button-export" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Exportar
           </Button>

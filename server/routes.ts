@@ -14,6 +14,11 @@ import {
   insertRuleSchema,
   updateRuleSchema,
   updateUserProfileSchema,
+  insertInvestmentSchema,
+  updateInvestmentSchema,
+  insertInvestmentGoalSchema,
+  updateInvestmentGoalSchema,
+  insertInvestmentTransactionSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -442,6 +447,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get investments summary
+  app.get("/api/dashboard/investments", requireAuth, async (req: any, res) => {
+    try {
+      const summary = await storage.getInvestmentsSummary(req.session.userId);
+      res.json(summary);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar investimentos" });
+    }
+  });
+
+  // ===== INVESTMENT ROUTES =====
+
+  // Get all investments
+  app.get("/api/investments", requireAuth, async (req: any, res) => {
+    try {
+      const investments = await storage.getInvestmentsByUserId(req.session.userId);
+      res.json(investments);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar investimentos" });
+    }
+  });
+
+  // Create investment
+  app.post("/api/investments", requireAuth, async (req: any, res) => {
+    try {
+      const data = insertInvestmentSchema.parse({ ...req.body, userId: req.session.userId });
+      const investment = await storage.createInvestment(data);
+      res.json(investment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  // Update investment
+  app.patch("/api/investments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const investment = await storage.getInvestment(req.params.id);
+      if (!investment || investment.userId !== req.session.userId) {
+        return res.status(404).json({ error: "Investimento não encontrado" });
+      }
+
+      const updates = updateInvestmentSchema.parse(req.body);
+      const updated = await storage.updateInvestment(req.params.id, updates);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  // Delete investment
+  app.delete("/api/investments/:id", requireAuth, async (req: any, res) => {
+    try {
+      const investment = await storage.getInvestment(req.params.id);
+      if (!investment || investment.userId !== req.session.userId) {
+        return res.status(404).json({ error: "Investimento não encontrado" });
+      }
+
+      await storage.deleteInvestment(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  // Get investment goal
+  app.get("/api/investments/:id/goal", requireAuth, async (req: any, res) => {
+    try {
+      const investment = await storage.getInvestment(req.params.id);
+      if (!investment || investment.userId !== req.session.userId) {
+        return res.status(404).json({ error: "Investimento não encontrado" });
+      }
+
+      const goal = await storage.getInvestmentGoal(req.params.id);
+      if (!goal) {
+        return res.status(404).json({ error: "Meta não encontrada" });
+      }
+
+      res.json(goal);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar meta" });
+    }
+  });
+
+  // Create or update investment goal
+  app.post("/api/investments/:id/goal", requireAuth, async (req: any, res) => {
+    try {
+      const investment = await storage.getInvestment(req.params.id);
+      if (!investment || investment.userId !== req.session.userId) {
+        return res.status(404).json({ error: "Investimento não encontrado" });
+      }
+
+      const data = insertInvestmentGoalSchema.parse({ 
+        ...req.body, 
+        userId: req.session.userId,
+        investmentId: req.params.id 
+      });
+      const goal = await storage.createOrUpdateInvestmentGoal(data);
+      res.json(goal);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  // Delete investment goal
+  app.delete("/api/investments/:id/goal", requireAuth, async (req: any, res) => {
+    try {
+      const investment = await storage.getInvestment(req.params.id);
+      if (!investment || investment.userId !== req.session.userId) {
+        return res.status(404).json({ error: "Investimento não encontrado" });
+      }
+
+      await storage.deleteInvestmentGoal(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  // Get investment transactions
+  app.get("/api/investments/:id/transactions", requireAuth, async (req: any, res) => {
+    try {
+      const investment = await storage.getInvestment(req.params.id);
+      if (!investment || investment.userId !== req.session.userId) {
+        return res.status(404).json({ error: "Investimento não encontrado" });
+      }
+
+      const transactions = await storage.getInvestmentTransactionsByInvestmentId(req.params.id);
+      res.json(transactions);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar transações" });
+    }
+  });
+
+  // Create investment transaction (transfer money to/from investment)
+  app.post("/api/investment-transactions", requireAuth, async (req: any, res) => {
+    try {
+      const data = insertInvestmentTransactionSchema.parse({ ...req.body, userId: req.session.userId });
+      const transaction = await storage.createInvestmentTransaction(data);
+      res.json(transaction);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
   // ===== USER/SETTINGS ROUTES =====
   
   // Update user profile
@@ -500,6 +661,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(userWithoutPassword);
     } catch (error) {
       res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  // ===== EXPORT ROUTES =====
+
+  // Export transactions to CSV
+  app.get("/api/export/transactions", requireAuth, async (req: any, res) => {
+    try {
+      const transactions = await storage.getTransactionsByUserId(req.session.userId);
+      const accounts = await storage.getAccountsByUserId(req.session.userId);
+      
+      // Create account lookup map
+      const accountMap = new Map(accounts.map(a => [a.id, a.name]));
+      
+      // Generate CSV
+      const headers = ["Data", "Descrição", "Conta", "Tipo", "Categoria", "Valor"];
+      const rows = transactions.map(t => {
+        const date = new Date(t.date).toLocaleDateString('pt-BR');
+        const accountName = accountMap.get(t.accountId) || "Conta desconhecida";
+        const type = t.type === "entrada" ? "Entrada" : "Saída";
+        const amount = `R$ ${parseFloat(t.amount).toFixed(2).replace('.', ',')}`;
+        
+        return [
+          date,
+          `"${t.description.replace(/"/g, '""')}"`, // Escape quotes
+          `"${accountName}"`,
+          type,
+          t.category,
+          amount
+        ].join(',');
+      });
+      
+      const csv = [headers.join(','), ...rows].join('\n');
+      
+      // Set headers for file download
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="transacoes_${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send('\uFEFF' + csv); // Add BOM for Excel UTF-8 support
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao exportar transações" });
     }
   });
 

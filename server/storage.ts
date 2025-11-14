@@ -7,6 +7,12 @@ import {
   type InsertTransaction,
   type Rule,
   type InsertRule,
+  type Investment,
+  type InsertInvestment,
+  type InvestmentGoal,
+  type InsertInvestmentGoal,
+  type InvestmentTransaction,
+  type InsertInvestmentTransaction,
   PLAN_LIMITS
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -46,6 +52,23 @@ export interface IStorage {
   updateRule(id: string, updates: { ruleName?: string; contains?: string; categoryResult?: string; isActive?: boolean }): Promise<Rule | undefined>;
   deleteRule(id: string): Promise<boolean>;
 
+  // Investment operations
+  getInvestment(id: string): Promise<Investment | undefined>;
+  getInvestmentsByUserId(userId: string): Promise<Investment[]>;
+  createInvestment(investment: InsertInvestment): Promise<Investment>;
+  updateInvestment(id: string, updates: { name?: string }): Promise<Investment | undefined>;
+  deleteInvestment(id: string): Promise<boolean>;
+
+  // Investment goal operations
+  getInvestmentGoal(investmentId: string): Promise<InvestmentGoal | undefined>;
+  createOrUpdateInvestmentGoal(goal: InsertInvestmentGoal): Promise<InvestmentGoal>;
+  deleteInvestmentGoal(investmentId: string): Promise<boolean>;
+
+  // Investment transaction operations
+  getInvestmentTransactionsByUserId(userId: string): Promise<InvestmentTransaction[]>;
+  getInvestmentTransactionsByInvestmentId(investmentId: string): Promise<InvestmentTransaction[]>;
+  createInvestmentTransaction(transaction: InsertInvestmentTransaction): Promise<InvestmentTransaction>;
+
   // Aggregations
   getDashboardMetrics(userId: string): Promise<{
     totalBalance: number;
@@ -54,6 +77,10 @@ export interface IStorage {
     netCashFlow: number;
   }>;
   getCategoryBreakdown(userId: string): Promise<{ category: string; amount: number }[]>;
+  getInvestmentsSummary(userId: string): Promise<{
+    totalInvested: number;
+    byType: { type: string; amount: number; goal?: number }[];
+  }>;
 }
 
 export class MemStorage implements IStorage {

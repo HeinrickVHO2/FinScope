@@ -1,10 +1,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, Plus } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, Plus, PiggyBank, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import type { Transaction } from "@shared/schema";
+import { type Transaction, INVESTMENT_TYPES } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 
@@ -20,6 +21,11 @@ interface CategoryData {
   amount: number;
 }
 
+interface InvestmentsSummary {
+  totalInvested: number;
+  byType: { type: string; amount: number; goal?: number }[];
+}
+
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
 
@@ -31,6 +37,11 @@ export default function DashboardPage() {
   // Fetch category breakdown
   const { data: categories, isLoading: categoriesLoading } = useQuery<CategoryData[]>({
     queryKey: ["/api/dashboard/categories"],
+  });
+
+  // Fetch investments summary
+  const { data: investments, isLoading: investmentsLoading } = useQuery<InvestmentsSummary>({
+    queryKey: ["/api/dashboard/investments"],
   });
 
   // Fetch recent transactions
@@ -151,6 +162,74 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Investments Section */}
+      {investments && investments.totalInvested > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-poppins font-bold">Investimentos</h2>
+            <Button variant="outline" size="sm">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Investimento
+            </Button>
+          </div>
+          
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Total Invested Card */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Investido</CardTitle>
+                <PiggyBank className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                {investmentsLoading ? (
+                  <Skeleton className="h-8 w-32" />
+                ) : (
+                  <div className="text-2xl font-bold font-poppins text-primary">
+                    R$ {(investments?.totalInvested || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Patrimônio em investimentos
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Investment by Type Cards */}
+            {investments?.byType.map((inv) => {
+              const investmentType = INVESTMENT_TYPES.find(t => t.value === inv.type);
+              const progress = inv.goal ? (inv.amount / inv.goal) * 100 : 0;
+              
+              return (
+                <Card key={inv.type}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">{investmentType?.label || inv.type}</CardTitle>
+                    {inv.goal && <Target className="h-4 w-4 text-muted-foreground" />}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold font-poppins">
+                      R$ {inv.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                    {inv.goal ? (
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Meta: R$ {inv.goal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          <span className="font-medium">{Math.min(progress, 100).toFixed(0)}%</span>
+                        </div>
+                        <Progress value={Math.min(progress, 100)} className="h-2" />
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Sem meta definida
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
