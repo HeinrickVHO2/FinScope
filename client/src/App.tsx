@@ -14,6 +14,7 @@ import SignupPage from "@/pages/signup";
 import DashboardPage from "@/pages/dashboard";
 import AccountsPage from "@/pages/accounts";
 import TransactionsPage from "@/pages/transactions";
+import InvestmentsPage from "@/pages/investments";
 import MEIPage from "@/pages/mei";
 import SettingsPage from "@/pages/settings";
 
@@ -85,6 +86,11 @@ function Router() {
       <Route path="/transactions">
         <DashboardLayout>
           <TransactionsPage />
+        </DashboardLayout>
+      </Route>
+      <Route path="/investments">
+        <DashboardLayout>
+          <InvestmentsPage />
         </DashboardLayout>
       </Route>
       <Route path="/mei">

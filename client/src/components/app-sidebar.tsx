@@ -1,4 +1,4 @@
-import { Home, Wallet, ArrowLeftRight, Briefcase, Settings, TrendingUp } from "lucide-react";
+import { Home, Wallet, ArrowLeftRight, Briefcase, Settings, TrendingUp, PiggyBank } from "lucide-react";
 import { useLocation } from "wouter";
 import {
   Sidebar,
@@ -27,6 +27,11 @@ const menuItems = [
     title: "Transações",
     url: "/transactions",
     icon: ArrowLeftRight,
+  },
+  {
+    title: "Investimentos",
+    url: "/investments",
+    icon: PiggyBank,
   },
   {
     title: "Gestão MEI",
