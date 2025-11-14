@@ -78,9 +78,12 @@ export default function InvestmentsPage() {
   // Create investment mutation
   const createMutation = useMutation({
     mutationFn: async (data: InsertInvestment) => {
+      console.log("🚀 [Investment Create] Sending to API:", data);
       return apiRequest("POST", "/api/investments", data);
     },
     onSuccess: () => {
+      console.log("✅ [Investment Create] Success!");
+
       queryClient.invalidateQueries({ queryKey: ["/api/investments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/investments"] });
       createForm.reset();
@@ -91,6 +94,7 @@ export default function InvestmentsPage() {
       });
     },
     onError: (error: Error) => {
+      console.error("❌ [Investment Create] Error:", error);
       toast({
         title: "Erro ao criar investimento",
         description: error.message || "Tente novamente mais tarde",
@@ -171,6 +175,8 @@ export default function InvestmentsPage() {
   });
 
   async function onCreateSubmit(data: InsertInvestment) {
+    console.log("🔍 [Investment Create] Form data:", data);
+    console.log("🔍 [Investment Create] Form errors:", createForm.formState.errors);
     createMutation.mutate(data);
   }
 
@@ -250,7 +256,13 @@ export default function InvestmentsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tipo de Investimento</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select 
+                        onValueChange={(value) => {
+                          console.log("🎯 [Select] Value changed to:", value);
+                          field.onChange(value);
+                        }} 
+                        value={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger data-testid="select-investment-type">
                             <SelectValue placeholder="Selecione o tipo" />
