@@ -64,7 +64,7 @@ export const insertAccountSchema = createInsertSchema(accounts, {
   name: z.string().min(1, "Nome da conta é obrigatório"),
   type: z.enum(["pessoal", "empresa"], { errorMap: () => ({ message: "Tipo inválido" }) }),
   initialBalance: z.coerce.number().min(0, "Saldo deve ser positivo").refine(
-    (val) => Number.isFinite(val) && /^\d+(\.\d{1,2})?$/.test(val.toFixed(2)),
+    (val) => Number.isFinite(val) && Math.round(val * 100) === val * 100,
     "Saldo deve ter no máximo 2 casas decimais"
   ),
 }).omit({
@@ -82,7 +82,7 @@ export const insertTransactionSchema = createInsertSchema(transactions, {
   description: z.string().min(1, "Descrição é obrigatória"),
   type: z.enum(["entrada", "saida"], { errorMap: () => ({ message: "Tipo inválido" }) }),
   amount: z.coerce.number().positive("Valor deve ser maior que zero").refine(
-    (val) => Number.isFinite(val) && /^\d+(\.\d{1,2})?$/.test(val.toFixed(2)),
+    (val) => Number.isFinite(val) && Math.round(val * 100) === val * 100,
     "Valor deve ter no máximo 2 casas decimais"
   ),
   category: z.string().min(1, "Categoria é obrigatória"),
@@ -96,7 +96,7 @@ export const updateTransactionSchema = z.object({
   description: z.string().min(1, "Descrição é obrigatória").optional(),
   type: z.enum(["entrada", "saida"]).optional(),
   amount: z.coerce.number().positive("Valor deve ser maior que zero").refine(
-    (val) => Number.isFinite(val) && /^\d+(\.\d{1,2})?$/.test(val.toFixed(2)),
+    (val) => Number.isFinite(val) && Math.round(val * 100) === val * 100,
     "Valor deve ter no máximo 2 casas decimais"
   ).optional(),
   category: z.string().min(1, "Categoria é obrigatória").optional(),
