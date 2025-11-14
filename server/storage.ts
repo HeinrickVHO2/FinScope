@@ -55,7 +55,7 @@ export interface IStorage {
   // Investment operations
   getInvestment(id: string): Promise<Investment | undefined>;
   getInvestmentsByUserId(userId: string): Promise<Investment[]>;
-  createInvestment(investment: InsertInvestment): Promise<Investment>;
+  createInvestment(investment: InsertInvestment & { userId: string }): Promise<Investment>;
   updateInvestment(id: string, updates: { name?: string }): Promise<Investment | undefined>;
   deleteInvestment(id: string): Promise<boolean>;
 
@@ -83,7 +83,8 @@ export interface IStorage {
   }>;
 }
 
-export class MemStorage implements IStorage {
+// MemStorage is deprecated - use SupabaseStorage instead
+export class MemStorage {
   private users: Map<string, User>;
   private accounts: Map<string, StoredAccount>;
   private transactions: Map<string, StoredTransaction>;

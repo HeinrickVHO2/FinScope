@@ -620,7 +620,7 @@ export class SupabaseStorage implements IStorage {
     }));
   }
 
-  async createInvestment(investment: InsertInvestment): Promise<Investment> {
+  async createInvestment(investment: InsertInvestment & { userId: string }): Promise<Investment> {
     const { data, error } = await supabase
       .from("investments")
       .insert({
@@ -640,7 +640,7 @@ export class SupabaseStorage implements IStorage {
       userId: data.user_id,
       name: data.name,
       type: data.type,
-      currentAmount: data.current_amount,
+      currentAmount: data.current_amount || "0",
       createdAt: new Date(data.created_at),
     };
   }

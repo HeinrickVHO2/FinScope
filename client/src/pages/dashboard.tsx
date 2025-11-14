@@ -167,66 +167,116 @@ export default function DashboardPage() {
       {investments && investments.totalInvested > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-poppins font-bold">Investimentos</h2>
-            <Button variant="outline" size="sm">
+            <h2 className="text-2xl font-poppins font-bold" data-testid="text-investments-section-title">Investimentos</h2>
+            <Button variant="outline" size="sm" onClick={() => setLocation("/investments")} data-testid="button-new-investment">
               <Plus className="mr-2 h-4 w-4" />
               Novo Investimento
             </Button>
           </div>
           
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Total Invested Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Investido</CardTitle>
-                <PiggyBank className="h-4 w-4 text-primary" />
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* Investment Summary Cards */}
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Total Invested Card */}
+              <Card data-testid="card-total-invested">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Investido</CardTitle>
+                  <PiggyBank className="h-4 w-4 text-primary" />
+                </CardHeader>
+                <CardContent>
+                  {investmentsLoading ? (
+                    <Skeleton className="h-8 w-32" />
+                  ) : (
+                    <div className="text-2xl font-bold font-poppins text-primary" data-testid="text-total-invested">
+                      R$ {(investments?.totalInvested || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Patrimônio em investimentos
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Investment by Type Cards */}
+              {investments?.byType.slice(0, 3).map((inv, idx) => {
+                const investmentType = INVESTMENT_TYPES.find(t => t.value === inv.type);
+                const progress = inv.goal ? (inv.amount / inv.goal) * 100 : 0;
+                
+                return (
+                  <Card key={inv.type} data-testid={`card-investment-type-${idx}`}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">{investmentType?.label || inv.type}</CardTitle>
+                      {inv.goal && <Target className="h-4 w-4 text-muted-foreground" />}
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold font-poppins" data-testid={`text-investment-amount-${idx}`}>
+                        R$ {inv.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                      {inv.goal ? (
+                        <div className="mt-2 space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Meta: R$ {inv.goal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            <span className="font-medium">{Math.min(progress, 100).toFixed(0)}%</span>
+                          </div>
+                          <Progress value={Math.min(progress, 100)} className="h-2" />
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Sem meta definida
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Investments Allocation Chart */}
+            <Card data-testid="card-investments-chart">
+              <CardHeader>
+                <CardTitle className="font-poppins">Alocação de Investimentos</CardTitle>
+                <CardDescription>Distribuição do seu portfólio</CardDescription>
               </CardHeader>
               <CardContent>
                 {investmentsLoading ? (
-                  <Skeleton className="h-8 w-32" />
+                  <Skeleton className="h-64 w-full" />
+                ) : investments && investments.byType.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={investments.byType.map((inv, idx) => {
+                          const investmentType = INVESTMENT_TYPES.find(t => t.value === inv.type);
+                          return {
+                            name: investmentType?.label || inv.type,
+                            value: inv.amount,
+                            color: chartColors[idx % chartColors.length],
+                          };
+                        })}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {investments.byType.map((inv, index) => (
+                          <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
                 ) : (
-                  <div className="text-2xl font-bold font-poppins text-primary">
-                    R$ {(investments?.totalInvested || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </div>
+                  <p className="text-center text-muted-foreground py-8">
+                    Nenhum investimento encontrado
+                  </p>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Patrimônio em investimentos
-                </p>
               </CardContent>
             </Card>
-
-            {/* Investment by Type Cards */}
-            {investments?.byType.map((inv) => {
-              const investmentType = INVESTMENT_TYPES.find(t => t.value === inv.type);
-              const progress = inv.goal ? (inv.amount / inv.goal) * 100 : 0;
-              
-              return (
-                <Card key={inv.type}>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">{investmentType?.label || inv.type}</CardTitle>
-                    {inv.goal && <Target className="h-4 w-4 text-muted-foreground" />}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold font-poppins">
-                      R$ {inv.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </div>
-                    {inv.goal ? (
-                      <div className="mt-2 space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Meta: R$ {inv.goal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                          <span className="font-medium">{Math.min(progress, 100).toFixed(0)}%</span>
-                        </div>
-                        <Progress value={Math.min(progress, 100)} className="h-2" />
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Sem meta definida
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
           </div>
         </div>
       )}
