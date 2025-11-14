@@ -30,22 +30,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Configure session with proper settings
   const SessionStore = MemoryStore(session);
+  
+  // Debug: Log session configuration
+  const isProduction = process.env.NODE_ENV === "production";
+  console.log(`[SESSION CONFIG] NODE_ENV: ${process.env.NODE_ENV}, secure: ${isProduction}`);
+  
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "finscope-secret-key-change-in-production",
       resave: false,
       saveUninitialized: false,
+      proxy: true, // CRITICAL: Required for sessions to work behind Replit's reverse proxy
       store: new SessionStore({
         checkPeriod: 86400000, // prune expired entries every 24h
       }),
       cookie: {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: true, // Required for HTTPS (Replit deployments are always HTTPS)
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         sameSite: "lax",
       },
     })
   );
+  
+  // Debug middleware to log session state
+  app.use((req: any, res, next) => {
+    const originalJson = res.json.bind(res);
+    res.json = function(data: any) {
+      if (req.path.includes('/api/auth/')) {
+        console.log(`[SESSION DEBUG] ${req.method} ${req.path} - Session ID: ${req.session?.id}, User ID: ${req.session?.userId}, Cookie will be sent: ${req.session?.id ? 'YES' : 'NO'}`);
+      }
+      return originalJson(data);
+    };
+    next();
+  });
+
+  // Debug endpoint to check deployment config
+  app.get("/api/debug/config", (req: any, res) => {
+    res.json({
+      nodeEnv: process.env.NODE_ENV,
+      replitDeployment: process.env.REPLIT_DEPLOYMENT || "not set",
+      sessionCookieSecure: isProduction || true, // Will always be true now
+      trustProxy: app.get('trust proxy'),
+      sessionId: req.session?.id || "no session",
+      timestamp: new Date().toISOString(),
+    });
+  });
 
   // Middleware to check authentication
   function requireAuth(req: any, res: any, next: any) {
