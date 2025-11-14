@@ -3,8 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Plus, Filter, Search, ArrowUpRight, ArrowDownRight, Download } from "lucide-react";
+import { Plus, Filter, Search, ArrowUpRight, ArrowDownRight, Download, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,59 +22,101 @@ import {
 } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertTransactionSchema, type InsertTransaction, CATEGORIES } from "@shared/schema";
+import { insertTransactionSchema, type InsertTransaction, type Transaction, type Account, CATEGORIES } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function TransactionsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  // Mock transactions - will be replaced with real data in Task 3
-  const transactions = [
-    { id: "1", description: "Salário", category: "Salário", type: "entrada", amount: "5000.00", date: new Date("2025-01-10"), accountId: "1" },
-    { id: "2", description: "Supermercado Pão de Açúcar", category: "Alimentação", type: "saida", amount: "320.50", date: new Date("2025-01-09"), accountId: "1" },
-    { id: "3", description: "Freelance Design", category: "Freelance", type: "entrada", amount: "1500.00", date: new Date("2025-01-08"), accountId: "1" },
-    { id: "4", description: "Academia SmartFit", category: "Saúde", type: "saida", amount: "89.90", date: new Date("2025-01-07"), accountId: "1" },
-    { id: "5", description: "Uber - Centro", category: "Transporte", type: "saida", amount: "45.00", date: new Date("2025-01-07"), accountId: "1" },
-    { id: "6", description: "Netflix", category: "Lazer", type: "saida", amount: "39.90", date: new Date("2025-01-05"), accountId: "1" },
-    { id: "7", description: "Venda Produto", category: "Vendas", type: "entrada", amount: "850.00", date: new Date("2025-01-04"), accountId: "1" },
-  ];
+  // Fetch transactions and accounts
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
+    queryKey: ["/api/transactions"],
+  });
 
-  const form = useForm<InsertTransaction>({
-    resolver: zodResolver(insertTransactionSchema),
+  const { data: accounts = [] } = useQuery<Account[]>({
+    queryKey: ["/api/accounts"],
+  });
+
+  const form = useForm({
+    resolver: zodResolver(insertTransactionSchema.omit({ userId: true })),
     defaultValues: {
       description: "",
-      type: "saida",
-      amount: "",
+      type: "saida" as const,
+      amount: 0,
       category: "",
-      date: new Date(),
-      userId: "temp-user-id",
-      accountId: "temp-account-id",
-      autoRuleApplied: false,
+      date: new Date().toISOString().split('T')[0],
+      accountId: accounts[0]?.id || "",
+    },
+  });
+
+  // Create transaction mutation
+  const createMutation = useMutation({
+    mutationFn: async (data: { description: string; type: string; amount: number; category: string; date: string; accountId: string }) => {
+      const response = await apiRequest("POST", "/api/transactions", {
+        ...data,
+        date: new Date(data.date).toISOString(),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/categories"] });
+      toast({
+        title: "Transação criada!",
+        description: "A transação foi adicionada com sucesso.",
+      });
+      setIsDialogOpen(false);
+      form.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao criar transação",
+        description: error.message || "Tente novamente mais tarde",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete transaction mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/transactions/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/categories"] });
+      toast({
+        title: "Transação deletada!",
+        description: "A transação foi removida.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao deletar transação",
+        description: error.message || "Tente novamente mais tarde",
+        variant: "destructive",
+      });
     },
   });
 
   async function onSubmit(data: InsertTransaction) {
-    try {
-      // TODO: Implement transaction creation in Task 3
-      console.log("Create transaction:", data);
-      
-      toast({
-        title: "Transação criada!",
-        description: `A transação foi adicionada com sucesso.`,
-      });
-      
-      setIsDialogOpen(false);
-      form.reset();
-    } catch (error) {
-      toast({
-        title: "Erro ao criar transação",
-        description: "Tente novamente mais tarde",
-        variant: "destructive",
-      });
+    createMutation.mutate(data);
+  }
+
+  function handleDelete(id: string) {
+    if (confirm("Tem certeza que deseja deletar esta transação?")) {
+      deleteMutation.mutate(id);
     }
   }
 
@@ -101,7 +142,7 @@ export default function TransactionsPage() {
           </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button data-testid="button-add-transaction">
+              <Button disabled={accounts.length === 0} data-testid="button-add-transaction">
                 <Plus className="mr-2 h-4 w-4" />
                 Nova Transação
               </Button>
@@ -117,13 +158,37 @@ export default function TransactionsPage() {
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
+                    name="accountId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Conta</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-account">
+                              <SelectValue placeholder="Selecione a conta" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {accounts.map((account) => (
+                              <SelectItem key={account.id} value={account.id}>
+                                {account.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
                     name="description"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Descrição</FormLabel>
                         <FormControl>
                           <Input 
-                            placeholder="Ex: Supermercado" 
+                            placeholder="Ex: Salário, Supermercado..." 
                             data-testid="input-description"
                             {...field} 
                           />
@@ -163,10 +228,11 @@ export default function TransactionsPage() {
                           <FormControl>
                             <Input 
                               type="number" 
-                              step="0.01"
+                              step="0.01" 
                               placeholder="0.00" 
                               data-testid="input-amount"
                               {...field} 
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             />
                           </FormControl>
                           <FormMessage />
@@ -187,8 +253,10 @@ export default function TransactionsPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {CATEGORIES.map((cat) => (
-                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            {CATEGORIES.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -196,9 +264,30 @@ export default function TransactionsPage() {
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Data</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="date" 
+                            data-testid="input-date"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <DialogFooter>
-                    <Button type="submit" data-testid="button-submit-transaction">
-                      Adicionar Transação
+                    <Button 
+                      type="submit" 
+                      disabled={createMutation.isPending}
+                      data-testid="button-create-transaction"
+                    >
+                      {createMutation.isPending ? "Criando..." : "Criar Transação"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -208,23 +297,38 @@ export default function TransactionsPage() {
         </div>
       </div>
 
+      {accounts.length === 0 && (
+        <Card className="bg-muted/30 border-dashed">
+          <CardContent className="flex items-center justify-between p-6">
+            <div>
+              <h3 className="font-semibold mb-1">Nenhuma conta encontrada</h3>
+              <p className="text-sm text-muted-foreground">
+                Crie uma conta para começar a registrar transações
+              </p>
+            </div>
+            <Button variant="default">
+              Criar Conta
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar transações..."
-                className="pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
                 data-testid="input-search"
               />
             </div>
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-full md:w-48" data-testid="select-filter-type">
-                <Filter className="mr-2 h-4 w-4" />
+              <SelectTrigger className="w-full md:w-[180px]" data-testid="select-filter-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -238,55 +342,98 @@ export default function TransactionsPage() {
       </Card>
 
       {/* Transactions List */}
-      <Card data-testid="card-transactions-list">
-        <CardContent className="p-0">
-          {filteredTransactions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <p className="text-muted-foreground">Nenhuma transação encontrada</p>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {filteredTransactions.map((transaction, index) => (
-                <div 
-                  key={transaction.id} 
-                  className="flex items-center justify-between p-4 hover-elevate"
-                  data-testid={`transaction-row-${index}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                      transaction.type === "entrada" ? "bg-secondary/10" : "bg-destructive/10"
-                    }`}>
-                      {transaction.type === "entrada" ? (
-                        <ArrowUpRight className="h-5 w-5 text-secondary" />
-                      ) : (
-                        <ArrowDownRight className="h-5 w-5 text-destructive" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-medium truncate" data-testid={`text-description-${index}`}>
-                        {transaction.description}
-                      </p>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="secondary" className="text-xs" data-testid={`badge-category-${index}`}>
-                          {transaction.category}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground" data-testid={`text-date-${index}`}>
-                          {transaction.date.toLocaleDateString('pt-BR')}
-                        </span>
+      {transactionsLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
+        </div>
+      ) : filteredTransactions.length === 0 ? (
+        <Card className="text-center p-12">
+          <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+            <Plus className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <h3 className="font-semibold text-lg mb-2">Nenhuma transação encontrada</h3>
+          <p className="text-muted-foreground mb-4">
+            {searchTerm || filterType !== "all" 
+              ? "Tente ajustar os filtros de busca"
+              : "Comece adicionando sua primeira transação"
+            }
+          </p>
+          {!searchTerm && filterType === "all" && accounts.length > 0 && (
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar Transação
+            </Button>
+          )}
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {filteredTransactions.map((transaction, index) => {
+            const account = accounts.find(a => a.id === transaction.accountId);
+            
+            return (
+              <Card key={transaction.id} data-testid={`card-transaction-${index}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className={`h-12 w-12 rounded-full flex items-center justify-center ${
+                        transaction.type === "entrada" ? "bg-secondary/10" : "bg-destructive/10"
+                      }`}>
+                        {transaction.type === "entrada" ? (
+                          <ArrowUpRight className="h-6 w-6 text-secondary" />
+                        ) : (
+                          <ArrowDownRight className="h-6 w-6 text-destructive" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium" data-testid={`text-description-${index}`}>
+                            {transaction.description}
+                          </p>
+                          {transaction.autoRuleApplied && (
+                            <Badge variant="secondary" className="text-xs">
+                              Auto
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap mt-1">
+                          <Badge variant="outline" className="text-xs" data-testid={`badge-category-${index}`}>
+                            {transaction.category}
+                          </Badge>
+                          {account && (
+                            <span className="text-xs text-muted-foreground">
+                              {account.name}
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    <div className="flex items-center gap-4">
+                      <div className={`text-right font-semibold text-lg ${
+                        transaction.type === "entrada" ? "text-secondary" : "text-foreground"
+                      }`} data-testid={`text-amount-${index}`}>
+                        {transaction.type === "entrada" ? "+" : "-"}R$ {Number(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(transaction.id)}
+                        data-testid={`button-delete-${index}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className={`text-right font-semibold whitespace-nowrap ml-4 ${
-                    transaction.type === "entrada" ? "text-secondary" : "text-foreground"
-                  }`} data-testid={`text-amount-${index}`}>
-                    {transaction.type === "entrada" ? "+" : "-"}R$ {parseFloat(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

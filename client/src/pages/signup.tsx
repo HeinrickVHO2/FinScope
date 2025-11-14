@@ -27,21 +27,30 @@ export default function SignupPage() {
   async function onSubmit(data: InsertUser) {
     setIsLoading(true);
     try {
-      // TODO: Implement signup logic in Task 2 & 3
-      console.log("Signup data:", data);
-      
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao criar conta");
+      }
+
       toast({
         title: "Conta criada com sucesso!",
         description: "Bem-vindo ao FinScope! Seu teste grátis de 10 dias começou.",
       });
       
       setTimeout(() => {
-        setLocation("/dashboard");
-      }, 1000);
+        window.location.href = "/dashboard";
+      }, 500);
     } catch (error) {
       toast({
         title: "Erro ao criar conta",
-        description: "Tente novamente mais tarde",
+        description: (error as Error).message || "Tente novamente mais tarde",
         variant: "destructive",
       });
     } finally {

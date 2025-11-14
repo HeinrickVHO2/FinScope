@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut, User } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/lib/auth";
 
 interface DashboardHeaderProps {
   userName?: string;
@@ -25,10 +26,10 @@ export function DashboardHeader({
   trialDaysLeft 
 }: DashboardHeaderProps) {
   const [, setLocation] = useLocation();
+  const { logout } = useAuth();
 
-  const handleLogout = () => {
-    // TODO: Implement logout logic in Task 3
-    setLocation("/");
+  const handleLogout = async () => {
+    await logout();
   };
 
   const getPlanBadge = () => {

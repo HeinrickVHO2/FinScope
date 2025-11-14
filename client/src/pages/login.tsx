@@ -27,21 +27,30 @@ export default function LoginPage() {
   async function onSubmit(data: LoginData) {
     setIsLoading(true);
     try {
-      // TODO: Implement login logic in Task 2 & 3
-      console.log("Login data:", data);
-      
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao fazer login");
+      }
+
       toast({
         title: "Login realizado!",
         description: "Redirecionando para o dashboard...",
       });
       
       setTimeout(() => {
-        setLocation("/dashboard");
-      }, 1000);
+        window.location.href = "/dashboard";
+      }, 500);
     } catch (error) {
       toast({
         title: "Erro ao fazer login",
-        description: "Email ou senha incorretos",
+        description: (error as Error).message || "Email ou senha incorretos",
         variant: "destructive",
       });
     } finally {
