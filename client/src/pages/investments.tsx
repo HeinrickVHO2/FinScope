@@ -175,7 +175,6 @@ export default function InvestmentsPage() {
   });
 
   async function onCreateSubmit(data: InsertInvestment) {
-    console.log("🔍 [Investment Create] Form data:", data);
     createMutation.mutate(data);
   }
 
@@ -262,7 +261,7 @@ export default function InvestmentsPage() {
                       <FormLabel>Tipo de Investimento</FormLabel>
                       <Select 
                         onValueChange={field.onChange} 
-                        defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-investment-type">
@@ -327,9 +326,11 @@ export default function InvestmentsPage() {
               <Card key={investment.id} className="hover-elevate" data-testid={`card-investment-${investment.id}`}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <div className="flex-1">
-                    <CardTitle className="text-lg font-poppins">{investmentType?.label || investment.type}</CardTitle>
+                    <CardTitle className="text-lg font-poppins" data-testid={`text-investment-name-${investment.id}`}>
+                      {investment.name}
+                    </CardTitle>
                     <CardDescription>
-                      {goal ? "Com meta definida" : "Sem meta"}
+                      {investmentType?.label || investment.type} · {goal ? "Com meta definida" : "Sem meta"}
                     </CardDescription>
                   </div>
                   {goal && <Target className="h-5 w-5 text-primary" />}
@@ -338,7 +339,7 @@ export default function InvestmentsPage() {
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Saldo Atual</p>
                     <p className="text-3xl font-bold font-poppins text-primary">
-                      R$ {parseFloat(investment.currentAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {(parseFloat(investment.currentAmount) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
 

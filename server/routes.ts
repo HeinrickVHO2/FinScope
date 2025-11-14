@@ -472,8 +472,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create investment
   app.post("/api/investments", requireAuth, async (req: any, res) => {
     try {
-      const data = insertInvestmentSchema.parse({ ...req.body, userId: req.session.userId });
-      const investment = await storage.createInvestment(data);
+      const validatedData = insertInvestmentSchema.parse(req.body);
+      const investment = await storage.createInvestment({ ...validatedData, userId: req.session.userId });
       res.json(investment);
     } catch (error) {
       if (error instanceof z.ZodError) {

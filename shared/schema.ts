@@ -159,6 +159,7 @@ export const insertInvestmentSchema = createInsertSchema(investments, {
   }),
 }).omit({
   id: true,
+  userId: true,
   createdAt: true,
   currentAmount: true,
 });
