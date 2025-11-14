@@ -2,14 +2,16 @@
 
 ## Recent Changes (November 14, 2025)
 
-**Investment Transactions - COMPLETE & SECURE**
-- ✅ Implemented atomic investment transactions using PostgreSQL stored procedure
+**Investment Transactions - PRODUCTION READY ✅**
+- ✅ Implemented atomic investment transactions using PostgreSQL stored procedure with SELECT FOR UPDATE locking
 - ✅ Fixed critical PostgREST schema cache issues (created `reload_postgrest_schema()` function)
 - ✅ Added missing database columns: `user_id` in investment_transactions, `current_amount` in investments
-- ✅ Fixed security vulnerability: validates account ownership to prevent unauthorized debits
-- ✅ All operations wrapped in single atomic transaction (no partial writes possible)
-- ✅ E2E tests passing: transaction creation, balance updates, dashboard visualization
-- ✅ Investment feature fully integrated: create/update investments, track goals, view dashboard charts
+- ✅ Fixed security vulnerability: validates both account AND investment ownership to prevent unauthorized access
+- ✅ All operations wrapped in single atomic transaction with row-level locking (prevents race conditions)
+- ✅ Complete deposit/withdrawal support: deposits create 'saida', withdrawals create 'entrada' transactions
+- ✅ E2E tests passing: R$ 0 → R$ 1.000 (deposit) → R$ 1.500 (deposit) - all balances sync correctly
+- ✅ Dashboard charts, account balances, and investment totals all in sync
+- ✅ Investment feature fully integrated: create/update investments, track goals, transactions, view dashboard charts
 
 ## Overview
 
