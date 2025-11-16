@@ -698,6 +698,7 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createOrUpdateInvestmentGoal(goal: InsertInvestmentGoal): Promise<InvestmentGoal> {
+    console.log("[GOAL RECEBIDO]", goal);
     const existing = await this.getInvestmentGoal(goal.investmentId);
 
     if (existing) {
