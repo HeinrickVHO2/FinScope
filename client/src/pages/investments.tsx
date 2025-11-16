@@ -156,7 +156,10 @@ export default function InvestmentsPage() {
     },
     onSuccess: async () => {
       // Force refetch instead of just invalidating (due to staleTime: Infinity)
-      await queryClient.refetchQueries({ queryKey: ["/api/investments/goals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/investments/goals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/investments"] });
+
+      await queryClient.refetchQueries({ queryKey: ["/api/investments/goals"], type: "active" });
       await queryClient.refetchQueries({ queryKey: ["/api/dashboard/investments"] });
       goalForm.reset();
       setIsGoalDialogOpen(false);
@@ -233,7 +236,10 @@ export default function InvestmentsPage() {
     setSelectedInvestment(investment);
     const existingGoal = goalsMap.get(investment.id);
     if (existingGoal) {
-      goalForm.setValue("targetAmount", existingGoal.targetAmount);
+      goalForm.setValue(
+        "targetAmount",
+      String(parseFloat(existingGoal.targetAmount))
+);
     } else {
       goalForm.reset();
     }
@@ -244,7 +250,7 @@ export default function InvestmentsPage() {
     if (!selectedInvestment) return;
     updateGoalMutation.mutate({
       investmentId: selectedInvestment.id,
-      targetAmount: data.targetAmount,
+      targetAmount: parseFloat(data.targetAmount).toFixed(2),
     });
   }
 
@@ -361,7 +367,11 @@ export default function InvestmentsPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {investments?.map((investment) => {
             const goal = goalsMap.get(investment.id);
-            const progress = goal ? (parseFloat(investment.currentAmount) / parseFloat(goal.targetAmount)) * 100 : 0;
+            const goalValue = goal ? parseFloat(goal.targetAmount) : 0;
+            const currentValue = parseFloat(investment.currentAmount);
+
+            const progress =
+              goalValue > 0 ? Math.min((currentValue / goalValue) * 100, 100) : 0;
             const investmentType = INVESTMENT_TYPES.find(t => t.value === investment.type);
 
             return (
