@@ -438,7 +438,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(400).json({ error: (error as Error).message });
     }
+
   });
+
+
+// -------------------------
+// INVESTMENT GOALS
+// -------------------------
+
+// GET ALL GOALS FOR USER
+app.get("/api/investments/goals", async (req, res) => {
+  const userId = req.session.userId;
+  if (!userId) return res.status(401).json({ error: "Não autenticado" });
+
+  const investments = await storage.getInvestmentsByUserId(userId);
+  const goals = [];
+
+  for (const inv of investments) {
+    const goal = await storage.getInvestmentGoal(inv.id);
+    if (goal) goals.push(goal);
+  }
+
+  res.json(goals);
+});
+
+// CREATE OR UPDATE GOAL
+app.post("/api/investments/goals", async (req, res) => {
+  const userId = req.session.userId;
+  if (!userId) return res.status(401).json({ error: "Não autenticado" });
+
+  const { investmentId, targetAmount } = req.body;
+
+  if (!investmentId) {
+    return res.status(400).json({ error: "investmentId é obrigatório" });
+  }
+
+  if (!targetAmount) {
+    return res.status(400).json({ error: "targetAmount é obrigatório" });
+  }
+
+  // 🔥 AQUI: parse correto
+  const parsedAmount = Number(targetAmount);
+
+  if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    return res.status(400).json({ error: "targetAmount inválido" });
+  }
+
+  console.log("[GOAL] Saving goal:", {
+    userId,
+    investmentId,
+    parsedAmount,
+  });
+
+  const goal = await storage.createOrUpdateInvestmentGoal({
+    userId,
+    investmentId,
+    targetAmount: parsedAmount, // 🔥 AQUI VAI O NUMERO CORRIGIDO
+  });
+
+  res.json(goal);
+});
+
+// DELETE GOAL
+app.delete("/api/investments/goals/:investmentId", async (req, res) => {
+  const userId = req.session.userId;
+  if (!userId) return res.status(401).json({ error: "Não autenticado" });
+
+  await storage.deleteInvestmentGoal(req.params.investmentId);
+
+  res.json({ success: true });
+});
+
 
   // ===== DASHBOARD ROUTES =====
   
@@ -740,6 +810,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount
         ].join(',');
       });
+
+      
       
       const csv = [headers.join(','), ...rows].join('\n');
       
