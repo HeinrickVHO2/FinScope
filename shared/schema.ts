@@ -217,27 +217,27 @@ export const updateUserProfileSchema = z.object({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-export type InsertAccount = z.infer<typeof insertAccountSchema>;
+export type InsertAccount = z.infer<typeof insertAccountSchema> & {userId: string;};
 export type UpdateAccount = z.infer<typeof updateAccountSchema>;
 export type Account = typeof accounts.$inferSelect;
 
-export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema> & {userId: string; accountId: string;};
 export type UpdateTransaction = z.infer<typeof updateTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 
-export type InsertRule = z.infer<typeof insertRuleSchema>;
+export type InsertRule = z.infer<typeof insertRuleSchema> & {userID: string;};
 export type UpdateRule = z.infer<typeof updateRuleSchema>;
 export type Rule = typeof rules.$inferSelect;
 
-export type InsertInvestment = z.infer<typeof insertInvestmentSchema>;
+export type InsertInvestment = z.infer<typeof insertInvestmentSchema> & {userId: string;};
 export type UpdateInvestment = z.infer<typeof updateInvestmentSchema>;
 export type Investment = typeof investments.$inferSelect;
 
-export type InsertInvestmentGoal = z.infer<typeof insertInvestmentGoalSchema>;
+export type InsertInvestmentGoal = z.infer<typeof insertInvestmentGoalSchema> & {userId: string; investmentId: string;};
 export type UpdateInvestmentGoal = z.infer<typeof updateInvestmentGoalSchema>;
 export type InvestmentGoal = typeof investmentGoals.$inferSelect;
 
-export type InsertInvestmentTransaction = z.infer<typeof insertInvestmentTransactionSchema>;
+export type InsertInvestmentTransaction = z.infer<typeof insertInvestmentTransactionSchema> & {userId: string; investmentId: string; sourceAccountId: string;};
 export type InvestmentTransaction = typeof investmentTransactions.$inferSelect;
 
 export type LoginData = z.infer<typeof loginSchema>;

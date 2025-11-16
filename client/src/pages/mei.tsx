@@ -41,8 +41,9 @@ export default function MEIPage() {
   const currentPlan = user.plan;
   const isPremium = currentPlan === "premium";
 
-  // Filter business accounts and transactions
-  const businessAccounts = accounts.filter(acc => acc.type === "empresa");
+  const BUSINESS_ACCOUNT_TYPES = new Set(["pj", "empresa", "mei"]);
+  const businessAccounts = accounts.filter(acc => BUSINESS_ACCOUNT_TYPES.has(String(acc.type).toLowerCase()));
+
   const businessAccountIds = new Set(businessAccounts.map(acc => acc.id));
   const businessTransactions = transactions.filter(t => businessAccountIds.has(t.accountId));
 
