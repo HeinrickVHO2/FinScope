@@ -116,19 +116,22 @@ export default function LandingPage() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
-            <a href="#beneficios" className="text-sm font-medium hover:text-primary transition-colors" data-testid="link-benefits">
-              Benefícios
-            </a>
-            <a href="#planos" className="text-sm font-medium hover:text-primary transition-colors" data-testid="link-pricing">
-              Planos
-            </a>
+            <a href="#beneficios" className="text-sm font-medium hover:text-primary transition-colors">Benefícios</a>
+            <a href="#planos" className="text-sm font-medium hover:text-primary transition-colors">Planos</a>
+            <Link href="/recursos" className="text-sm font-medium hover:text-primary transition-colors">Recursos</Link>
+            <Link href="/faq" className="text-sm font-medium hover:text-primary transition-colors">FAQ</Link>
+            <Link href="/sobre" className="text-sm font-medium hover:text-primary transition-colors">Sobre</Link>
+            <Link href="/blog" className="text-sm font-medium hover:text-primary transition-colors">Blog</Link>
+            <Link href="/contato" className="text-sm font-medium hover:text-primary transition-colors">Contato</Link>
+
             <Link href="/login">
-              <Button variant="ghost" data-testid="button-login">Entrar</Button>
+              <Button variant="ghost">Entrar</Button>
             </Link>
             <Link href="/signup">
-              <Button data-testid="button-signup-header">Criar Conta</Button>
+              <Button>Criar Conta</Button>
             </Link>
           </nav>
+
 
           {/* Mobile Navigation */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -143,49 +146,96 @@ export default function LandingPage() {
                   <img
                     src="/logo.png"
                     alt="FinScope"
-                    className="h-19"
+                    className="h-10 w-auto"
                   />
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-4 mt-8">
-                <a
-                  href="#beneficios"
-                  className="text-base font-medium hover:text-primary transition-colors py-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                  data-testid="link-benefits-mobile"
-                >
-                  Benefícios
-                </a>
-                <a
-                  href="#planos"
-                  className="text-base font-medium hover:text-primary transition-colors py-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                  data-testid="link-pricing-mobile"
-                >
-                  Planos
-                </a>
-                <div className="border-t pt-4 mt-2 space-y-3">
-                  <Link href="/login">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => setMobileMenuOpen(false)}
-                      data-testid="button-login-mobile"
-                    >
-                      Entrar
-                    </Button>
-                  </Link>
-                  <Link href="/signup">
-                    <Button
-                      className="w-full justify-start"
-                      onClick={() => setMobileMenuOpen(false)}
-                      data-testid="button-signup-mobile"
-                    >
-                      Criar Conta
-                    </Button>
-                  </Link>
-                </div>
-              </nav>
+
+  <a 
+    href="#beneficios"
+    className="text-base font-medium hover:text-primary transition-colors py-2"
+    onClick={() => setMobileMenuOpen(false)}
+  >
+    Benefícios
+  </a>
+
+  <a 
+    href="#planos"
+    className="text-base font-medium hover:text-primary transition-colors py-2"
+    onClick={() => setMobileMenuOpen(false)}
+  >
+    Planos
+  </a>
+
+  <Link href="/recursos">
+    <span 
+      className="text-base font-medium py-2 block hover:text-primary transition-colors"
+      onClick={() => setMobileMenuOpen(false)}
+    >
+      Recursos
+    </span>
+  </Link>
+
+  <Link href="/faq">
+    <span 
+      className="text-base font-medium py-2 block hover:text-primary transition-colors"
+      onClick={() => setMobileMenuOpen(false)}
+    >
+      FAQ
+    </span>
+  </Link>
+
+  <Link href="/sobre">
+    <span 
+      className="text-base font-medium py-2 block hover:text-primary transition-colors"
+      onClick={() => setMobileMenuOpen(false)}
+    >
+      Sobre
+    </span>
+  </Link>
+
+  <Link href="/blog">
+    <span 
+      className="text-base font-medium py-2 block hover:text-primary transition-colors"
+      onClick={() => setMobileMenuOpen(false)}
+    >
+      Blog
+    </span>
+  </Link>
+
+  <Link href="/contato">
+    <span 
+      className="text-base font-medium py-2 block hover:text-primary transition-colors"
+      onClick={() => setMobileMenuOpen(false)}
+    >
+      Contato
+    </span>
+  </Link>
+
+  <div className="border-t pt-4 mt-2 space-y-3">
+    <Link href="/login">
+      <Button
+        variant="outline"
+        className="w-full justify-start"
+        onClick={() => setMobileMenuOpen(false)}
+      >
+        Entrar
+      </Button>
+    </Link>
+    
+    <Link href="/signup">
+      <Button
+        className="w-full justify-start"
+        onClick={() => setMobileMenuOpen(false)}
+      >
+        Criar Conta
+      </Button>
+    </Link>
+  </div>
+
+</nav>
+
             </SheetContent>
           </Sheet>
         </div>
@@ -356,47 +406,47 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-12 bg-muted/30">
-        <div className="container">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                <span className="font-poppins font-bold">FinScope</span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Controle financeiro inteligente para pessoas e microempresas.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Produto</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">Recursos</a></li>
-                <li><a href="#planos" className="hover:text-foreground transition-colors">Preços</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">FAQ</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Empresa</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">Sobre</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Contato</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Legal</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">Privacidade</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Termos</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
-            <p>&copy; 2025 FinScope. Todos os direitos reservados.</p>
-          </div>
-        </div>
-      </footer>
+    {/* Footer */}
+<footer className="border-t py-12 bg-muted/30">
+  <div className="container">
+    <div className="grid md:grid-cols-4 gap-8">
+
+      {/* ... logo & texto ... */}
+
+      <div>
+        <h3 className="font-semibold mb-4">Produto</h3>
+        <ul className="space-y-2 text-sm text-muted-foreground">
+          <li><Link href="/recursos" className="hover:text-foreground transition-colors">Recursos</Link></li>
+          <li><a href="#planos" className="hover:text-foreground transition-colors">Preços</a></li>
+          <li><Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link></li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 className="font-semibold mb-4">Empresa</h3>
+        <ul className="space-y-2 text-sm text-muted-foreground">
+          <li><Link href="/sobre" className="hover:text-foreground transition-colors">Sobre</Link></li>
+          <li><Link href="/blog" className="hover:text-foreground transition-colors">Blog</Link></li>
+          <li><Link href="/contato" className="hover:text-foreground transition-colors">Contato</Link></li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 className="font-semibold mb-4">Legal</h3>
+        <ul className="space-y-2 text-sm text-muted-foreground">
+          <li><Link href="/privacidade" className="hover:text-foreground transition-colors">Privacidade</Link></li>
+          <li><Link href="/termos" className="hover:text-foreground transition-colors">Termos</Link></li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
+      <p>&copy; 2025 FinScope. Todos os direitos reservados.</p>
+    </div>
+  </div>
+</footer>
+
     </div>
   );
 }
