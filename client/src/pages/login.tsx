@@ -145,6 +145,11 @@ export default function LoginPage() {
             </Form>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
+            <p className="text-sm mt-2">
+  <a href="/forgot-password" className="text-blue-600 hover:underline">
+    Esqueceu sua senha?
+  </a>
+</p>
             <p className="text-sm text-center text-muted-foreground">
               Não tem uma conta?{" "}
               <Link href="/signup">
@@ -152,6 +157,8 @@ export default function LoginPage() {
                   Criar conta grátis
                 </span>
               </Link>
+              
+
             </p>
           </CardFooter>
         </Card>

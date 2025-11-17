@@ -1,6 +1,9 @@
 import type { Express } from "express";
+import bcrypt from "bcrypt";
 import express from "express";
 import session from "express-session";
+import { supabase } from "./supabase";
+import { sendResetEmail } from "server/emails/resetEmail";
 import MemoryStore from "memorystore";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -21,6 +24,7 @@ import {
   insertInvestmentTransactionSchema,
 } from "@shared/schema";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 
 // Extend Express session type
 declare module 'express-session' {
@@ -30,6 +34,10 @@ declare module 'express-session' {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+
+  app.use(express.json());      // 👈 OBRIGATÓRIO
+  app.use(express.urlencoded({ extended: true }));  // (opcional, mas recomendado)
+
   // Trust proxy - required for cookies to work behind Replit's proxy
   app.set('trust proxy', 1);
 
@@ -91,7 +99,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // ===== AUTH ROUTES =====
-  
+
+    app.post("/api/auth/forgot-password", async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email é obrigatório" });
+    }
+
+    const user = await storage.getUserByEmail(email);
+
+    // Não revelar caso o email não exista
+    if (!user) {
+      console.log("[FORGOT] Email não encontrado, retornando sucesso genérico");
+      return res.json({ success: true });
+    }
+
+    const token = randomUUID();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    console.log("[FORGOT] Gerando token de reset:", {
+      userId: user.id,
+      token,
+      expiresAt: expiresAt.toISOString(),
+    });
+
+    await supabase.from("password_reset_tokens").insert({
+      user_id: user.id,
+      token,
+      expires_at: expiresAt.toISOString(),
+    });
+
+    const resetLink = `${process.env.APP_URL}/reset-password?token=${token}`;
+    console.log("[FORGOT] Link de reset gerado:", resetLink);
+
+    await sendResetEmail(email, resetLink);
+
+    return res.json({ success: true });
+  });
+
+
+  app.get("/api/auth/reset-password/validate", async (req, res) => {
+    const token = req.query.token?.toString();
+
+    console.log("[RESET VALIDATE] Query recebida:", req.query);
+    console.log("[RESET VALIDATE] Token recebido:", token);
+
+    if (!token) {
+      console.log("[RESET VALIDATE] Nenhum token informado");
+      return res.status(400).json({ error: "Token inválido" });
+    }
+
+    const { data: tokenData, error } = await supabase
+      .from("password_reset_tokens")
+      .select("*")
+      .eq("token", token)
+      .maybeSingle();
+
+    console.log("[RESET VALIDATE] Resultado Supabase:", {
+      tokenData,
+      error,
+    });
+
+    if (error) {
+      console.error("[RESET VALIDATE] Erro Supabase:", error);
+      return res.status(500).json({ error: "Erro ao validar token" });
+    }
+
+    if (!tokenData) {
+      console.log("[RESET VALIDATE] Nenhum registro encontrado para o token");
+      return res.status(400).json({ error: "Token inválido ou expirado" });
+    }
+
+    const now = new Date();
+    const expires = new Date(tokenData.expires_at);
+
+    console.log("[RESET VALIDATE] Datas:", {
+      agora: now.toISOString(),
+      expiraEm: expires.toISOString(),
+    });
+
+    if (expires < now) {
+      console.log("[RESET VALIDATE] Token expirado");
+      return res.status(400).json({ error: "Token inválido ou expirado" });
+    }
+
+    return res.json({ valid: true });
+  });
+
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+  console.log("[RESET POST] Body recebido:", req.body);
+
+  const { token, password, confirmPassword } = req.body;
+
+  if (!token || !password || !confirmPassword) {
+    console.log("[RESET POST] Campo faltando");
+    return res.status(400).json({ error: "Dados inválidos" });
+  }
+
+  if (password !== confirmPassword) {
+    console.log("[RESET POST] As senhas não coincidem!");
+    return res.status(400).json({ error: "As senhas não coincidem" });
+  }
+
+  // Verifica token no Supabase
+  const { data: tokenData, error: tokenError } = await supabase
+    .from("password_reset_tokens")
+    .select("*")
+    .eq("token", token)
+    .maybeSingle();
+
+  console.log("[RESET POST] Token no banco:", tokenData);
+
+  if (!tokenData || tokenError) {
+    return res.status(400).json({ error: "Token inválido" });
+  }
+
+  const agora = new Date();
+  const expiraEm = new Date(tokenData.expires_at);
+
+  if (agora > expiraEm) {
+    return res.status(400).json({ error: "Token expirado" });
+  }
+
+  // Hash da nova senha
+  const hashed = await bcrypt.hash(password, 10);
+
+  // Atualiza o usuário
+  await supabase
+    .from("users")
+    .update({ password: hashed })
+    .eq("id", tokenData.user_id);
+
+  // Remove o token
+  await supabase
+    .from("password_reset_tokens")
+    .delete()
+    .eq("token", token);
+
+  console.log("[RESET POST] Senha atualizada com sucesso!");
+
+  res.json({ success: true });
+});
+
+
   // Register
   app.post("/api/auth/register", async (req, res) => {
     try {

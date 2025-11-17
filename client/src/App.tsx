@@ -17,6 +17,10 @@ import TransactionsPage from "@/pages/transactions";
 import InvestmentsPage from "@/pages/investments";
 import MEIPage from "@/pages/mei";
 import SettingsPage from "@/pages/settings";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
+
+
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useRequireAuth();
@@ -71,7 +75,18 @@ function Router() {
       <Route path="/" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
-      
+
+      {/* 🔥 ADICIONE ESTAS DUAS LINHAS ABAIXO */}
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+
+{/* 🔥 Rota corrigida para aceitar query strings */}
+<Route path="/reset-password" nest>
+  {() => <ResetPasswordPage />}
+</Route>
+
+
+      {/* 🔥 ------------------------------ */}
+
       {/* Dashboard routes with layout */}
       <Route path="/dashboard">
         <DashboardLayout>
@@ -103,12 +118,13 @@ function Router() {
           <SettingsPage />
         </DashboardLayout>
       </Route>
-      
+
       {/* 404 */}
       <Route component={NotFound} />
     </Switch>
   );
 }
+
 
 function App() {
   return (
