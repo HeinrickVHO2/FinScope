@@ -23,7 +23,7 @@ export async function sendResetEmail(to: string, link: string) {
   <div style="max-width: 520px; margin: auto; background:white; border-radius:14px; padding:40px; box-shadow: 0 8px 28px rgba(0,0,0,0.08);">
 
     <div style="text-align:center; margin-bottom:28px;">
-      <img src="./client/public/Logo.png" alt="FinScope" style="width:130px; opacity:0.95;">
+      <img src="/client/public/Logo.png" alt="FinScope" style="width:130px; opacity:0.95;">
     </div>
 
     <h2 style="color:#1a1a1a; font-size:24px; font-weight:700; margin:0 0 12px;">

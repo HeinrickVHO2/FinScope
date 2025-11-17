@@ -19,12 +19,20 @@ import MEIPage from "@/pages/mei";
 import SettingsPage from "@/pages/settings";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
+import SobrePage from "@/pages/sobre";
+import FAQPage from "@/pages/faq";
+import PrivacidadePage from "@/pages/privacidade";
+import TermosPage from "@/pages/termos";
+import ContatoPage from "@/pages/contato";
+import BlogPage from "@/pages/blog";
+import RecursosPage from "@/pages/recursos";
+
 
 
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useRequireAuth();
-  
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -40,7 +48,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     return <Redirect to="/login" />;
   }
 
-  const trialDaysLeft = user.trialEnd 
+  const trialDaysLeft = user.trialEnd
     ? Math.ceil((new Date(user.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : 0;
 
@@ -54,7 +62,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <DashboardHeader 
+          <DashboardHeader
             userName={user.fullName}
             userPlan={user.plan}
             trialDaysLeft={trialDaysLeft}
@@ -75,14 +83,22 @@ function Router() {
       <Route path="/" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
+      <Route path="/sobre" component={SobrePage} />
+      <Route path="/faq" component={FAQPage} />
+      <Route path="/privacidade" component={PrivacidadePage} />
+      <Route path="/termos" component={TermosPage} />
+      <Route path="/contato" component={ContatoPage} />
+      <Route path="/blog" component={BlogPage} />
+      <Route path="/recursos" component={RecursosPage} />
+
 
       {/* 🔥 ADICIONE ESTAS DUAS LINHAS ABAIXO */}
       <Route path="/forgot-password" component={ForgotPasswordPage} />
 
-{/* 🔥 Rota corrigida para aceitar query strings */}
-<Route path="/reset-password" nest>
-  {() => <ResetPasswordPage />}
-</Route>
+      {/* 🔥 Rota corrigida para aceitar query strings */}
+      <Route path="/reset-password" nest>
+        {() => <ResetPasswordPage />}
+      </Route>
 
 
       {/* 🔥 ------------------------------ */}
