@@ -10,13 +10,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { 
-  TrendingUp, 
-  PieChart, 
-  Zap, 
-  Shield, 
-  BarChart3, 
-  Wallet, 
+import {
+  TrendingUp,
+  PieChart,
+  Zap,
+  Shield,
+  BarChart3,
+  Wallet,
   FileText,
   Check,
   ArrowRight,
@@ -105,11 +105,15 @@ export default function LandingPage() {
       {/* Navigation */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-6 w-6 text-primary" />
-            <span className="text-xl font-poppins font-bold">FinScope</span>
+          <div className="flex items-center gap-3">
+            <img
+              src="/logo.png"
+              alt="FinScope"
+              className="h-15 max-h-20 w-auto"
+            />
           </div>
-          
+
+
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
             <a href="#beneficios" className="text-sm font-medium hover:text-primary transition-colors" data-testid="link-benefits">
@@ -136,21 +140,24 @@ export default function LandingPage() {
             <SheetContent side="right" className="w-[300px]">
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  <span className="font-poppins">FinScope</span>
+                  <img
+                    src="/logo.png"
+                    alt="FinScope"
+                    className="h-19"
+                  />
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-4 mt-8">
-                <a 
-                  href="#beneficios" 
+                <a
+                  href="#beneficios"
                   className="text-base font-medium hover:text-primary transition-colors py-2"
                   onClick={() => setMobileMenuOpen(false)}
                   data-testid="link-benefits-mobile"
                 >
                   Benefícios
                 </a>
-                <a 
-                  href="#planos" 
+                <a
+                  href="#planos"
                   className="text-base font-medium hover:text-primary transition-colors py-2"
                   onClick={() => setMobileMenuOpen(false)}
                   data-testid="link-pricing-mobile"
@@ -159,9 +166,9 @@ export default function LandingPage() {
                 </a>
                 <div className="border-t pt-4 mt-2 space-y-3">
                   <Link href="/login">
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start" 
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
                       onClick={() => setMobileMenuOpen(false)}
                       data-testid="button-login-mobile"
                     >
@@ -169,7 +176,7 @@ export default function LandingPage() {
                     </Button>
                   </Link>
                   <Link href="/signup">
-                    <Button 
+                    <Button
                       className="w-full justify-start"
                       onClick={() => setMobileMenuOpen(false)}
                       data-testid="button-signup-mobile"
@@ -195,7 +202,7 @@ export default function LandingPage() {
               Controle completo das suas finanças pessoais e do seu negócio em um só lugar
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl" data-testid="text-hero-subtitle">
-              Dashboards inteligentes, categorização automática e gestão MEI simplificada. 
+              Dashboards inteligentes, categorização automática e gestão MEI simplificada.
               Tudo que você precisa para organizar sua vida financeira.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
@@ -288,8 +295,8 @@ export default function LandingPage() {
           </div>
           <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto justify-items-center">
             {plans.map((plan, index) => (
-              <Card 
-                key={index} 
+              <Card
+                key={index}
                 className={`relative flex flex-col ${plan.highlighted ? 'border-primary border-2 shadow-lg' : ''}`}
                 data-testid={`card-plan-${plan.name.toLowerCase()}`}
               >
@@ -333,8 +340,8 @@ export default function LandingPage() {
                 </CardContent>
                 <CardFooter>
                   <Link href="/signup" className="w-full">
-                    <Button 
-                      className="w-full" 
+                    <Button
+                      className="w-full"
                       variant={plan.highlighted ? "default" : "outline"}
                       data-testid={`button-select-plan-${plan.name.toLowerCase()}`}
                     >

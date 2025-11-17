@@ -23,6 +23,8 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="flex justify-center pt-20">
+      <div className="flex justify-center mb-6">
+</div>
       <Card className="w-[380px]">
         <CardHeader>
           <CardTitle>Recuperar senha</CardTitle>
