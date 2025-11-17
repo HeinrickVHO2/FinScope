@@ -1,4 +1,4 @@
-import { Home, Wallet, ArrowLeftRight, Briefcase, Settings, TrendingUp, PiggyBank } from "lucide-react";
+import { Home, Wallet, ArrowLeftRight, Briefcase, Settings, PiggyBank } from "lucide-react";
 import { useLocation } from "wouter";
 import {
   Sidebar,
@@ -13,36 +13,12 @@ import {
 } from "@/components/ui/sidebar";
 
 const menuItems = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: Home,
-  },
-  {
-    title: "Contas",
-    url: "/accounts",
-    icon: Wallet,
-  },
-  {
-    title: "Transações",
-    url: "/transactions",
-    icon: ArrowLeftRight,
-  },
-  {
-    title: "Investimentos",
-    url: "/investments",
-    icon: PiggyBank,
-  },
-  {
-    title: "Gestão MEI",
-    url: "/mei",
-    icon: Briefcase,
-  },
-  {
-    title: "Configurações",
-    url: "/settings",
-    icon: Settings,
-  },
+  { title: "Dashboard", url: "/dashboard", icon: Home },
+  { title: "Contas", url: "/accounts", icon: Wallet },
+  { title: "Transações", url: "/transactions", icon: ArrowLeftRight },
+  { title: "Investimentos", url: "/investments", icon: PiggyBank },
+  { title: "Gestão MEI", url: "/mei", icon: Briefcase },
+  { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -51,11 +27,19 @@ export function AppSidebar() {
   return (
     <Sidebar data-testid="sidebar">
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-6 w-6 text-primary" />
-          <span className="text-xl font-poppins font-bold">FinScope</span>
-        </div>
+        <a href="/dashboard" className="flex items-center gap-2">
+          
+          {/* 🔵 SUA LOGO NO SIDEBAR */}
+          <img
+            src="/logo.png"
+            alt="FinScope"
+            className="h-19 max-h-20 w-auto"
+            draggable="false"
+          />
+
+        </a>
       </SidebarHeader>
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navegação</SidebarGroupLabel>
@@ -63,8 +47,8 @@ export function AppSidebar() {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
+                  <SidebarMenuButton
+                    asChild
                     isActive={location === item.url}
                     data-testid={`sidebar-link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
                   >

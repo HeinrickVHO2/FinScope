@@ -78,6 +78,8 @@ export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f1f5f9] px-4">
       <div className="w-full max-w-md p-8 bg-white shadow-xl rounded-xl border border-gray-200">
+        <div className="flex justify-center mb-6">
+</div>
 
         <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">
           Redefinir senha

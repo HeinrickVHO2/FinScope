@@ -78,8 +78,11 @@ export default function SignupPage() {
         <div className="flex flex-col items-center gap-2">
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer" data-testid="link-logo">
-              <TrendingUp className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-poppins font-bold">FinScope</span>
+               <img 
+    src="/logo.png"
+    alt="FinScope"
+    className="h-36 max-h-39 w-auto"
+  />
             </div>
           </Link>
           <p className="text-muted-foreground text-center">
