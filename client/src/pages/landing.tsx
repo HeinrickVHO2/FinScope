@@ -62,7 +62,7 @@ export default function LandingPage() {
   const plans = [
     {
       name: "Pro",
-      price: "R$ 14,90",
+      price: "R$ 19,90",
       period: "/mês",
       description: "Ideal para controle pessoal completo",
       features: [
@@ -76,7 +76,7 @@ export default function LandingPage() {
       ],
       cta: "Iniciar Teste Grátis",
       highlighted: false,
-      badge: "10 dias grátis"
+      badge: "7 dias grátis"
     },
     {
       name: "Premium",
@@ -146,7 +146,7 @@ export default function LandingPage() {
                   <img
                     src="/logo.png"
                     alt="FinScope"
-                    className="h-10 w-auto"
+                    className="h-19 max-h-20 w-auto"
                   />
                 </SheetTitle>
               </SheetHeader>
@@ -246,7 +246,7 @@ export default function LandingPage() {
         <div className="grid lg:grid-cols-2 gap-12 items-center max-w-7xl mx-auto">
           <div className="space-y-6 text-center lg:text-left">
             <Badge variant="secondary" className="w-fit" data-testid="badge-hero">
-              Teste grátis por 10 dias
+              Teste grátis por 7 dias
             </Badge>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-poppins font-bold tracking-tight" data-testid="text-hero-title">
               Controle completo das suas finanças pessoais e do seu negócio em um só lugar
@@ -340,7 +340,7 @@ export default function LandingPage() {
               Escolha o plano ideal para você
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto" data-testid="text-pricing-subtitle">
-              Comece com 10 dias grátis. Sem compromisso, cancele quando quiser.
+              Comece com 7 dias grátis. Sem compromisso, cancele quando quiser.
             </p>
           </div>
           <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto justify-items-center">
