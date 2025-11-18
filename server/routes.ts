@@ -25,7 +25,6 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { caktoFetch } from "./cakto";
 
 
 // Extend Express session type
@@ -1007,68 +1006,30 @@ app.post("/api/checkout/create", requireAuth, async (req: any, res) => {
       return res.status(500).json({ error: "IDs dos produtos da Cakto ausentes no .env" });
     }
 
-    if (mode === "upgrade" && user.caktoSubscriptionId) {
-      try {
-        await caktoFetch(`/public_api/customersubscription/${user.caktoSubscriptionId}/cancel/`, {
-          method: "POST",
-          body: JSON.stringify({ cancel_at_period_end: false }),
-        });
-      } catch (cancelErr) {
-        console.error("[CAKTO CANCEL ERROR]", cancelErr);
-        return res.status(500).json({ error: "Erro ao cancelar plano atual" });
-      }
+    const directCheckoutUrl =
+      rawPlan === "premium"
+        ? process.env.CAKTO_CHECKOUT_PREMIUM_URL
+        : process.env.CAKTO_CHECKOUT_PRO_URL;
+
+    let checkoutUrl = (directCheckoutUrl || "").trim();
+
+    if (!checkoutUrl) {
+      const checkoutBase = process.env.CAKTO_CHECKOUT_BASE_URL || "https://app.cakto.com.br/product";
+      const normalizedBase = checkoutBase.endsWith("/")
+        ? checkoutBase.slice(0, -1)
+        : checkoutBase;
+      checkoutUrl = `${normalizedBase}/${productId}`;
     }
-
-    const defaultTrialDays = Number(process.env.TRIAL_DAYS || "7");
-    const trialDays = mode === "trial" ? defaultTrialDays : 0;
-
-    const payload = {
-      product: productId,
-      customer: {
-        email: user.email,
-        name: user.fullName || user.email,
-      },
-      trial_days: trialDays,
-      success_url: `${process.env.APP_URL}/onboarding/success`,
-      failure_url: `${process.env.APP_URL}/onboarding/error`,
-      metadata: {
-        finscope_user_id: user.id,
-        finscope_mode: mode,
-      },
-    };
-
-    const result: any = await caktoFetch("/public_api/customersubscription/", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-
-    const now = new Date();
-    const updates: any = {
-      caktoSubscriptionId: result.id,
-      plan: rawPlan,
-    };
-
-    if (trialDays > 0) {
-      const trialEnd = new Date(now.getTime() + trialDays * 86400000);
-      updates.trialStart = now;
-      updates.trialEnd = trialEnd;
-    } else {
-      updates.trialStart = null;
-      updates.trialEnd = null;
-    }
-
-    await storage.updateUser(user.id, updates);
 
     return res.json({
       success: true,
-      checkoutUrl: result.checkout_url,
-      subscriptionId: result.id,
+      checkoutUrl,
       plan: rawPlan,
       mode,
     });
   } catch (err) {
     console.error("[CAKTO CHECKOUT ERROR]", err);
-    res.status(500).json({ error: "Erro ao criar checkout da Cakto" });
+    res.status(500).json({ error: "Erro ao preparar checkout da Cakto" });
   }
 });
 
