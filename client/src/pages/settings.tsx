@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Check, Crown } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function SettingsPage() {
   const { toast } = useToast();
   const { user, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   
@@ -44,7 +46,7 @@ export default function SettingsPage() {
   const plans = [
     {
       name: "Pro",
-      price: "R$ 14,90/mês",
+      price: "R$ 19,90/mês",
       current: currentPlan === "pro",
       features: [
         "Até 3 contas",
@@ -98,7 +100,7 @@ export default function SettingsPage() {
                   Você tem {trialDaysLeft} dias restantes no seu teste gratuito do plano Premium.
                 </p>
               </div>
-              <Button variant="default" data-testid="button-activate-plan">
+              <Button variant="default" data-testid="button-activate-plan" onClick={() => setLocation("/settings/billing")}>
                 Ativar Plano
               </Button>
             </div>
@@ -162,7 +164,7 @@ export default function SettingsPage() {
               </div>
             </div>
             {currentPlan !== "premium" && (
-              <Button variant="outline" data-testid="button-upgrade-plan">
+              <Button variant="outline" data-testid="button-upgrade-plan" onClick={() => setLocation("/settings/billing")}>
                 Fazer Upgrade
               </Button>
             )}
@@ -173,7 +175,7 @@ export default function SettingsPage() {
               <p>Você está no plano gratuito. Faça upgrade para desbloquear recursos avançados.</p>
             )}
             {currentPlan === "pro" && (
-              <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 14,90</p>
+              <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 19,90</p>
             )}
             {currentPlan === "premium" && (
               <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 29,90</p>
@@ -220,7 +222,12 @@ export default function SettingsPage() {
               </CardContent>
               <CardFooter>
                 {!plan.current ? (
-                  <Button className="w-full" variant={plan.recommended ? "default" : "outline"} data-testid={`button-select-${plan.name.toLowerCase()}`}>
+                  <Button
+                    className="w-full"
+                    variant={plan.recommended ? "default" : "outline"}
+                    data-testid={`button-select-${plan.name.toLowerCase()}`}
+                    onClick={() => setLocation("/settings/billing")}
+                  >
                     {plan.name === "Free" ? "Fazer Downgrade" : "Selecionar Plano"}
                   </Button>
                 ) : (

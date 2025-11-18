@@ -8,7 +8,7 @@
 - ✅ Fixed critical cache bug: changed from invalidateQueries() to refetchQueries() to handle staleTime: Infinity
 - ✅ Fixed hoisting bug: moved goalsMap initialization before function definitions
 - ✅ Investment goals now update UI immediately after creation/editing
-- ✅ Landing page: removed Free plan, kept only Pro (R$14,90) and Premium (R$29,90) with 10-day trial
+- ✅ Landing page: removed Free plan, kept only Pro (R$19,90) and Premium (R$29,90) with 7-day trial
 - ✅ Landing page: added mobile-responsive navigation with Sheet-based hamburger menu
 - ✅ Landing page: fixed pricing grid layout (md:grid-cols-2 with justify-items-center) for balanced appearance
 - ✅ All E2E tests passing: mobile/desktop navigation, goal creation workflow

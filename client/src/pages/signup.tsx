@@ -10,10 +10,12 @@ import { insertUserSchema, type InsertUser } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { CaktoCheckoutModal } from "@/components/CaktoCheckoutModal";
 
 export default function SignupPage() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const { toast } = useToast();
   const { refetchUser } = useAuth();
 
@@ -46,13 +48,10 @@ export default function SignupPage() {
       
       toast({
         title: "Conta criada com sucesso!",
-        description: "Bem-vindo ao FinScope! Seu teste grátis de 7 dias começou.",
+        description: "Agora escolha seu plano e finalize o checkout para acessar o dashboard.",
       });
       
-      // Small delay to ensure auth context is fully updated
-      setTimeout(() => {
-        setLocation("/dashboard");
-      }, 100);
+      setIsCheckoutOpen(true);
     } catch (error) {
       toast({
         title: "Erro ao criar conta",
@@ -65,6 +64,7 @@ export default function SignupPage() {
   }
 
   return (
+    <>
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="flex items-center justify-between mb-4">
@@ -187,5 +187,19 @@ export default function SignupPage() {
         </Card>
       </div>
     </div>
+    <CaktoCheckoutModal
+      open={isCheckoutOpen}
+      onOpenChange={(open) => {
+        setIsCheckoutOpen(open);
+        if (!open) {
+          setLocation("/dashboard");
+        }
+      }}
+      intent="signup"
+      onFinished={() => {
+        setLocation("/dashboard");
+      }}
+    />
+    </>
   );
 }
