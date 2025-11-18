@@ -147,6 +147,7 @@ export class MemStorage {
       trialStart: null,
       trialEnd: null,
       caktoSubscriptionId: null,
+      billingStatus: "pending",
       createdAt: new Date(),
     };
 

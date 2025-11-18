@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   trialStart: timestamp("trial_start"),
   trialEnd: timestamp("trial_end"),
   caktoSubscriptionId: text("cakto_subscription_id"),
+  billingStatus: text("billing_status").notNull().default("pending"), // 'pending' | 'active' | 'canceled'
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -95,6 +96,7 @@ export const insertUserSchema = createInsertSchema(users, {
   trialStart: true,
   trialEnd: true,
   caktoSubscriptionId: true,
+  billingStatus: true,
   createdAt: true,
 });
 

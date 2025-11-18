@@ -273,6 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           trialStart: user.trialStart,
           trialEnd: user.trialEnd,
           caktoSubscriptionId: user.caktoSubscriptionId,
+          billingStatus: user.billingStatus,
           createdAt: user.createdAt,
         };
         
@@ -313,6 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           trialStart: user.trialStart,
           trialEnd: user.trialEnd,
           caktoSubscriptionId: user.caktoSubscriptionId,
+          billingStatus: user.billingStatus,
           createdAt: user.createdAt,
         };
         res.json({ user: userWithoutPassword });
@@ -342,6 +344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         trialStart: user.trialStart,
         trialEnd: user.trialEnd,
         caktoSubscriptionId: user.caktoSubscriptionId,
+        billingStatus: user.billingStatus,
         createdAt: user.createdAt,
       };
       res.json(userWithoutPassword);
@@ -897,6 +900,8 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
         plan: updated.plan,
         trialStart: updated.trialStart,
         trialEnd: updated.trialEnd,
+        caktoSubscriptionId: updated.caktoSubscriptionId,
+        billingStatus: updated.billingStatus,
         createdAt: updated.createdAt,
       };
       res.json(userWithoutPassword);
@@ -930,6 +935,8 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
         plan: updated.plan,
         trialStart: updated.trialStart,
         trialEnd: updated.trialEnd,
+        caktoSubscriptionId: updated.caktoSubscriptionId,
+        billingStatus: updated.billingStatus,
         createdAt: updated.createdAt,
       };
       res.json(userWithoutPassword);
@@ -980,8 +987,8 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
     }
   });
 
- // ======================================================
-// CAKTO – Criar assinatura + checkout com trial de 7 dias
+// ======================================================
+// CAKTO – Checkout com garantia de 10 dias (reembolso manual)
 // ======================================================
 app.post("/api/checkout/create", requireAuth, async (req: any, res) => {
   try {
@@ -1097,6 +1104,8 @@ app.post("/api/cakto/webhook", async (req, res) => {
         updates.trialEnd = null;
       }
 
+      updates.billingStatus = "active";
+
       await storage.updateUser(user.id, updates);
 
       console.log(`[CAKTO] Plano ativado: ${email} → ${plan}`);
@@ -1109,6 +1118,7 @@ app.post("/api/cakto/webhook", async (req, res) => {
         trialStart: null,
         trialEnd: null,
         caktoSubscriptionId: null,
+        billingStatus: "canceled",
       });
 
       console.log(`[CAKTO] Assinatura cancelada: ${email}`);

@@ -39,7 +39,7 @@ export default function BillingSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              O plano atual será cancelado imediatamente e um novo será criado sem período de teste.
+              O plano atual será cancelado imediatamente e um novo será criado. Você continua com 10 dias de garantia para solicitar reembolso caso não esteja satisfeito.
             </p>
             <div className="flex gap-3">
               <Button onClick={() => setIsModalOpen(true)}>Abrir checkout</Button>
