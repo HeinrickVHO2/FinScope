@@ -138,18 +138,15 @@ export class MemStorage {
     const hashedPassword = await bcrypt.hash(insertUser.password, 10);
     
     // Set trial dates for new users
-    const trialStart = new Date();
-    const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 10); // 10 days trial
-
     const user: User = {
       id,
       email: insertUser.email,
       password: hashedPassword,
       fullName: insertUser.fullName,
       plan: "free",
-      trialStart,
-      trialEnd,
+      trialStart: null,
+      trialEnd: null,
+      caktoSubscriptionId: null,
       createdAt: new Date(),
     };
 

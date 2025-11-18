@@ -273,6 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           plan: user.plan,
           trialStart: user.trialStart,
           trialEnd: user.trialEnd,
+          caktoSubscriptionId: user.caktoSubscriptionId,
           createdAt: user.createdAt,
         };
         
@@ -312,6 +313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           plan: user.plan,
           trialStart: user.trialStart,
           trialEnd: user.trialEnd,
+          caktoSubscriptionId: user.caktoSubscriptionId,
           createdAt: user.createdAt,
         };
         res.json({ user: userWithoutPassword });
@@ -340,6 +342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         plan: user.plan,
         trialStart: user.trialStart,
         trialEnd: user.trialEnd,
+        caktoSubscriptionId: user.caktoSubscriptionId,
         createdAt: user.createdAt,
       };
       res.json(userWithoutPassword);
@@ -983,9 +986,10 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
 // ======================================================
 app.post("/api/checkout/create", requireAuth, async (req: any, res) => {
   try {
-    const { plan } = req.body;
+    const rawPlan = req.body?.plan?.toString().toLowerCase();
+    const mode = req.body?.mode === "upgrade" ? "upgrade" : "trial";
 
-    if (!["pro", "premium"].includes(plan)) {
+    if (!["pro", "premium"].includes(rawPlan)) {
       return res.status(400).json({ error: "Plano inválido. Use: pro | premium" });
     }
 
@@ -994,26 +998,43 @@ app.post("/api/checkout/create", requireAuth, async (req: any, res) => {
       return res.status(404).json({ error: "Usuário não encontrado" });
     }
 
-    // IDs das ofertas no .env
-    const planId =
-      plan === "premium"
-        ? process.env.CAKTO_PLAN_PREMIUM_ID
-        : process.env.CAKTO_PLAN_PRO_ID;
+    const productId =
+      rawPlan === "premium"
+        ? process.env.CAKTO_PRODUCT_PREMIUM_ID || process.env.CAKTO_PLAN_PREMIUM_ID
+        : process.env.CAKTO_PRODUCT_PRO_ID || process.env.CAKTO_PLAN_PRO_ID;
 
-    if (!planId) {
-      return res.status(500).json({ error: "IDs das ofertas da Cakto ausentes no .env" });
+    if (!productId) {
+      return res.status(500).json({ error: "IDs dos produtos da Cakto ausentes no .env" });
     }
 
-    // Criar assinatura com trial via API
+    if (mode === "upgrade" && user.caktoSubscriptionId) {
+      try {
+        await caktoFetch(`/public_api/customersubscription/${user.caktoSubscriptionId}/cancel/`, {
+          method: "POST",
+          body: JSON.stringify({ cancel_at_period_end: false }),
+        });
+      } catch (cancelErr) {
+        console.error("[CAKTO CANCEL ERROR]", cancelErr);
+        return res.status(500).json({ error: "Erro ao cancelar plano atual" });
+      }
+    }
+
+    const defaultTrialDays = Number(process.env.TRIAL_DAYS || "7");
+    const trialDays = mode === "trial" ? defaultTrialDays : 0;
+
     const payload = {
-      plan: planId,
+      product: productId,
       customer: {
         email: user.email,
         name: user.fullName || user.email,
       },
-      trial_days: 7,
+      trial_days: trialDays,
       success_url: `${process.env.APP_URL}/onboarding/success`,
       failure_url: `${process.env.APP_URL}/onboarding/error`,
+      metadata: {
+        finscope_user_id: user.id,
+        finscope_mode: mode,
+      },
     };
 
     const result: any = await caktoFetch("/public_api/customersubscription/", {
@@ -1021,12 +1042,30 @@ app.post("/api/checkout/create", requireAuth, async (req: any, res) => {
       body: JSON.stringify(payload),
     });
 
+    const now = new Date();
+    const updates: any = {
+      caktoSubscriptionId: result.id,
+      plan: rawPlan,
+    };
+
+    if (trialDays > 0) {
+      const trialEnd = new Date(now.getTime() + trialDays * 86400000);
+      updates.trialStart = now;
+      updates.trialEnd = trialEnd;
+    } else {
+      updates.trialStart = null;
+      updates.trialEnd = null;
+    }
+
+    await storage.updateUser(user.id, updates);
+
     return res.json({
       success: true,
       checkoutUrl: result.checkout_url,
       subscriptionId: result.id,
+      plan: rawPlan,
+      mode,
     });
-
   } catch (err) {
     console.error("[CAKTO CHECKOUT ERROR]", err);
     res.status(500).json({ error: "Erro ao criar checkout da Cakto" });
@@ -1062,24 +1101,42 @@ app.post("/api/cakto/webhook", async (req, res) => {
 
     if (!email) return res.json({ received: true });
 
+    const subscriptionId =
+      data.id ||
+      data.subscription_id ||
+      data.subscriptionId ||
+      data?.fields?.subscription_id;
+
     const user = await storage.getUserByEmail(email);
     if (!user) return res.json({ received: true });
 
     // Ativar assinatura ou trial
     if (event === "purchase_approved" || event === "subscription_created") {
       const now = new Date();
-      const trialEnd = new Date(now.getTime() + 7 * 86400 * 1000);
-
       const productName = data.product?.name?.toLowerCase() || "";
 
       const plan =
         productName.includes("premium") ? "premium" : "pro";
 
-      await storage.updateUser(user.id, {
+      const trialStartValue = data.trial_start ? new Date(data.trial_start) : now;
+      const trialEndValue = data.trial_end ? new Date(data.trial_end) : null;
+      const hasTrial = Boolean(trialEndValue || data.trial_days > 0);
+
+      const updates: any = {
         plan,
-        trialStart: now,
-        trialEnd,
-      });
+        caktoSubscriptionId: subscriptionId || user.caktoSubscriptionId,
+      };
+
+      if (hasTrial) {
+        updates.trialStart = trialStartValue;
+        updates.trialEnd =
+          trialEndValue || new Date(trialStartValue.getTime() + 7 * 86400 * 1000);
+      } else {
+        updates.trialStart = null;
+        updates.trialEnd = null;
+      }
+
+      await storage.updateUser(user.id, updates);
 
       console.log(`[CAKTO] Plano ativado: ${email} → ${plan}`);
     }
@@ -1090,6 +1147,7 @@ app.post("/api/cakto/webhook", async (req, res) => {
         plan: "free",
         trialStart: null,
         trialEnd: null,
+        caktoSubscriptionId: null,
       });
 
       console.log(`[CAKTO] Assinatura cancelada: ${email}`);

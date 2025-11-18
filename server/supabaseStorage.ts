@@ -38,6 +38,7 @@ export class SupabaseStorage implements IStorage {
       plan: data.plan,
       trialStart: data.trial_start ? new Date(data.trial_start) : null,
       trialEnd: data.trial_end ? new Date(data.trial_end) : null,
+      caktoSubscriptionId: data.cakto_subscription_id || null,
       createdAt: new Date(data.created_at),
     };
   }
@@ -59,6 +60,7 @@ export class SupabaseStorage implements IStorage {
       plan: data.plan,
       trialStart: data.trial_start ? new Date(data.trial_start) : null,
       trialEnd: data.trial_end ? new Date(data.trial_end) : null,
+      caktoSubscriptionId: data.cakto_subscription_id || null,
       createdAt: new Date(data.created_at),
     };
   }
@@ -71,10 +73,6 @@ export class SupabaseStorage implements IStorage {
 
     const hashedPassword = await bcrypt.hash(insertUser.password, 10);
     
-    const trialStart = new Date();
-    const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 10);
-
     const { data, error } = await supabase
       .from("users")
       .insert({
@@ -82,8 +80,9 @@ export class SupabaseStorage implements IStorage {
         password: hashedPassword,
         full_name: insertUser.fullName,
         plan: "free",
-        trial_start: trialStart.toISOString(),
-        trial_end: trialEnd.toISOString(),
+        trial_start: null,
+        trial_end: null,
+        cakto_subscription_id: null,
       })
       .select()
       .single();
@@ -98,19 +97,27 @@ export class SupabaseStorage implements IStorage {
       password: data.password,
       fullName: data.full_name,
       plan: data.plan,
-      trialStart: new Date(data.trial_start),
-      trialEnd: new Date(data.trial_end),
+      trialStart: data.trial_start ? new Date(data.trial_start) : null,
+      trialEnd: data.trial_end ? new Date(data.trial_end) : null,
+      caktoSubscriptionId: data.cakto_subscription_id || null,
       createdAt: new Date(data.created_at),
     };
   }
 
   async updateUser(id: string, updates: Partial<Omit<User, 'id' | 'password' | 'createdAt'>>): Promise<User | undefined> {
     const updateData: any = {};
-    if (updates.email) updateData.email = updates.email;
-    if (updates.fullName) updateData.full_name = updates.fullName;
-    if (updates.plan) updateData.plan = updates.plan;
-    if (updates.trialStart) updateData.trial_start = updates.trialStart.toISOString();
-    if (updates.trialEnd) updateData.trial_end = updates.trialEnd.toISOString();
+    if (updates.email !== undefined) updateData.email = updates.email;
+    if (updates.fullName !== undefined) updateData.full_name = updates.fullName;
+    if (updates.plan !== undefined) updateData.plan = updates.plan;
+    if (updates.trialStart !== undefined) {
+      updateData.trial_start = updates.trialStart ? updates.trialStart.toISOString() : null;
+    }
+    if (updates.trialEnd !== undefined) {
+      updateData.trial_end = updates.trialEnd ? updates.trialEnd.toISOString() : null;
+    }
+    if (updates.caktoSubscriptionId !== undefined) {
+      updateData.cakto_subscription_id = updates.caktoSubscriptionId || null;
+    }
 
     const { data, error } = await supabase
       .from("users")
@@ -129,6 +136,7 @@ export class SupabaseStorage implements IStorage {
       plan: data.plan,
       trialStart: data.trial_start ? new Date(data.trial_start) : null,
       trialEnd: data.trial_end ? new Date(data.trial_end) : null,
+      caktoSubscriptionId: data.cakto_subscription_id || null,
       createdAt: new Date(data.created_at),
     };
   }

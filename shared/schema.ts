@@ -12,6 +12,7 @@ export const users = pgTable("users", {
   plan: text("plan").notNull().default("free"), // 'free' | 'pro' | 'premium'
   trialStart: timestamp("trial_start"),
   trialEnd: timestamp("trial_end"),
+  caktoSubscriptionId: text("cakto_subscription_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -90,6 +91,10 @@ export const insertUserSchema = createInsertSchema(users, {
   fullName: z.string().min(2, "Nome deve ter no mínimo 2 caracteres"),
 }).omit({
   id: true,
+  plan: true,
+  trialStart: true,
+  trialEnd: true,
+  caktoSubscriptionId: true,
   createdAt: true,
 });
 

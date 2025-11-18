@@ -26,6 +26,9 @@ import TermosPage from "@/pages/termos";
 import ContatoPage from "@/pages/contato";
 import BlogPage from "@/pages/blog";
 import RecursosPage from "@/pages/recursos";
+import BillingSettingsPage from "@/pages/settings-billing";
+import OnboardingSuccessPage from "@/pages/onboarding-success";
+import OnboardingErrorPage from "@/pages/onboarding-error";
 
 
 
@@ -90,6 +93,8 @@ function Router() {
       <Route path="/contato" component={ContatoPage} />
       <Route path="/blog" component={BlogPage} />
       <Route path="/recursos" component={RecursosPage} />
+      <Route path="/onboarding/success" component={OnboardingSuccessPage} />
+      <Route path="/onboarding/error" component={OnboardingErrorPage} />
 
 
       {/* 🔥 ADICIONE ESTAS DUAS LINHAS ABAIXO */}
@@ -132,6 +137,11 @@ function Router() {
       <Route path="/settings">
         <DashboardLayout>
           <SettingsPage />
+        </DashboardLayout>
+      </Route>
+      <Route path="/settings/billing">
+        <DashboardLayout>
+          <BillingSettingsPage />
         </DashboardLayout>
       </Route>
 
