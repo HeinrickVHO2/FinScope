@@ -64,7 +64,7 @@ export function CaktoCheckoutModal({ open, onOpenChange, intent, onFinished }: C
 
   const subtitle = useMemo(() => {
     if (intent === "signup") {
-      return "Finalize sua assinatura sem sair do FinScope. Você terá 7 dias grátis para testar.";
+      return "Finalize sua assinatura sem sair do FinScope. Caso não curta em até 10 dias, reembolsamos 100% do valor.";
     }
     return "Troque de plano imediatamente. Cancelamos o plano atual e criamos o novo sem período de teste.";
   }, [intent]);
@@ -136,9 +136,9 @@ export function CaktoCheckoutModal({ open, onOpenChange, intent, onFinished }: C
                   <Clock3 className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="font-semibold text-primary">Cobrança apenas após os 7 dias grátis</p>
+                  <p className="font-semibold text-primary">Garantia de 10 dias</p>
                   <p className="text-muted-foreground">
-                    Durante o período de teste você pode cancelar a qualquer momento e nada será cobrado.
+                    Pague agora e, se não gostar em até 10 dias, reembolsamos o valor integral sem burocracia.
                   </p>
                 </div>
               </div>
@@ -228,17 +228,17 @@ export function CaktoCheckoutModal({ open, onOpenChange, intent, onFinished }: C
               <div>
                 <p className="font-medium">Finalize o pagamento no modal</p>
                 <p className="text-sm text-muted-foreground">
-                  Após confirmar o pagamento, clique em &quot;Ir para o dashboard&quot;.
+                  Após confirmar o pagamento, clique em &quot;Verificar pagamento&quot; para atualizar seu acesso.
                 </p>
                 {intent === "signup" && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Lembre-se: sua cobrança só acontece após os 7 dias grátis. Cancele antes do fim do período para não pagar nada.
+                    Lembre-se: você tem 10 dias para testar com tranquilidade. Se cancelar nesse prazo, devolvemos tudo.
                   </p>
                 )}
               </div>
             </div>
               <Button onClick={handleFinish}>
-                Ir para o dashboard
+                Verificar pagamento
               </Button>
             </div>
           </div>

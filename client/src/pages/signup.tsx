@@ -3,19 +3,17 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, type InsertUser } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { CaktoCheckoutModal } from "@/components/CaktoCheckoutModal";
 
 export default function SignupPage() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const { toast } = useToast();
   const { refetchUser } = useAuth();
 
@@ -48,10 +46,10 @@ export default function SignupPage() {
       
       toast({
         title: "Conta criada com sucesso!",
-        description: "Agora escolha seu plano e finalize o checkout para acessar o dashboard.",
+        description: "Complete o checkout para liberar o dashboard. Você tem 10 dias para testar com direito a reembolso.",
       });
       
-      setIsCheckoutOpen(true);
+      setLocation("/billing-required?autoOpen=1");
     } catch (error) {
       toast({
         title: "Erro ao criar conta",
@@ -86,7 +84,7 @@ export default function SignupPage() {
             </div>
           </Link>
           <p className="text-muted-foreground text-center">
-            Crie sua conta e ganhe 7 dias grátis
+            Crie sua conta e tenha 10 dias de garantia de reembolso
           </p>
         </div>
 
@@ -187,19 +185,6 @@ export default function SignupPage() {
         </Card>
       </div>
     </div>
-    <CaktoCheckoutModal
-      open={isCheckoutOpen}
-      onOpenChange={(open) => {
-        setIsCheckoutOpen(open);
-        if (!open) {
-          setLocation("/dashboard");
-        }
-      }}
-      intent="signup"
-      onFinished={() => {
-        setLocation("/dashboard");
-      }}
-    />
     </>
   );
 }

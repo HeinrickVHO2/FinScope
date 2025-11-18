@@ -74,9 +74,9 @@ export default function LandingPage() {
         "Exportação CSV",
         "Suporte via e-mail"
       ],
-      cta: "Iniciar Teste Grátis",
+      cta: "Começar com garantia de 10 dias",
       highlighted: false,
-      badge: "7 dias grátis"
+      badge: "10 dias de garantia"
     },
     {
       name: "Premium",
@@ -94,7 +94,7 @@ export default function LandingPage() {
         "Acesso antecipado a recursos",
         "Backup automático"
       ],
-      cta: "Iniciar Teste Premium",
+      cta: "Assinar com garantia de 10 dias",
       highlighted: true,
       badge: "Mais popular"
     }
@@ -246,7 +246,7 @@ export default function LandingPage() {
         <div className="grid lg:grid-cols-2 gap-12 items-center max-w-7xl mx-auto">
           <div className="space-y-6 text-center lg:text-left">
             <Badge variant="secondary" className="w-fit" data-testid="badge-hero">
-              Teste grátis por 7 dias
+              Garantia de 10 dias
             </Badge>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-poppins font-bold tracking-tight" data-testid="text-hero-title">
               Controle completo das suas finanças pessoais e do seu negócio em um só lugar
@@ -258,7 +258,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/signup">
                 <Button size="lg" className="w-full sm:w-auto" data-testid="button-cta-primary">
-                  Iniciar Teste Grátis
+                  Começar com garantia
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
@@ -269,7 +269,7 @@ export default function LandingPage() {
               </a>
             </div>
             <p className="text-sm text-muted-foreground" data-testid="text-hero-note">
-              Sem cartão de crédito necessário • Cancele quando quiser
+              Pagamento imediato com reembolso garantido por 10 dias
             </p>
           </div>
           <div className="hidden lg:block">
@@ -340,7 +340,7 @@ export default function LandingPage() {
               Escolha o plano ideal para você
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto" data-testid="text-pricing-subtitle">
-              Comece com 7 dias grátis. Sem compromisso, cancele quando quiser.
+              Pagamento imediato com garantia total de 10 dias. Se não gostar, solicitamos o reembolso sem burocracia.
             </p>
           </div>
           <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto justify-items-center">
