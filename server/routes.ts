@@ -25,6 +25,8 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import { caktoFetch } from "./cakto";
+
 
 // Extend Express session type
 declare module 'express-session' {
@@ -976,80 +978,132 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
     }
   });
 
-  // ===== CACKTO PAYMENT ROUTES =====
+ // ======================================================
+// CAKTO – Criar assinatura + checkout com trial de 7 dias
+// ======================================================
+app.post("/api/checkout/create", requireAuth, async (req: any, res) => {
+  try {
+    const { plan } = req.body;
 
-  // Create checkout session (called before user signup)
-  app.post("/api/checkout/create", async (req, res) => {
-    try {
-      const { email, fullName, plan } = req.body;
-      
-      if (!email || !fullName || !plan) {
-        return res.status(400).json({ error: "Email, nome completo e plano são obrigatórios" });
-      }
+    if (!["pro", "premium"].includes(plan)) {
+      return res.status(400).json({ error: "Plano inválido. Use: pro | premium" });
+    }
 
-      if (!["pro", "premium"].includes(plan)) {
-        return res.status(400).json({ error: "Plano inválido. Escolha 'pro' ou 'premium'" });
-      }
+    const user = await storage.getUser(req.session.userId);
+    if (!user) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
 
-      // TODO: Implement Cackto API integration here
-      // For now, return a placeholder response
-      res.json({
-        success: true,
-        checkoutUrl: "https://checkout.cakto.com.br/placeholder",
-        message: "Integração com Cackto em desenvolvimento"
+    // IDs das ofertas no .env
+    const planId =
+      plan === "premium"
+        ? process.env.CAKTO_PLAN_PREMIUM_ID
+        : process.env.CAKTO_PLAN_PRO_ID;
+
+    if (!planId) {
+      return res.status(500).json({ error: "IDs das ofertas da Cakto ausentes no .env" });
+    }
+
+    // Criar assinatura com trial via API
+    const payload = {
+      plan: planId,
+      customer: {
+        email: user.email,
+        name: user.fullName || user.email,
+      },
+      trial_days: 7,
+      success_url: `${process.env.APP_URL}/onboarding/success`,
+      failure_url: `${process.env.APP_URL}/onboarding/error`,
+    };
+
+    const result: any = await caktoFetch("/public_api/customersubscription/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    return res.json({
+      success: true,
+      checkoutUrl: result.checkout_url,
+      subscriptionId: result.id,
+    });
+
+  } catch (err) {
+    console.error("[CAKTO CHECKOUT ERROR]", err);
+    res.status(500).json({ error: "Erro ao criar checkout da Cakto" });
+  }
+});
+
+// ======================================================
+// CAKTO Webhook – ativação/cancelamento/renovações
+// ======================================================
+app.post("/api/cakto/webhook", async (req, res) => {
+  try {
+    const body = req.body;
+
+    // Validação do secret
+    const incomingSecret = body.secret || body.fields?.secret;
+    if (incomingSecret !== process.env.CAKTO_WEBHOOK_SECRET) {
+      console.warn("[CAKTO WEBHOOK] Secret inválido");
+      return res.status(401).json({ error: "Invalid secret" });
+    }
+
+    // Tipo do evento
+    const event =
+      body.event ||
+      body.event_id ||
+      body.type ||
+      body?.event?.custom_id;
+
+    const data = body.data || body.payload || body;
+    const customer = data.customer || body.customer;
+    const email = customer?.email;
+
+    console.log("[CAKTO WEBHOOK RECEIVED]", event, email);
+
+    if (!email) return res.json({ received: true });
+
+    const user = await storage.getUserByEmail(email);
+    if (!user) return res.json({ received: true });
+
+    // Ativar assinatura ou trial
+    if (event === "purchase_approved" || event === "subscription_created") {
+      const now = new Date();
+      const trialEnd = new Date(now.getTime() + 7 * 86400 * 1000);
+
+      const productName = data.product?.name?.toLowerCase() || "";
+
+      const plan =
+        productName.includes("premium") ? "premium" : "pro";
+
+      await storage.updateUser(user.id, {
+        plan,
+        trialStart: now,
+        trialEnd,
       });
-    } catch (error) {
-      res.status(500).json({ error: (error as Error).message });
-    }
-  });
 
-  // Webhook endpoint to receive Cackto payment events
-  app.post("/api/webhooks/cackto", async (req, res) => {
-    try {
-      const event = req.body;
-      
-      console.log("[Cackto Webhook] Received event:", event.event || event.type);
-      
-      // Validate webhook signature (TODO: implement when we have API key)
-      
-      const eventType = event.event || event.type;
-      
-      switch (eventType) {
-        case "payment.approved":
-          console.log("[Cackto] Payment approved:", event.order_id);
-          // TODO: Create user account and activate trial
-          break;
-          
-        case "payment.pending":
-          console.log("[Cackto] Payment pending:", event.order_id);
-          break;
-          
-        case "payment.rejected":
-          console.log("[Cackto] Payment rejected:", event.order_id);
-          break;
-          
-        case "subscription.renewed":
-          console.log("[Cackto] Subscription renewed:", event.order_id);
-          // TODO: Extend subscription period
-          break;
-          
-        case "subscription.cancelled":
-          console.log("[Cackto] Subscription cancelled:", event.order_id);
-          // TODO: Downgrade user to free plan
-          break;
-          
-        default:
-          console.log("[Cackto] Unknown event type:", eventType);
-      }
-      
-      // Always return 200 to acknowledge receipt
-      res.status(200).json({ received: true });
-    } catch (error) {
-      console.error("[Cackto Webhook] Error:", error);
-      // Still return 200 to avoid retries
-      res.status(200).json({ received: true, error: (error as Error).message });
+      console.log(`[CAKTO] Plano ativado: ${email} → ${plan}`);
     }
-  });
+
+    // Cancelamento
+    if (event === "subscription_canceled" || event === "subscription_renewal_refused") {
+      await storage.updateUser(user.id, {
+        plan: "free",
+        trialStart: null,
+        trialEnd: null,
+      });
+
+      console.log(`[CAKTO] Assinatura cancelada: ${email}`);
+    }
+
+    return res.json({ received: true });
+
+  } catch (err) {
+    console.error("[CAKTO WEBHOOK ERROR]", err);
+    return res.status(200).json({ received: true });
+  }
+});
+
+
 
   const httpServer = createServer(app);
   return httpServer;

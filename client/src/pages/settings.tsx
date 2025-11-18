@@ -43,16 +43,6 @@ export default function SettingsPage() {
 
   const plans = [
     {
-      name: "Free",
-      price: "Grátis",
-      current: currentPlan === "free",
-      features: [
-        "1 conta financeira",
-        "Dashboard básico",
-        "Transações ilimitadas",
-      ],
-    },
-    {
       name: "Pro",
       price: "R$ 14,90/mês",
       current: currentPlan === "pro",
@@ -183,10 +173,10 @@ export default function SettingsPage() {
               <p>Você está no plano gratuito. Faça upgrade para desbloquear recursos avançados.</p>
             )}
             {currentPlan === "pro" && (
-              <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 29,90</p>
+              <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 14,90</p>
             )}
             {currentPlan === "premium" && (
-              <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 47,90</p>
+              <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 29,90</p>
             )}
           </div>
         </CardContent>

@@ -46,7 +46,7 @@ export default function SignupPage() {
       
       toast({
         title: "Conta criada com sucesso!",
-        description: "Bem-vindo ao FinScope! Seu teste grátis de 10 dias começou.",
+        description: "Bem-vindo ao FinScope! Seu teste grátis de 7 dias começou.",
       });
       
       // Small delay to ensure auth context is fully updated
@@ -86,7 +86,7 @@ export default function SignupPage() {
             </div>
           </Link>
           <p className="text-muted-foreground text-center">
-            Crie sua conta e ganhe 10 dias grátis
+            Crie sua conta e ganhe 7 dias grátis
           </p>
         </div>
 
