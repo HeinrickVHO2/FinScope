@@ -3,7 +3,10 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import dotenv from "dotenv";
 
-dotenv.config();
+// Only load .env files in development (not in production/deployment)
+if (process.env.NODE_ENV !== 'production' && !process.env.REPLIT_DEPLOYMENT) {
+  dotenv.config();
+}
 
 const app = express();
 
@@ -18,6 +21,11 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+
+// Health check endpoint for deployments (Autoscale/Cloud Run)
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Disable caching for API routes to prevent 304 responses that break TanStack Query
 app.set('etag', false);
