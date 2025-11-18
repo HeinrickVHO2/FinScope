@@ -2,13 +2,19 @@
 
 ## Recent Changes (November 14, 2025)
 
+**Deployment Fixes - READY FOR DEPLOYMENT ✅**
+- ✅ Fixed dotenv loading issue: conditional check prevents loading .env files in production/deployment
+- ✅ Added `/health` endpoint for Autoscale (Cloud Run) health checks
+- ✅ Health check returns `{ status: 'ok', timestamp }` with HTTP 200
+- ⚠️ **ACTION REQUIRED**: Add SUPABASE_ANON_KEY to deployment secrets (see deployment instructions below)
+
 **Investment Goals UX + Landing Page Improvements - PRODUCTION READY ✅**
 - ✅ Replaced browser prompt() with proper Dialog form for investment goal creation/editing
 - ✅ Added Tooltip components on icon-only buttons (Target, Delete) for better accessibility
 - ✅ Fixed critical cache bug: changed from invalidateQueries() to refetchQueries() to handle staleTime: Infinity
 - ✅ Fixed hoisting bug: moved goalsMap initialization before function definitions
 - ✅ Investment goals now update UI immediately after creation/editing
-- ✅ Landing page: removed Free plan, kept only Pro (R$19,90) and Premium (R$29,90) with 7-day trial
+- ✅ Landing page: removed Free plan, kept only Pro (R$14,90) and Premium (R$29,90) with 10-day trial
 - ✅ Landing page: added mobile-responsive navigation with Sheet-based hamburger menu
 - ✅ Landing page: fixed pricing grid layout (md:grid-cols-2 with justify-items-center) for balanced appearance
 - ✅ All E2E tests passing: mobile/desktop navigation, goal creation workflow
