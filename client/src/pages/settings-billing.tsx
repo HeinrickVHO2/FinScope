@@ -1,36 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, CreditCard } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { CaktoCheckoutModal } from "@/components/CaktoCheckoutModal";
+import { BillingCheckoutSection } from "@/components/BillingCheckoutSection";
 
 export default function BillingSettingsPage() {
   const [, setLocation] = useLocation();
   const { user, refetchUser } = useAuth();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const returnPath = useMemo(() => {
+  const returnPath = (() => {
     if (typeof window === "undefined") return "/dashboard";
     const params = new URLSearchParams(window.location.search);
     return params.get("return") || "/dashboard";
-  }, []);
-
-  useEffect(() => {
-    setIsModalOpen(true);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("autoOpen") === "1") {
-      setIsModalOpen(true);
-      params.delete("autoOpen");
-      const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-      window.history.replaceState(null, "", next || window.location.pathname);
-    }
-  }, []);
+  })();
 
   const checkoutIntent = user?.billingStatus === "active" ? "upgrade" : "signup";
 
@@ -53,37 +35,24 @@ export default function BillingSettingsPage() {
               Confirme seu pagamento
             </CardTitle>
             <CardDescription>
-              Abriremos o checkout seguro para que você finalize ou atualize sua assinatura.
+              Revise os planos disponíveis e conclua o checkout diretamente nesta página.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Após concluir o pagamento, volte para esta tela e clique em "Verificar pagamento" para liberar o acesso.
-            </p>
-            <div className="flex gap-3">
-              <Button onClick={() => setIsModalOpen(true)}>Abrir checkout</Button>
-              <Button variant="outline" onClick={() => setLocation(returnPath)}>
-                Cancelar
-              </Button>
-            </div>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            Após concluir o pagamento, clique em “Verificar pagamento” para atualizar o acesso.
           </CardContent>
         </Card>
       </div>
 
-      <CaktoCheckoutModal
-        open={isModalOpen}
-        onOpenChange={(open) => {
-          setIsModalOpen(open);
-          if (!open) {
+      <div className="px-6 pb-10">
+        <BillingCheckoutSection
+          intent={checkoutIntent}
+          onFinished={async () => {
+            await refetchUser();
             setLocation(returnPath);
-          }
-        }}
-        intent={checkoutIntent}
-        onFinished={async () => {
-          await refetchUser();
-          setLocation(returnPath);
-        }}
-      />
+          }}
+        />
+      </div>
     </>
   );
 }

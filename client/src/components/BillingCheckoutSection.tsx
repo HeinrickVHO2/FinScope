@@ -1,74 +1,46 @@
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, ArrowLeft, Loader2, CreditCard, Clock3 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
 import { CHECKOUT_PLAN_OPTIONS, type CheckoutPlanId } from "@/constants/checkout-plans";
+import { Check, Clock3, ArrowLeft, Loader2, CreditCard } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-type CheckoutIntent = "signup" | "upgrade";
-
-interface CaktoCheckoutModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  intent: CheckoutIntent;
-  onFinished?: () => void;
+interface BillingCheckoutSectionProps {
+  intent: "signup" | "upgrade";
+  title?: string;
+  subtitle?: string;
+  onFinished?: () => Promise<void> | void;
+  className?: string;
 }
 
-const PLAN_OPTIONS = [
-    {
-      id: "pro",
-      name: "Plano Pro",
-      price: "R$ 19,90/mês",
-    description: "Para quem precisa organizar as finanças com mais controle.",
-    features: [
-      "Até 3 contas",
-      "Dashboard completo",
-      "Alertas de pagamento",
-      "Exportação CSV",
-    ],
-  },
-  {
-    id: "premium",
-    name: "Plano Premium",
-    price: "R$ 29,90/mês",
-    description: "Tudo do Pro + recursos avançados para empresas e MEI.",
-    badge: "Mais popular",
-    features: [
-      "Contas ilimitadas",
-      "Categorização automática",
-      "Relatórios avançados",
-      "Gestão MEI completa",
-    ],
-  },
-] as const;
-
-export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinished }: CaktoCheckoutModalProps) {
+export function BillingCheckoutSection({
+  intent,
+  title = "Finalize sua assinatura agora",
+  subtitle,
+  onFinished,
+  className,
+}: BillingCheckoutSectionProps) {
   const { toast } = useToast();
-  const { refetchUser } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<CheckoutPlanId | null>(null);
-  const [isCreatingCheckout, setIsCreatingCheckout] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [isCreatingCheckout, setIsCreatingCheckout] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) {
-      setSelectedPlan(null);
-      setCheckoutUrl(null);
-      setErrorMessage(null);
-      setIsCreatingCheckout(false);
-    }
-  }, [open]);
-
-  const dialogTitle = intent === "signup" ? "Escolha um plano para começar" : "Atualize seu plano";
-
-  const subtitle = useMemo(() => {
-    if (intent === "signup") {
-      return "Escolha seu plano e finalize sem sair do FinScope. Pagamento confirmado na hora e com 10 dias de garantia total.";
-    }
-    return "Troque de plano em segundos. A garantia de 10 dias também vale para upgrades e downgrades.";
+    setSelectedPlan(null);
+    setCheckoutUrl(null);
+    setErrorMessage(null);
+    setIsCreatingCheckout(false);
   }, [intent]);
+
+  const computedSubtitle = useMemo(() => {
+    if (subtitle) return subtitle;
+    if (intent === "signup") {
+      return "Escolha seu plano e finalize por aqui mesmo. Pagamento confirmado na hora com 10 dias de garantia total.";
+    }
+    return "Troque de plano em segundos. Toda nova cobrança também possui 10 dias de garantia para reembolso.";
+  }, [intent, subtitle]);
 
   async function createCheckout() {
     if (!selectedPlan) {
@@ -95,15 +67,12 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
       });
 
       const data = await response.json();
-
       if (!response.ok || !data.checkoutUrl) {
         throw new Error(data.error || "Não foi possível iniciar o checkout");
       }
-
       setCheckoutUrl(data.checkoutUrl);
-      await refetchUser();
     } catch (error) {
-      const message = (error as Error).message || "Erro inesperado ao criar checkout";
+      const message = (error as Error).message || "Erro inesperado ao iniciar checkout";
       setErrorMessage(message);
       toast({
         title: "Erro ao iniciar checkout",
@@ -115,22 +84,19 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
     }
   }
 
-  const handleFinish = async () => {
-    await refetchUser();
-    onFinished?.();
-    onOpenChange(false);
-  };
+  async function handleFinish() {
+    await onFinished?.();
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-full">
-        <DialogHeader>
-          <DialogTitle className="font-poppins text-2xl">{dialogTitle}</DialogTitle>
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
-        </DialogHeader>
-
+    <Card className={className}>
+      <CardHeader className="space-y-2">
+        <CardTitle className="font-poppins text-2xl">{title}</CardTitle>
+        <CardDescription>{computedSubtitle}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
         {!checkoutUrl ? (
-          <div className="space-y-4">
+          <>
             <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">
               <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
                 <Clock3 className="h-5 w-5 text-primary" />
@@ -138,7 +104,7 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
               <div>
                 <p className="font-semibold text-primary">Garantia total de 10 dias</p>
                 <p className="text-muted-foreground">
-                  Se o FinScope não fizer sentido para você dentro de 10 dias, devolvemos 100% do valor sem perguntas.
+                  Se o FinScope não fizer sentido para você dentro desse período, devolvemos 100% do valor sem perguntas.
                 </p>
               </div>
             </div>
@@ -175,27 +141,20 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
                 </button>
               ))}
             </div>
-            {errorMessage && (
-              <p className="text-sm text-destructive">{errorMessage}</p>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
+            {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
+            <div className="flex justify-end">
               <Button onClick={createCheckout} disabled={!selectedPlan || isCreatingCheckout}>
                 {isCreatingCheckout ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Iniciando checkout
+                    Preparando checkout
                   </>
                 ) : (
-                  <>
-                    Continuar para pagamento
-                  </>
+                  <>Continuar para pagamento</>
                 )}
               </Button>
             </div>
-          </div>
+          </>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -204,7 +163,7 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
                 Trocar plano
               </Button>
               <p className="text-xs text-muted-foreground">
-                Se preferir,{" "}
+                Se preferir, {""}
                 <a href={checkoutUrl} target="_blank" rel="noreferrer" className="text-primary underline">
                   abra o checkout em outra aba
                 </a>.
@@ -224,23 +183,21 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <CreditCard className="h-5 w-5 text-primary" />
                 </div>
-              <div>
-                <p className="font-medium">Finalize o pagamento no modal</p>
-                <p className="text-sm text-muted-foreground">
-                  Após confirmar o pagamento, clique em &quot;Verificar pagamento&quot; ou feche esta janela para atualizar o status.
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Sua assinatura continua com 10 dias de garantia para solicitar reembolso integral.
-                </p>
+                <div>
+                  <p className="font-medium">Finalize o pagamento no painel</p>
+                  <p className="text-sm text-muted-foreground">
+                    Assim que concluir, clique em &quot;Verificar pagamento&quot; para liberar seu acesso.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sua assinatura continua com 10 dias de garantia para reembolso integral.
+                  </p>
+                </div>
               </div>
-            </div>
-              <Button onClick={handleFinish}>
-                Verificar pagamento
-              </Button>
+              <Button onClick={handleFinish}>Verificar pagamento</Button>
             </div>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </CardContent>
+    </Card>
   );
 }
