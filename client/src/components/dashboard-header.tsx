@@ -17,7 +17,6 @@ import { useAuth } from "@/lib/auth";
 interface DashboardHeaderProps {
   userName?: string;
   userPlan?: string;
-  trialDaysLeft?: number;
 }
 
 export function DashboardHeader({ 

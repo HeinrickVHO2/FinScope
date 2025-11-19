@@ -234,7 +234,7 @@ export function CaktoCheckoutModal({ open, onOpenChange, intent, onFinished }: C
               </div>
             </div>
               <Button onClick={handleFinish}>
-                Ir para o dashboard
+                Verificar pagamento
               </Button>
             </div>
           </div>

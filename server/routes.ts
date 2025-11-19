@@ -23,6 +23,7 @@ import {
   updateInvestmentGoalSchema,
   insertInvestmentTransactionSchema,
 } from "@shared/schema";
+import type { User } from "@shared/schema";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 
@@ -31,6 +32,14 @@ import { randomUUID } from "crypto";
 declare module 'express-session' {
   interface SessionData {
     userId: string;
+  }
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      currentUser?: User;
+    }
   }
 }
 
@@ -413,14 +422,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse the request body without userId first
       const validatedData = insertAccountSchema.parse(req.body);
 
+      const currentUser = req.currentUser!;
+
       // Validate MEI restriction: only Premium users can create MEI accounts
-      if (validatedData.type === 'mei') {
-        const user = await storage.getUser(req.session.userId);
-        if (!user || user.plan !== 'premium') {
-          return res.status(403).json({ 
-            error: "Conta MEI disponível apenas para plano Premium" 
-          });
-        }
+      if (validatedData.type === 'mei' && currentUser.plan !== 'premium') {
+        return res.status(403).json({ 
+          error: "Conta MEI disponível apenas para plano Premium" 
+        });
       }
 
       // Add userId from session after validation
@@ -901,7 +909,7 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
   // ===== USER/SETTINGS ROUTES =====
   
   // Update user profile
-  app.patch("/api/user/profile", requireAuth, async (req: any, res) => {
+  app.patch("/api/user/profile", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const updates = updateUserProfileSchema.parse(req.body);
       const updated = await storage.updateUser(req.session.userId, updates);
@@ -932,7 +940,7 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
   });
 
   // Update user plan
-  app.patch("/api/user/plan", requireAuth, async (req: any, res) => {
+  app.patch("/api/user/plan", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const { plan } = req.body;
       if (!["pro", "premium"].includes(plan)) {
@@ -1138,6 +1146,7 @@ app.post("/api/cakto/webhook", async (req, res) => {
         trialEnd: null,
         billingStatus: "pending",
         caktoSubscriptionId: null,
+        billingStatus: "canceled",
       });
 
       console.log(`[CAKTO] Assinatura encerrada (${normalizedEvent}): ${email}`);

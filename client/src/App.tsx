@@ -1,4 +1,5 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
+import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -36,6 +37,20 @@ import OnboardingErrorPage from "@/pages/onboarding-error";
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useRequireAuth();
+  const [location, setLocation] = useLocation();
+  const currentPath = location.split("?")[0];
+  const allowedBillingPaths = ["/billing-required", "/settings/billing"];
+
+  useEffect(() => {
+    if (
+      !isLoading &&
+      user &&
+      user.billingStatus !== "active" &&
+      !allowedBillingPaths.includes(currentPath)
+    ) {
+      setLocation("/billing-required");
+    }
+  }, [currentPath, isLoading, setLocation, user]);
 
   if (isLoading) {
     return (
@@ -148,6 +163,11 @@ function Router() {
       <Route path="/dashboard">
         <DashboardLayout>
           <DashboardPage />
+        </DashboardLayout>
+      </Route>
+      <Route path="/billing-required">
+        <DashboardLayout>
+          <BillingRequiredPage />
         </DashboardLayout>
       </Route>
       <Route path="/accounts">

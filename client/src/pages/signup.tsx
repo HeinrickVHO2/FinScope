@@ -10,7 +10,6 @@ import { insertUserSchema, type InsertUser } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { CaktoCheckoutModal } from "@/components/CaktoCheckoutModal";
 
 export default function SignupPage() {
   const [, setLocation] = useLocation();
@@ -49,7 +48,7 @@ export default function SignupPage() {
       
       toast({
         title: "Conta criada com sucesso!",
-        description: "Agora escolha seu plano e finalize o checkout para acessar o dashboard.",
+        description: "Complete o checkout para liberar o dashboard. Você tem 10 dias para testar com direito a reembolso.",
       });
       
       setIsCheckoutOpen(true);
