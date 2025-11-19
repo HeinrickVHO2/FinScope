@@ -35,7 +35,7 @@ export default function BillingRequiredPage() {
     );
   }
 
-  const checkoutIntent = user.plan === "free" ? "signup" : "upgrade";
+  const checkoutIntent = user.billingStatus === "active" ? "upgrade" : "signup";
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">

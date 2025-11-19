@@ -38,10 +38,10 @@ export default function SettingsPage() {
   }
   
   const currentPlan = user.plan;
-  const trialDaysLeft = user.trialEnd 
-    ? Math.ceil((new Date(user.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  const guaranteeDaysLeft = user.trialEnd 
+    ? Math.max(0, Math.ceil((new Date(user.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
-  const isOnTrial = trialDaysLeft > 0;
+  const isWithinGuarantee = guaranteeDaysLeft > 0;
 
   const plans = [
     {
@@ -89,19 +89,19 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* Trial Banner */}
-      {isOnTrial && (
+      {/* Guarantee Banner */}
+      {isWithinGuarantee && (
         <Card className="border-primary/50 bg-primary/5" data-testid="card-trial-banner">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h3 className="font-semibold mb-1">Teste Grátis Ativo</h3>
+                <h3 className="font-semibold mb-1">Garantia de 10 dias ativa</h3>
                 <p className="text-sm text-muted-foreground">
-                  Você tem {trialDaysLeft} dias restantes no seu teste gratuito do plano Premium.
+                  Você tem {guaranteeDaysLeft} dias restantes para solicitar reembolso integral, se precisar.
                 </p>
               </div>
-              <Button variant="default" data-testid="button-activate-plan" onClick={() => setLocation("/settings/billing")}>
-                Ativar Plano
+              <Button variant="outline" data-testid="button-activate-plan" onClick={() => setLocation("/contato")}>
+                Falar com o suporte
               </Button>
             </div>
           </CardContent>
@@ -159,7 +159,7 @@ export default function SettingsPage() {
                   Plano {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {isOnTrial ? `${trialDaysLeft} dias de teste grátis restantes` : "Ativo"}
+                  {isWithinGuarantee ? `${guaranteeDaysLeft} dias de garantia restantes` : "Assinatura confirmada"}
                 </p>
               </div>
             </div>
@@ -171,14 +171,11 @@ export default function SettingsPage() {
           </div>
           <Separator className="my-4" />
           <div className="text-sm text-muted-foreground">
-            {currentPlan === "free" && (
-              <p>Você está no plano gratuito. Faça upgrade para desbloquear recursos avançados.</p>
-            )}
             {currentPlan === "pro" && (
-              <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 19,90</p>
+              <p>Plano Pro ativo. Você pode fazer upgrade para Premium quando quiser.</p>
             )}
             {currentPlan === "premium" && (
-              <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 29,90</p>
+              <p>Plano Premium ativo com todos os recursos liberados.</p>
             )}
           </div>
         </CardContent>
@@ -228,7 +225,7 @@ export default function SettingsPage() {
                     data-testid={`button-select-${plan.name.toLowerCase()}`}
                     onClick={() => setLocation("/settings/billing")}
                   >
-                    {plan.name === "Free" ? "Fazer Downgrade" : "Selecionar Plano"}
+                    Selecionar Plano
                   </Button>
                 ) : (
                   <Button className="w-full" variant="secondary" disabled data-testid={`button-current-${plan.name.toLowerCase()}`}>

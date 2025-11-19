@@ -78,10 +78,6 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const trialDaysLeft = user.trialEnd
-    ? Math.ceil((new Date(user.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    : 0;
-
   const sidebarStyle = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
@@ -95,7 +91,6 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
           <DashboardHeader
             userName={user.fullName}
             userPlan={user.plan}
-            trialDaysLeft={trialDaysLeft}
           />
           <main className="flex-1 overflow-auto">
             {children}

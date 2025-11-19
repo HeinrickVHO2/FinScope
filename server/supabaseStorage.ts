@@ -81,7 +81,7 @@ export class SupabaseStorage implements IStorage {
         email: insertUser.email,
         password: hashedPassword,
         full_name: insertUser.fullName,
-        plan: "free",
+        plan: "pro",
         trial_start: null,
         trial_end: null,
         cakto_subscription_id: null,

@@ -23,6 +23,7 @@ import {
   updateInvestmentGoalSchema,
   insertInvestmentTransactionSchema,
 } from "@shared/schema";
+import type { User } from "@shared/schema";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 
@@ -31,6 +32,14 @@ import { randomUUID } from "crypto";
 declare module 'express-session' {
   interface SessionData {
     userId: string;
+  }
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      currentUser?: User;
+    }
   }
 }
 
@@ -97,6 +106,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ error: "Não autenticado" });
     }
     next();
+  }
+
+  async function requireActiveBilling(req: any, res: any, next: any) {
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+      req.currentUser = user;
+      if (user.billingStatus !== "active") {
+        return res.status(403).json({ error: "Pagamento pendente" });
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
   }
 
   // ===== AUTH ROUTES =====
@@ -367,7 +392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== ACCOUNT ROUTES =====
   
   // Get all accounts for user
-  app.get("/api/accounts", requireAuth, async (req: any, res) => {
+  app.get("/api/accounts", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const accounts = await storage.getAccountsByUserId(req.session.userId);
       res.json(accounts);
@@ -377,7 +402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single account
-  app.get("/api/accounts/:id", requireAuth, async (req: any, res) => {
+  app.get("/api/accounts/:id", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const account = await storage.getAccount(req.params.id);
       if (!account || account.userId !== req.session.userId) {
@@ -390,19 +415,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create account
-  app.post("/api/accounts", requireAuth, async (req: any, res) => {
+  app.post("/api/accounts", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       // Parse the request body without userId first
       const validatedData = insertAccountSchema.parse(req.body);
 
+      const currentUser = req.currentUser!;
+
       // Validate MEI restriction: only Premium users can create MEI accounts
-      if (validatedData.type === 'mei') {
-        const user = await storage.getUser(req.session.userId);
-        if (!user || user.plan !== 'premium') {
-          return res.status(403).json({ 
-            error: "Conta MEI disponível apenas para plano Premium" 
-          });
-        }
+      if (validatedData.type === 'mei' && currentUser.plan !== 'premium') {
+        return res.status(403).json({ 
+          error: "Conta MEI disponível apenas para plano Premium" 
+        });
       }
 
       // Add userId from session after validation
@@ -422,7 +446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update account
-  app.patch("/api/accounts/:id", requireAuth, async (req: any, res) => {
+  app.patch("/api/accounts/:id", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const account = await storage.getAccount(req.params.id);
       if (!account || account.userId !== req.session.userId) {
@@ -442,7 +466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete account
-  app.delete("/api/accounts/:id", requireAuth, async (req: any, res) => {
+  app.delete("/api/accounts/:id", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const account = await storage.getAccount(req.params.id);
       if (!account || account.userId !== req.session.userId) {
@@ -459,7 +483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== TRANSACTION ROUTES =====
   
   // Get all transactions for user
-  app.get("/api/transactions", requireAuth, async (req: any, res) => {
+  app.get("/api/transactions", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const transactions = await storage.getTransactionsByUserId(req.session.userId);
       res.json(transactions);
@@ -469,7 +493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get transactions by account
-  app.get("/api/accounts/:accountId/transactions", requireAuth, async (req: any, res) => {
+  app.get("/api/accounts/:accountId/transactions", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const account = await storage.getAccount(req.params.accountId);
       if (!account || account.userId !== req.session.userId) {
@@ -484,7 +508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create transaction
-  app.post("/api/transactions", requireAuth, async (req: any, res) => {
+  app.post("/api/transactions", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const data = insertTransactionSchema.parse({
         ...req.body,
@@ -501,7 +525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update transaction
-  app.patch("/api/transactions/:id", requireAuth, async (req: any, res) => {
+  app.patch("/api/transactions/:id", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction || transaction.userId !== req.session.userId) {
@@ -521,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete transaction
-  app.delete("/api/transactions/:id", requireAuth, async (req: any, res) => {
+  app.delete("/api/transactions/:id", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction || transaction.userId !== req.session.userId) {
@@ -538,7 +562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== RULE ROUTES =====
   
   // Get all rules for user
-  app.get("/api/rules", requireAuth, async (req: any, res) => {
+  app.get("/api/rules", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const rules = await storage.getRulesByUserId(req.session.userId);
       res.json(rules);
@@ -548,7 +572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create rule
-  app.post("/api/rules", requireAuth, async (req: any, res) => {
+  app.post("/api/rules", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const data = insertRuleSchema.parse({
         ...req.body,
@@ -565,7 +589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update rule
-  app.patch("/api/rules/:id", requireAuth, async (req: any, res) => {
+  app.patch("/api/rules/:id", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const rule = await storage.getRule(req.params.id);
       if (!rule || rule.userId !== req.session.userId) {
@@ -585,7 +609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete rule
-  app.delete("/api/rules/:id", requireAuth, async (req: any, res) => {
+  app.delete("/api/rules/:id", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const rule = await storage.getRule(req.params.id);
       if (!rule || rule.userId !== req.session.userId) {
@@ -672,7 +696,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   // ===== DASHBOARD ROUTES =====
   
   // Get dashboard metrics
-  app.get("/api/dashboard/metrics", requireAuth, async (req: any, res) => {
+  app.get("/api/dashboard/metrics", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const metrics = await storage.getDashboardMetrics(req.session.userId);
       res.json(metrics);
@@ -682,7 +706,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
   // Get category breakdown
-  app.get("/api/dashboard/categories", requireAuth, async (req: any, res) => {
+  app.get("/api/dashboard/categories", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const categories = await storage.getCategoryBreakdown(req.session.userId);
       res.json(categories);
@@ -692,7 +716,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
   // Get investments summary
-  app.get("/api/dashboard/investments", requireAuth, async (req: any, res) => {
+  app.get("/api/dashboard/investments", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const summary = await storage.getInvestmentsSummary(req.session.userId);
       res.json(summary);
@@ -701,7 +725,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
     }
   });
 
-  app.get("/api/dashboard/income-expenses", requireAuth, async (req: any, res) => {
+  app.get("/api/dashboard/income-expenses", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const data = await storage.getIncomeExpensesData(req.session.userId);
       res.json(data);
@@ -713,7 +737,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   // ===== INVESTMENT ROUTES =====
 
   // Get all investments
-  app.get("/api/investments", requireAuth, async (req: any, res) => {
+  app.get("/api/investments", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const investments = await storage.getInvestmentsByUserId(req.session.userId);
       res.json(investments);
@@ -723,7 +747,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
   // Create investment
-  app.post("/api/investments", requireAuth, async (req: any, res) => {
+  app.post("/api/investments", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const validatedData = insertInvestmentSchema.parse(req.body);
       const investment = await storage.createInvestment({ ...validatedData, userId: req.session.userId });
@@ -737,7 +761,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
   // Update investment
-  app.patch("/api/investments/:id", requireAuth, async (req: any, res) => {
+  app.patch("/api/investments/:id", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const investment = await storage.getInvestment(req.params.id);
       if (!investment || investment.userId !== req.session.userId) {
@@ -756,7 +780,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
   // Delete investment
-  app.delete("/api/investments/:id", requireAuth, async (req: any, res) => {
+  app.delete("/api/investments/:id", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const investment = await storage.getInvestment(req.params.id);
       if (!investment || investment.userId !== req.session.userId) {
@@ -771,7 +795,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
   // Get investment goal
-  app.get("/api/investments/:id/goal", requireAuth, async (req: any, res) => {
+  app.get("/api/investments/:id/goal", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const investment = await storage.getInvestment(req.params.id);
       if (!investment || investment.userId !== req.session.userId) {
@@ -790,7 +814,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
   // Create or update investment goal
-  app.post("/api/investments/:id/goal", requireAuth, async (req: any, res) => {
+  app.post("/api/investments/:id/goal", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const investment = await storage.getInvestment(req.params.id);
       if (!investment || investment.userId !== req.session.userId) {
@@ -813,7 +837,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
   // Delete investment goal
-  app.delete("/api/investments/:id/goal", requireAuth, async (req: any, res) => {
+  app.delete("/api/investments/:id/goal", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const investment = await storage.getInvestment(req.params.id);
       if (!investment || investment.userId !== req.session.userId) {
@@ -828,7 +852,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
   // Get investment transactions
-  app.get("/api/investments/:id/transactions", requireAuth, async (req: any, res) => {
+  app.get("/api/investments/:id/transactions", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const investment = await storage.getInvestment(req.params.id);
       if (!investment || investment.userId !== req.session.userId) {
@@ -843,7 +867,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
   // Create investment transaction (RESTful route)
-  app.post("/api/investments/:id/transactions", requireAuth, async (req: any, res) => {
+  app.post("/api/investments/:id/transactions", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const investment = await storage.getInvestment(req.params.id);
       if (!investment || investment.userId !== req.session.userId) {
@@ -867,7 +891,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
   // Create investment transaction (legacy route - kept for backwards compatibility)
-  app.post("/api/investment-transactions", requireAuth, async (req: any, res) => {
+  app.post("/api/investment-transactions", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const data = insertInvestmentTransactionSchema.parse({ ...req.body, userId: req.session.userId });
       const transaction = await storage.createInvestmentTransaction(data);
@@ -883,7 +907,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   // ===== USER/SETTINGS ROUTES =====
   
   // Update user profile
-  app.patch("/api/user/profile", requireAuth, async (req: any, res) => {
+  app.patch("/api/user/profile", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const updates = updateUserProfileSchema.parse(req.body);
       const updated = await storage.updateUser(req.session.userId, updates);
@@ -914,10 +938,10 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
   // Update user plan
-  app.patch("/api/user/plan", requireAuth, async (req: any, res) => {
+  app.patch("/api/user/plan", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const { plan } = req.body;
-      if (!["free", "pro", "premium"].includes(plan)) {
+      if (!["pro", "premium"].includes(plan)) {
         return res.status(400).json({ error: "Plano inválido" });
       }
 
@@ -948,7 +972,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   // ===== EXPORT ROUTES =====
 
   // Export transactions to CSV
-  app.get("/api/export/transactions", requireAuth, async (req: any, res) => {
+  app.get("/api/export/transactions", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const transactions = await storage.getTransactionsByUserId(req.session.userId);
       const accounts = await storage.getAccountsByUserId(req.session.userId);
@@ -1086,27 +1110,16 @@ app.post("/api/cakto/webhook", async (req, res) => {
       const plan =
         productName.includes("premium") ? "premium" : "pro";
 
-      const trialStartValue = data.trial_start ? new Date(data.trial_start) : now;
-      const trialEndValue = data.trial_end ? new Date(data.trial_end) : null;
-      const hasTrial = Boolean(trialEndValue || data.trial_days > 0);
+      const guaranteeDays = Number(process.env.GUARANTEE_DAYS || process.env.TRIAL_DAYS || "10");
+      const guaranteeEnd = new Date(now.getTime() + guaranteeDays * 86400 * 1000);
 
-      const updates: any = {
+      await storage.updateUser(user.id, {
         plan,
         caktoSubscriptionId: subscriptionId || user.caktoSubscriptionId,
-      };
-
-      if (hasTrial) {
-        updates.trialStart = trialStartValue;
-        updates.trialEnd =
-          trialEndValue || new Date(trialStartValue.getTime() + 7 * 86400 * 1000);
-      } else {
-        updates.trialStart = null;
-        updates.trialEnd = null;
-      }
-
-      updates.billingStatus = "active";
-
-      await storage.updateUser(user.id, updates);
+        billingStatus: "active",
+        trialStart: now,
+        trialEnd: guaranteeEnd,
+      });
 
       console.log(`[CAKTO] Plano ativado: ${email} → ${plan}`);
     }
@@ -1114,7 +1127,7 @@ app.post("/api/cakto/webhook", async (req, res) => {
     // Cancelamento
     if (event === "subscription_canceled" || event === "subscription_renewal_refused") {
       await storage.updateUser(user.id, {
-        plan: "free",
+        plan: "pro",
         trialStart: null,
         trialEnd: null,
         caktoSubscriptionId: null,

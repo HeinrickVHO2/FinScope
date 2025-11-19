@@ -17,13 +17,11 @@ import { useAuth } from "@/lib/auth";
 interface DashboardHeaderProps {
   userName?: string;
   userPlan?: string;
-  trialDaysLeft?: number;
 }
 
 export function DashboardHeader({ 
   userName = "Usuário", 
-  userPlan = "free",
-  trialDaysLeft 
+  userPlan = "pro",
 }: DashboardHeaderProps) {
   const [, setLocation] = useLocation();
   const { logout } = useAuth();
@@ -34,11 +32,10 @@ export function DashboardHeader({
 
   const getPlanBadge = () => {
     const badges = {
-      free: { label: "Grátis", variant: "secondary" as const },
       pro: { label: "Pro", variant: "default" as const },
       premium: { label: "Premium", variant: "default" as const },
     };
-    return badges[userPlan as keyof typeof badges] || badges.free;
+    return badges[userPlan as keyof typeof badges] || badges.pro;
   };
 
   const planBadge = getPlanBadge();
@@ -47,11 +44,6 @@ export function DashboardHeader({
     <header className="flex items-center justify-between gap-4 border-b p-4 bg-background">
       <div className="flex items-center gap-4">
         <SidebarTrigger data-testid="button-sidebar-toggle" />
-        {trialDaysLeft !== undefined && trialDaysLeft > 0 && (
-          <Badge variant="secondary" className="hidden sm:flex" data-testid="badge-trial">
-            {trialDaysLeft} dias restantes no teste grátis
-          </Badge>
-        )}
       </div>
       <div className="flex items-center gap-3">
         <Badge variant={planBadge.variant} data-testid="badge-plan">

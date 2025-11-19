@@ -9,7 +9,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   fullName: text("full_name").notNull(),
-  plan: text("plan").notNull().default("free"), // 'free' | 'pro' | 'premium'
+  plan: text("plan").notNull().default("pro"), // 'pro' | 'premium'
   trialStart: timestamp("trial_start"),
   trialEnd: timestamp("trial_end"),
   caktoSubscriptionId: text("cakto_subscription_id"),
@@ -252,7 +252,6 @@ export type UpdateUserProfile = z.infer<typeof updateUserProfileSchema>;
 
 // Plan limits
 export const PLAN_LIMITS = {
-  free: { accounts: 1, features: ["basic_dashboard"] },
   pro: { accounts: 3, features: ["basic_dashboard", "cash_flow", "csv_export", "alerts"] },
   premium: { accounts: Infinity, features: ["advanced_dashboard", "auto_rules", "pdf_reports", "mei_management"] },
 } as const;

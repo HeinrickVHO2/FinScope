@@ -143,7 +143,7 @@ export class MemStorage {
       email: insertUser.email,
       password: hashedPassword,
       fullName: insertUser.fullName,
-      plan: "free",
+      plan: "pro",
       trialStart: null,
       trialEnd: null,
       caktoSubscriptionId: null,

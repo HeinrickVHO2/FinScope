@@ -10,9 +10,11 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   password TEXT NOT NULL,
   full_name TEXT NOT NULL,
-  plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'premium')),
+  plan TEXT NOT NULL DEFAULT 'pro' CHECK (plan IN ('pro', 'premium')),
   trial_start TIMESTAMPTZ,
   trial_end TIMESTAMPTZ,
+  cakto_subscription_id TEXT,
+  billing_status TEXT NOT NULL DEFAULT 'pending' CHECK (billing_status IN ('pending', 'active', 'canceled')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

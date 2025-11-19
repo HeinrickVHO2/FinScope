@@ -157,7 +157,7 @@ export default function SignupPage() {
                   disabled={isLoading}
                   data-testid="button-submit"
                 >
-                  {isLoading ? "Criando conta..." : "Criar conta e iniciar teste"}
+                  {isLoading ? "Criando conta..." : "Criar conta e garantir acesso"}
                 </Button>
               </form>
             </Form>
