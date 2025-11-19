@@ -7,9 +7,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Account, Transaction } from "@shared/schema";
+import { useLocation } from "wouter";
 
 export default function MEIPage() {
   const { user, isLoading: authLoading } = useAuth();
+  const [, setLocation] = useLocation();
   
   // Fetch accounts and transactions
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
@@ -114,7 +116,10 @@ export default function MEIPage() {
               <Button variant="outline" data-testid="button-learn-more">
                 Saiba Mais
               </Button>
-              <Button data-testid="button-upgrade">
+              <Button
+                data-testid="button-upgrade"
+                onClick={() => setLocation("/settings?checkout=upgrade")}
+              >
                 Fazer Upgrade
               </Button>
             </div>
