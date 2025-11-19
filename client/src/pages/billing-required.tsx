@@ -28,7 +28,11 @@ export default function BillingRequiredPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      <BillingCheckoutSection intent={checkoutIntent} onFinished={refetchUser} />
+      <BillingCheckoutSection
+        intent={checkoutIntent}
+        initialPlan={user.plan}
+        onFinished={refetchUser}
+      />
     </div>
   );
 }

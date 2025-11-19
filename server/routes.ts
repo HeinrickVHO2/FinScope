@@ -1121,6 +1121,8 @@ app.post("/api/cakto/webhook", async (req, res) => {
       "subscription_payment_failed",
       "subscription_chargeback",
       "refund_requested",
+      "refund_completed",
+      "refund",
     ];
 
     const now = new Date();
@@ -1146,7 +1148,6 @@ app.post("/api/cakto/webhook", async (req, res) => {
         trialEnd: null,
         billingStatus: "pending",
         caktoSubscriptionId: null,
-        billingStatus: "canceled",
       });
 
       console.log(`[CAKTO] Assinatura encerrada (${normalizedEvent}): ${email}`);
