@@ -30,7 +30,7 @@ export default function BillingRequiredPage() {
     <div className="p-6 max-w-3xl mx-auto">
       <BillingCheckoutSection
         intent={checkoutIntent}
-        initialPlan={user.plan}
+        currentPlan={user.plan}
         onFinished={refetchUser}
       />
     </div>
