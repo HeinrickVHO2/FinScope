@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -5,19 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Check, Crown } from "lucide-react";
-import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CaktoCheckoutModal } from "@/components/CaktoCheckoutModal";
+import { BillingCheckoutSection } from "@/components/BillingCheckoutSection";
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const { user, isLoading, refetchUser } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
-  
+  const [showCheckoutSection, setShowCheckoutSection] = useState(false);
+  const [checkoutIntent, setCheckoutIntent] = useState<"signup" | "upgrade">("signup");
+
   useEffect(() => {
     if (user) {
       setFullName(user.fullName);
@@ -25,8 +26,6 @@ export default function SettingsPage() {
     }
   }, [user]);
 
-  // DashboardLayout already handles auth redirect, but we need loading state
-  // while user data is being fetched within the authenticated session
   if (isLoading || !user) {
     return (
       <div className="p-6 space-y-6">
@@ -36,7 +35,7 @@ export default function SettingsPage() {
       </div>
     );
   }
-  
+
   const currentPlan = user.plan;
   const guaranteeDaysLeft = user.trialEnd
     ? Math.max(0, Math.ceil((new Date(user.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -45,38 +44,29 @@ export default function SettingsPage() {
   const displayPlan = user.billingStatus === "active" ? user.plan : "pending";
   const showGuaranteeBanner = displayPlan !== "pending" && isWithinGuarantee;
 
-  const checkoutIntent = user.billingStatus === "active" ? "upgrade" : "signup";
+  useEffect(() => {
+    const shouldShow = displayPlan === "pending";
+    setShowCheckoutSection(shouldShow);
+    setCheckoutIntent(shouldShow ? "signup" : "upgrade");
+  }, [displayPlan]);
 
   const plans = [
     {
       name: "Pro",
       price: "R$ 19,90/mês",
       current: currentPlan === "pro",
-      features: [
-        "Até 3 contas",
-        "Dashboard completo",
-        "Alertas de pagamento",
-        "Exportação CSV",
-      ],
+      features: ["Até 3 contas", "Dashboard completo", "Alertas de pagamento", "Exportação CSV"],
     },
     {
       name: "Premium",
       price: "R$ 29,90/mês",
       current: currentPlan === "premium",
       recommended: true,
-      features: [
-        "Contas ilimitadas",
-        "Dashboard avançado",
-        "Categorização automática",
-        "Gestão MEI completa",
-        "Relatórios PDF",
-      ],
+      features: ["Contas ilimitadas", "Dashboard avançado", "Categorização automática", "Gestão MEI completa", "Relatórios PDF"],
     },
   ];
 
   const handleSaveProfile = () => {
-    // TODO: Implement real profile update API call
-    // For now, just show feedback that feature is not yet implemented
     toast({
       title: "Recurso em desenvolvimento",
       description: "A atualização de perfil será implementada em breve.",
@@ -85,16 +75,16 @@ export default function SettingsPage() {
   };
 
   return (
-    <>
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-poppins font-bold" data-testid="text-settings-title">Configurações</h1>
+        <h1 className="text-3xl font-poppins font-bold" data-testid="text-settings-title">
+          Configurações
+        </h1>
         <p className="text-muted-foreground" data-testid="text-settings-subtitle">
           Gerencie sua conta e preferências
         </p>
       </div>
 
-      {/* Guarantee Banner */}
       {showGuaranteeBanner && (
         <Card className="border-primary/50 bg-primary/5" data-testid="card-trial-banner">
           <CardContent className="pt-6">
@@ -108,7 +98,10 @@ export default function SettingsPage() {
               <Button
                 variant="default"
                 data-testid="button-activate-plan"
-                onClick={() => setIsBillingModalOpen(true)}
+                onClick={() => {
+                  setCheckoutIntent("signup");
+                  setShowCheckoutSection(true);
+                }}
               >
                 Gerenciar cobrança
               </Button>
@@ -117,7 +110,6 @@ export default function SettingsPage() {
         </Card>
       )}
 
-      {/* Profile Settings */}
       <Card data-testid="card-profile">
         <CardHeader>
           <CardTitle className="font-poppins">Informações Pessoais</CardTitle>
@@ -151,7 +143,6 @@ export default function SettingsPage() {
         </CardFooter>
       </Card>
 
-      {/* Current Plan */}
       <Card data-testid="card-current-plan">
         <CardHeader>
           <CardTitle className="font-poppins">Plano Atual</CardTitle>
@@ -165,9 +156,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <p className="font-semibold font-poppins text-lg" data-testid="text-current-plan-name">
-                  {displayPlan === "pending"
-                    ? "Pagamento pendente"
-                    : `Plano ${currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}`}
+                  {displayPlan === "pending" ? "Pagamento pendente" : `Plano ${currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}`}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {displayPlan === "pending"
@@ -179,38 +168,47 @@ export default function SettingsPage() {
               </div>
             </div>
             {displayPlan === "pending" ? (
-              <Button variant="outline" data-testid="button-finish-payment" onClick={() => setIsBillingModalOpen(true)}>
+              <Button
+                variant="outline"
+                data-testid="button-finish-payment"
+                onClick={() => {
+                  setCheckoutIntent("signup");
+                  setShowCheckoutSection(true);
+                }}
+              >
                 Concluir pagamento
               </Button>
             ) : currentPlan !== "premium" ? (
-              <Button variant="outline" data-testid="button-upgrade-plan" onClick={() => setIsBillingModalOpen(true)}>
+              <Button
+                variant="outline"
+                data-testid="button-upgrade-plan"
+                onClick={() => {
+                  setCheckoutIntent("upgrade");
+                  setShowCheckoutSection(true);
+                }}
+              >
                 Fazer Upgrade
               </Button>
             ) : null}
           </div>
           <Separator className="my-4" />
           <div className="text-sm text-muted-foreground">
-            {displayPlan === "pending" && (
-              <p>Se já concluiu o pagamento, clique em &quot;Verificar pagamento&quot; na tela anterior.</p>
-            )}
-            {displayPlan !== "pending" && currentPlan === "pro" && (
-              <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 19,90</p>
-            )}
-            {displayPlan !== "pending" && currentPlan === "premium" && (
-              <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 29,90</p>
-            )}
+            {displayPlan === "pending" && <p>Se já concluiu o pagamento, clique em &quot;Verificar pagamento&quot; abaixo.</p>}
+            {displayPlan !== "pending" && currentPlan === "pro" && <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 19,90</p>}
+            {displayPlan !== "pending" && currentPlan === "premium" && <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 29,90</p>}
           </div>
         </CardContent>
       </Card>
 
-      {/* Available Plans */}
       <div className="space-y-4">
-        <h2 className="text-2xl font-poppins font-bold" data-testid="text-plans-title">Planos Disponíveis</h2>
+        <h2 className="text-2xl font-poppins font-bold" data-testid="text-plans-title">
+          Planos Disponíveis
+        </h2>
         <div className="grid md:grid-cols-3 gap-4">
           {plans.map((plan, index) => (
-            <Card 
-              key={plan.name} 
-              className={`relative ${plan.current ? 'border-primary' : ''} ${plan.recommended ? 'border-primary border-2' : ''}`}
+            <Card
+              key={plan.name}
+              className={`relative ${plan.current ? "border-primary" : ""} ${plan.recommended ? "border-primary border-2" : ""}`}
               data-testid={`card-plan-${plan.name.toLowerCase()}`}
             >
               {plan.recommended && (
@@ -224,7 +222,9 @@ export default function SettingsPage() {
                 </div>
               )}
               <CardHeader>
-                <CardTitle className="font-poppins" data-testid={`text-plan-name-${index}`}>{plan.name}</CardTitle>
+                <CardTitle className="font-poppins" data-testid={`text-plan-name-${index}`}>
+                  {plan.name}
+                </CardTitle>
                 <div className="text-2xl font-bold font-poppins" data-testid={`text-plan-price-${index}`}>
                   {plan.price}
                 </div>
@@ -245,7 +245,10 @@ export default function SettingsPage() {
                     className="w-full"
                     variant={plan.recommended ? "default" : "outline"}
                     data-testid={`button-select-${plan.name.toLowerCase()}`}
-                    onClick={() => setIsBillingModalOpen(true)}
+                    onClick={() => {
+                      setCheckoutIntent(plan.name === "Premium" ? "upgrade" : "signup");
+                      setShowCheckoutSection(true);
+                    }}
                   >
                     Selecionar plano
                   </Button>
@@ -260,7 +263,13 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Danger Zone */}
+      {showCheckoutSection && (
+        <BillingCheckoutSection
+          intent={checkoutIntent}
+          onFinished={refetchUser}
+        />
+      )}
+
       <Card className="border-destructive/50" data-testid="card-danger-zone">
         <CardHeader>
           <CardTitle className="font-poppins text-destructive">Zona de Perigo</CardTitle>
@@ -270,9 +279,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Cancelar Assinatura</p>
-              <p className="text-sm text-muted-foreground">
-                Você perderá acesso aos recursos premium
-              </p>
+              <p className="text-sm text-muted-foreground">Você perderá acesso aos recursos premium</p>
             </div>
             <Button variant="outline" className="text-destructive" data-testid="button-cancel-subscription">
               Cancelar
@@ -282,9 +289,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Excluir Conta</p>
-              <p className="text-sm text-muted-foreground">
-                Todos os seus dados serão permanentemente removidos
-              </p>
+              <p className="text-sm text-muted-foreground">Todos os seus dados serão permanentemente removidos</p>
             </div>
             <Button variant="destructive" data-testid="button-delete-account">
               Excluir Conta
@@ -293,20 +298,5 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
     </div>
-      <CaktoCheckoutModal
-        open={isBillingModalOpen}
-        onOpenChange={(open) => {
-          setIsBillingModalOpen(open);
-          if (!open) {
-            refetchUser();
-          }
-        }}
-        intent={checkoutIntent}
-        onFinished={async () => {
-          await refetchUser();
-          setIsBillingModalOpen(false);
-        }}
-      />
-    </>
   );
 }
