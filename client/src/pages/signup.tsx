@@ -10,10 +10,6 @@ import { insertUserSchema, type InsertUser } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-<<<<<<< HEAD
-=======
-import CaktoCheckoutModal from "@/components/CaktoCheckoutModal";
->>>>>>> 2153ccc (Finalização de integração do Checkout)
 
 export default function SignupPage() {
   const [, setLocation] = useLocation();
