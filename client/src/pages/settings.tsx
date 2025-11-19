@@ -266,7 +266,11 @@ export default function SettingsPage() {
       {showCheckoutSection && (
         <BillingCheckoutSection
           intent={checkoutIntent}
-          onFinished={refetchUser}
+          initialPlan={currentPlan}
+          onFinished={async () => {
+            await refetchUser();
+            setShowCheckoutSection(false);
+          }}
         />
       )}
 

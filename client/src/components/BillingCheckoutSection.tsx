@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,12 +26,15 @@ export function BillingCheckoutSection({
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [isCreatingCheckout, setIsCreatingCheckout] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setSelectedPlan(null);
     setCheckoutUrl(null);
     setErrorMessage(null);
     setIsCreatingCheckout(false);
+    stopPolling();
   }, [intent]);
 
   const computedSubtitle = useMemo(() => {
@@ -41,6 +44,29 @@ export function BillingCheckoutSection({
     }
     return "Troque de plano em segundos. Toda nova cobrança também possui 10 dias de garantia para reembolso.";
   }, [intent, subtitle]);
+
+  useEffect(() => {
+    if (checkoutUrl) {
+      startPolling();
+    } else {
+      stopPolling();
+    }
+    return stopPolling;
+  }, [checkoutUrl]);
+
+  function startPolling() {
+    if (pollRef.current) return;
+    pollRef.current = setInterval(() => {
+      verifyPayment(false);
+    }, 4000);
+  }
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
 
   async function createCheckout() {
     if (!selectedPlan) {
@@ -84,8 +110,38 @@ export function BillingCheckoutSection({
     }
   }
 
-  async function handleFinish() {
-    await onFinished?.();
+  async function verifyPayment(manual = true) {
+    try {
+      if (manual) {
+        setIsVerifying(true);
+      }
+      const response = await fetch("/api/auth/me", { credentials: "include" });
+      if (!response.ok) return;
+      const data = await response.json();
+      const baseReady = data?.billingStatus === "active";
+      let success = baseReady;
+      if (intent === "upgrade") {
+        const targetPlan = selectedPlan || initialPlan;
+        success = baseReady && !!targetPlan && data?.plan === targetPlan;
+      }
+      if (success) {
+        stopPolling();
+        toast({
+          title: "Pagamento confirmado",
+          description: "Atualizamos seu acesso automaticamente.",
+        });
+        await onFinished?.();
+      } else if (manual) {
+        toast({
+          title: "Pagamento ainda pendente",
+          description: "Finalize o checkout e tente novamente em alguns segundos.",
+        });
+      }
+    } finally {
+      if (manual) {
+        setIsVerifying(false);
+      }
+    }
   }
 
   return (
@@ -178,7 +234,7 @@ export function BillingCheckoutSection({
                 allow="payment *"
               />
             </div>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border rounded-lg p-4 bg-background">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border rounded-lg p-4 bg-background">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <CreditCard className="h-5 w-5 text-primary" />
@@ -186,14 +242,23 @@ export function BillingCheckoutSection({
                 <div>
                   <p className="font-medium">Finalize o pagamento no painel</p>
                   <p className="text-sm text-muted-foreground">
-                    Assim que concluir, clique em &quot;Verificar pagamento&quot; para liberar seu acesso.
+                    Seu acesso é liberado automaticamente assim que o pagamento for confirmado. Se continuar vendo esta mensagem após alguns segundos, clique em <strong>Verificar pagamento</strong>.
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Sua assinatura continua com 10 dias de garantia para reembolso integral.
+                    Para sua tranquilidade, continuamos verificando em segundo plano.
                   </p>
                 </div>
               </div>
-              <Button onClick={handleFinish}>Verificar pagamento</Button>
+              <Button onClick={() => verifyPayment(true)} disabled={isVerifying}>
+                {isVerifying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Verificando...
+                  </>
+                ) : (
+                  <>Verificar pagamento</>
+                )}
+              </Button>
             </div>
           </div>
         )}

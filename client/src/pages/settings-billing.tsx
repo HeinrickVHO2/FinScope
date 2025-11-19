@@ -47,6 +47,7 @@ export default function BillingSettingsPage() {
       <div className="px-6 pb-10">
         <BillingCheckoutSection
           intent={checkoutIntent}
+          initialPlan={user?.plan}
           onFinished={async () => {
             await refetchUser();
             setLocation(returnPath);
