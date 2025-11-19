@@ -7,8 +7,8 @@ import { ChevronDown } from "lucide-react";
 export default function FAQPage() {
   const faqs = [
     {
-      q: "O FinScope é realmente gratuito por 7 dias?",
-      a: "Sim! Você cria sua conta e usa tudo sem limitações, durante os 7 dias de Free Trial.",
+      q: "Tenho garantia ao contratar o FinScope?",
+      a: "Sim! Você paga agora, usa sem limitações e tem 10 dias para pedir reembolso total caso não curta a experiência.",
     },
     {
       q: "Posso usar tanto para vida pessoal quanto MEI?",

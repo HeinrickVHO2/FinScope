@@ -22,7 +22,7 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ 
   userName = "Usuário", 
-  userPlan = "free",
+  userPlan = "pro",
   trialDaysLeft 
 }: DashboardHeaderProps) {
   const [, setLocation] = useLocation();
@@ -34,11 +34,10 @@ export function DashboardHeader({
 
   const getPlanBadge = () => {
     const badges = {
-      free: { label: "Grátis", variant: "secondary" as const },
       pro: { label: "Pro", variant: "default" as const },
       premium: { label: "Premium", variant: "default" as const },
     };
-    return badges[userPlan as keyof typeof badges] || badges.free;
+    return badges[userPlan as keyof typeof badges] || badges.pro;
   };
 
   const planBadge = getPlanBadge();
@@ -49,7 +48,7 @@ export function DashboardHeader({
         <SidebarTrigger data-testid="button-sidebar-toggle" />
         {trialDaysLeft !== undefined && trialDaysLeft > 0 && (
           <Badge variant="secondary" className="hidden sm:flex" data-testid="badge-trial">
-            {trialDaysLeft} dias restantes no teste grátis
+            {trialDaysLeft} dias restantes na garantia
           </Badge>
         )}
       </div>

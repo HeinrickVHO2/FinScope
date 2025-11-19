@@ -39,6 +39,7 @@ export class SupabaseStorage implements IStorage {
       trialStart: data.trial_start ? new Date(data.trial_start) : null,
       trialEnd: data.trial_end ? new Date(data.trial_end) : null,
       caktoSubscriptionId: data.cakto_subscription_id || null,
+      billingStatus: data.billing_status || "pending",
       createdAt: new Date(data.created_at),
     };
   }
@@ -61,6 +62,7 @@ export class SupabaseStorage implements IStorage {
       trialStart: data.trial_start ? new Date(data.trial_start) : null,
       trialEnd: data.trial_end ? new Date(data.trial_end) : null,
       caktoSubscriptionId: data.cakto_subscription_id || null,
+      billingStatus: data.billing_status || "pending",
       createdAt: new Date(data.created_at),
     };
   }
@@ -79,10 +81,11 @@ export class SupabaseStorage implements IStorage {
         email: insertUser.email,
         password: hashedPassword,
         full_name: insertUser.fullName,
-        plan: "free",
+        plan: "pro",
         trial_start: null,
         trial_end: null,
         cakto_subscription_id: null,
+        billing_status: "pending",
       })
       .select()
       .single();
@@ -100,6 +103,7 @@ export class SupabaseStorage implements IStorage {
       trialStart: data.trial_start ? new Date(data.trial_start) : null,
       trialEnd: data.trial_end ? new Date(data.trial_end) : null,
       caktoSubscriptionId: data.cakto_subscription_id || null,
+      billingStatus: data.billing_status || "pending",
       createdAt: new Date(data.created_at),
     };
   }
@@ -117,6 +121,9 @@ export class SupabaseStorage implements IStorage {
     }
     if (updates.caktoSubscriptionId !== undefined) {
       updateData.cakto_subscription_id = updates.caktoSubscriptionId || null;
+    }
+    if (updates.billingStatus !== undefined) {
+      updateData.billing_status = updates.billingStatus;
     }
 
     const { data, error } = await supabase
@@ -137,6 +144,7 @@ export class SupabaseStorage implements IStorage {
       trialStart: data.trial_start ? new Date(data.trial_start) : null,
       trialEnd: data.trial_end ? new Date(data.trial_end) : null,
       caktoSubscriptionId: data.cakto_subscription_id || null,
+      billingStatus: data.billing_status || "pending",
       createdAt: new Date(data.created_at),
     };
   }

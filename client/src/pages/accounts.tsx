@@ -41,8 +41,8 @@ export default function AccountsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  const currentPlan = user?.plan || "free";
-  const planLimit = PLAN_LIMITS[currentPlan as keyof typeof PLAN_LIMITS].accounts;
+  const currentPlan = (user?.plan as keyof typeof PLAN_LIMITS) || "pro";
+  const planLimit = PLAN_LIMITS[currentPlan]?.accounts ?? PLAN_LIMITS.pro.accounts;
 
   // Fetch accounts
   const { data: accounts = [], isLoading } = useQuery<Account[]>({

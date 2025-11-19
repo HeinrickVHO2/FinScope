@@ -27,6 +27,7 @@ import ContatoPage from "@/pages/contato";
 import BlogPage from "@/pages/blog";
 import RecursosPage from "@/pages/recursos";
 import BillingSettingsPage from "@/pages/settings-billing";
+import BillingRequiredPage from "@/pages/billing-required";
 import OnboardingSuccessPage from "@/pages/onboarding-success";
 import OnboardingErrorPage from "@/pages/onboarding-error";
 
@@ -51,8 +52,12 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     return <Redirect to="/login" />;
   }
 
-  const trialDaysLeft = user.trialEnd
-    ? Math.ceil((new Date(user.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  if (user.billingStatus !== "active") {
+    return <Redirect to="/billing-required" />;
+  }
+
+  const guaranteeDaysLeft = user.trialEnd
+    ? Math.max(0, Math.ceil((new Date(user.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
 
   const sidebarStyle = {
@@ -68,7 +73,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
           <DashboardHeader
             userName={user.fullName}
             userPlan={user.plan}
-            trialDaysLeft={trialDaysLeft}
+            trialDaysLeft={guaranteeDaysLeft}
           />
           <main className="flex-1 overflow-auto">
             {children}
@@ -77,6 +82,27 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       </div>
     </SidebarProvider>
   );
+}
+
+function ProtectedPage({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useRequireAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Redirect to="/login" />;
+  }
+
+  return <>{children}</>;
 }
 
 function Router() {
@@ -95,6 +121,16 @@ function Router() {
       <Route path="/recursos" component={RecursosPage} />
       <Route path="/onboarding/success" component={OnboardingSuccessPage} />
       <Route path="/onboarding/error" component={OnboardingErrorPage} />
+      <Route path="/billing-required">
+        <ProtectedPage>
+          <BillingRequiredPage />
+        </ProtectedPage>
+      </Route>
+      <Route path="/billing">
+        <ProtectedPage>
+          <BillingSettingsPage />
+        </ProtectedPage>
+      </Route>
 
 
       {/* 🔥 ADICIONE ESTAS DUAS LINHAS ABAIXO */}
@@ -139,11 +175,7 @@ function Router() {
           <SettingsPage />
         </DashboardLayout>
       </Route>
-      <Route path="/settings/billing">
-        <DashboardLayout>
-          <BillingSettingsPage />
-        </DashboardLayout>
-      </Route>
+
 
       {/* 404 */}
       <Route component={NotFound} />
