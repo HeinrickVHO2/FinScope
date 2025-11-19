@@ -48,6 +48,7 @@ export default function BillingSettingsPage() {
         <BillingCheckoutSection
           intent={checkoutIntent}
           currentPlan={user?.plan}
+          autoVerify={false}
           onFinished={async () => {
             await refetchUser();
             setLocation(returnPath);

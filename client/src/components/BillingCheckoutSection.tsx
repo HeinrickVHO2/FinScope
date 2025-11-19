@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 
 interface BillingCheckoutSectionProps {
   intent: "signup" | "upgrade";
+  currentPlan?: string;
+  autoVerify?: boolean;
   title?: string;
   subtitle?: string;
   onFinished?: () => Promise<void> | void;
@@ -16,6 +18,8 @@ interface BillingCheckoutSectionProps {
 
 export function BillingCheckoutSection({
   intent,
+  currentPlan,
+  autoVerify,
   title = "Finalize sua assinatura agora",
   subtitle,
   onFinished,
@@ -34,6 +38,7 @@ export function BillingCheckoutSection({
     setCheckoutUrl(null);
     setErrorMessage(null);
     setIsCreatingCheckout(false);
+    setIsVerifying(false);
     stopPolling();
   }, [intent]);
 
@@ -45,14 +50,16 @@ export function BillingCheckoutSection({
     return "Troque de plano em segundos. Toda nova cobrança também possui 10 dias de garantia para reembolso.";
   }, [intent, subtitle]);
 
+  const shouldAutoVerify = autoVerify ?? intent === "signup";
+
   useEffect(() => {
-    if (checkoutUrl) {
+    if (checkoutUrl && shouldAutoVerify) {
       startPolling();
     } else {
       stopPolling();
     }
     return stopPolling;
-  }, [checkoutUrl]);
+  }, [checkoutUrl, shouldAutoVerify]);
 
   function startPolling() {
     if (pollRef.current) return;
@@ -112,17 +119,16 @@ export function BillingCheckoutSection({
 
   async function verifyPayment(manual = true) {
     try {
-      if (manual) {
-        setIsVerifying(true);
-      }
+      if (manual) setIsVerifying(true);
       const response = await fetch("/api/auth/me", { credentials: "include" });
       if (!response.ok) return;
-      const data = await response.json();
-      const baseReady = data?.billingStatus === "active";
-      let success = baseReady;
+      const user = await response.json();
+      const ready = user?.billingStatus === "active";
+      let success = ready;
       if (intent === "upgrade") {
-        const targetPlan = selectedPlan || initialPlan;
-        success = baseReady && !!targetPlan && data?.plan === targetPlan;
+        const planChanged = !!currentPlan && user?.plan && user.plan !== currentPlan;
+        const matchesSelection = selectedPlan ? user?.plan === selectedPlan : true;
+        success = ready && planChanged && matchesSelection;
       }
       if (success) {
         stopPolling();
@@ -134,13 +140,11 @@ export function BillingCheckoutSection({
       } else if (manual) {
         toast({
           title: "Pagamento ainda pendente",
-          description: "Finalize o checkout e tente novamente em alguns segundos.",
+          description: "Finalize o checkout e tente novamente em instantes.",
         });
       }
     } finally {
-      if (manual) {
-        setIsVerifying(false);
-      }
+      if (manual) setIsVerifying(false);
     }
   }
 
@@ -242,11 +246,9 @@ export function BillingCheckoutSection({
                 <div>
                   <p className="font-medium">Finalize o pagamento no painel</p>
                   <p className="text-sm text-muted-foreground">
-                    Seu acesso é liberado automaticamente assim que o pagamento for confirmado. Se continuar vendo esta mensagem após alguns segundos, clique em <strong>Verificar pagamento</strong>.
+                    Seu acesso é liberado automaticamente. Caso continue vendo esta tela, clique em <strong>Verificar pagamento</strong>.
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Para sua tranquilidade, continuamos verificando em segundo plano.
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Verificamos em segundo plano para você não se preocupar.</p>
                 </div>
               </div>
               <Button onClick={() => verifyPayment(true)} disabled={isVerifying}>
