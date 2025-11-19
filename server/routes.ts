@@ -47,6 +47,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(express.json());      // 👈 OBRIGATÓRIO
   app.use(express.urlencoded({ extended: true }));  // (opcional, mas recomendado)
+  const GUARANTEE_DAYS = Number(process.env.BILLING_GUARANTEE_DAYS || "10");
+  const GUARANTEE_WINDOW_MS = GUARANTEE_DAYS * 24 * 60 * 60 * 1000;
 
   // Trust proxy - required for cookies to work behind Replit's proxy
   app.set('trust proxy', 1);
@@ -630,7 +632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 // -------------------------
 
 // GET ALL GOALS FOR USER
-app.get("/api/investments/goals", async (req, res) => {
+app.get("/api/investments/goals", requireAuth, requireActiveBilling, async (req, res) => {
   const userId = req.session.userId;
   if (!userId) return res.status(401).json({ error: "Não autenticado" });
 
@@ -646,7 +648,7 @@ app.get("/api/investments/goals", async (req, res) => {
 });
 
 // CREATE OR UPDATE GOAL
-app.post("/api/investments/goals", async (req, res) => {
+app.post("/api/investments/goals", requireAuth, requireActiveBilling, async (req, res) => {
   const userId = req.session.userId;
   if (!userId) return res.status(401).json({ error: "Não autenticado" });
 
@@ -683,7 +685,7 @@ app.post("/api/investments/goals", async (req, res) => {
 });
 
 // DELETE GOAL
-app.delete("/api/investments/goals/:investmentId", async (req, res) => {
+app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBilling, async (req, res) => {
   const userId = req.session.userId;
   if (!userId) return res.status(401).json({ error: "Não autenticado" });
 
@@ -1012,7 +1014,7 @@ app.delete("/api/investments/goals/:investmentId", async (req, res) => {
   });
 
 // ======================================================
-// CAKTO – Checkout com garantia de 10 dias (reembolso manual)
+// CAKTO – Criar assinatura + checkout com garantia
 // ======================================================
 app.post("/api/checkout/create", requireAuth, async (req: any, res) => {
   try {
@@ -1102,16 +1104,31 @@ app.post("/api/cakto/webhook", async (req, res) => {
     const user = await storage.getUserByEmail(email);
     if (!user) return res.json({ received: true });
 
-    // Ativar assinatura ou trial
-    if (event === "purchase_approved" || event === "subscription_created") {
-      const now = new Date();
-      const productName = data.product?.name?.toLowerCase() || "";
+    const normalizedEvent = (event || "").toLowerCase();
+    const activationEvents = [
+      "purchase_approved",
+      "subscription_created",
+      "subscription_renewed",
+      "subscription_payment_confirmed",
+      "subscription_payment_success",
+    ];
+    const cancellationEvents = [
+      "subscription_canceled",
+      "subscription_cancelled",
+      "subscription_refunded",
+      "purchase_refunded",
+      "subscription_renewal_refused",
+      "subscription_payment_failed",
+      "subscription_chargeback",
+      "refund_requested",
+    ];
 
-      const plan =
-        productName.includes("premium") ? "premium" : "pro";
+    const now = new Date();
+    const productName = data.product?.name?.toLowerCase() || "";
+    const plan = productName.includes("premium") ? "premium" : "pro";
 
-      const guaranteeDays = Number(process.env.GUARANTEE_DAYS || process.env.TRIAL_DAYS || "10");
-      const guaranteeEnd = new Date(now.getTime() + guaranteeDays * 86400 * 1000);
+    if (activationEvents.some((evt) => normalizedEvent.includes(evt))) {
+      const guaranteeEnd = new Date(now.getTime() + GUARANTEE_WINDOW_MS);
 
       await storage.updateUser(user.id, {
         plan,
@@ -1121,20 +1138,20 @@ app.post("/api/cakto/webhook", async (req, res) => {
         trialEnd: guaranteeEnd,
       });
 
-      console.log(`[CAKTO] Plano ativado: ${email} → ${plan}`);
-    }
-
-    // Cancelamento
-    if (event === "subscription_canceled" || event === "subscription_renewal_refused") {
+      console.log(`[CAKTO] Assinatura confirmada (${normalizedEvent}): ${email} → ${plan}`);
+    } else if (cancellationEvents.some((evt) => normalizedEvent.includes(evt))) {
       await storage.updateUser(user.id, {
         plan: "pro",
         trialStart: null,
         trialEnd: null,
+        billingStatus: "pending",
         caktoSubscriptionId: null,
         billingStatus: "canceled",
       });
 
-      console.log(`[CAKTO] Assinatura cancelada: ${email}`);
+      console.log(`[CAKTO] Assinatura encerrada (${normalizedEvent}): ${email}`);
+    } else {
+      console.log("[CAKTO] Evento ignorado:", normalizedEvent);
     }
 
     return res.json({ received: true });

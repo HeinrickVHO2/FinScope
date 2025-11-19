@@ -6,17 +6,17 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Check, Crown } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CaktoCheckoutModal } from "@/components/CaktoCheckoutModal";
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const { user, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
+  const { user, isLoading, refetchUser } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
   
   useEffect(() => {
     if (user) {
@@ -38,10 +38,14 @@ export default function SettingsPage() {
   }
   
   const currentPlan = user.plan;
-  const guaranteeDaysLeft = user.trialEnd 
+  const guaranteeDaysLeft = user.trialEnd
     ? Math.max(0, Math.ceil((new Date(user.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
   const isWithinGuarantee = guaranteeDaysLeft > 0;
+  const displayPlan = user.billingStatus === "active" ? user.plan : "pending";
+  const showGuaranteeBanner = displayPlan !== "pending" && isWithinGuarantee;
+
+  const checkoutIntent = user.billingStatus === "active" ? "upgrade" : "signup";
 
   const plans = [
     {
@@ -81,6 +85,7 @@ export default function SettingsPage() {
   };
 
   return (
+    <>
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-poppins font-bold" data-testid="text-settings-title">Configurações</h1>
@@ -90,18 +95,22 @@ export default function SettingsPage() {
       </div>
 
       {/* Guarantee Banner */}
-      {isWithinGuarantee && (
+      {showGuaranteeBanner && (
         <Card className="border-primary/50 bg-primary/5" data-testid="card-trial-banner">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h3 className="font-semibold mb-1">Garantia de 10 dias ativa</h3>
+                <h3 className="font-semibold mb-1">Garantia ativa</h3>
                 <p className="text-sm text-muted-foreground">
-                  Você tem {guaranteeDaysLeft} dias restantes para solicitar reembolso integral, se precisar.
+                  Você tem {guaranteeDaysLeft} dias para solicitar reembolso total caso não esteja satisfeito.
                 </p>
               </div>
-              <Button variant="outline" data-testid="button-activate-plan" onClick={() => setLocation("/contato")}>
-                Falar com o suporte
+              <Button
+                variant="default"
+                data-testid="button-activate-plan"
+                onClick={() => setIsBillingModalOpen(true)}
+              >
+                Gerenciar cobrança
               </Button>
             </div>
           </CardContent>
@@ -156,26 +165,39 @@ export default function SettingsPage() {
               </div>
               <div>
                 <p className="font-semibold font-poppins text-lg" data-testid="text-current-plan-name">
-                  Plano {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}
+                  {displayPlan === "pending"
+                    ? "Pagamento pendente"
+                    : `Plano ${currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}`}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {isWithinGuarantee ? `${guaranteeDaysLeft} dias de garantia restantes` : "Assinatura confirmada"}
+                  {displayPlan === "pending"
+                    ? "Conclua o checkout para liberar todos os recursos"
+                    : isWithinGuarantee
+                      ? `${guaranteeDaysLeft} dias restantes na garantia`
+                      : "Assinatura confirmada"}
                 </p>
               </div>
             </div>
-            {currentPlan !== "premium" && (
-              <Button variant="outline" data-testid="button-upgrade-plan" onClick={() => setLocation("/settings/billing")}>
+            {displayPlan === "pending" ? (
+              <Button variant="outline" data-testid="button-finish-payment" onClick={() => setIsBillingModalOpen(true)}>
+                Concluir pagamento
+              </Button>
+            ) : currentPlan !== "premium" ? (
+              <Button variant="outline" data-testid="button-upgrade-plan" onClick={() => setIsBillingModalOpen(true)}>
                 Fazer Upgrade
               </Button>
-            )}
+            ) : null}
           </div>
           <Separator className="my-4" />
           <div className="text-sm text-muted-foreground">
-            {currentPlan === "pro" && (
-              <p>Plano Pro ativo. Você pode fazer upgrade para Premium quando quiser.</p>
+            {displayPlan === "pending" && (
+              <p>Se já concluiu o pagamento, clique em &quot;Verificar pagamento&quot; na tela anterior.</p>
             )}
-            {currentPlan === "premium" && (
-              <p>Plano Premium ativo com todos os recursos liberados.</p>
+            {displayPlan !== "pending" && currentPlan === "pro" && (
+              <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 19,90</p>
+            )}
+            {displayPlan !== "pending" && currentPlan === "premium" && (
+              <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 29,90</p>
             )}
           </div>
         </CardContent>
@@ -223,9 +245,9 @@ export default function SettingsPage() {
                     className="w-full"
                     variant={plan.recommended ? "default" : "outline"}
                     data-testid={`button-select-${plan.name.toLowerCase()}`}
-                    onClick={() => setLocation("/settings/billing")}
+                    onClick={() => setIsBillingModalOpen(true)}
                   >
-                    Selecionar Plano
+                    Selecionar plano
                   </Button>
                 ) : (
                   <Button className="w-full" variant="secondary" disabled data-testid={`button-current-${plan.name.toLowerCase()}`}>
@@ -271,5 +293,20 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
     </div>
+      <CaktoCheckoutModal
+        open={isBillingModalOpen}
+        onOpenChange={(open) => {
+          setIsBillingModalOpen(open);
+          if (!open) {
+            refetchUser();
+          }
+        }}
+        intent={checkoutIntent}
+        onFinished={async () => {
+          await refetchUser();
+          setIsBillingModalOpen(false);
+        }}
+      />
+    </>
   );
 }

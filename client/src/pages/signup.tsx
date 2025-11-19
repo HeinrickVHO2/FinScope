@@ -14,6 +14,8 @@ import { useAuth } from "@/lib/auth";
 export default function SignupPage() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [checkoutDismissed, setCheckoutDismissed] = useState(false);
   const { toast } = useToast();
   const { refetchUser } = useAuth();
 
@@ -49,7 +51,8 @@ export default function SignupPage() {
         description: "Complete o checkout para liberar o dashboard. Você tem 10 dias para testar com direito a reembolso.",
       });
       
-      setLocation("/billing-required?autoOpen=1");
+      setIsCheckoutOpen(true);
+      setCheckoutDismissed(false);
     } catch (error) {
       toast({
         title: "Erro ao criar conta",
@@ -84,7 +87,7 @@ export default function SignupPage() {
             </div>
           </Link>
           <p className="text-muted-foreground text-center">
-            Crie sua conta e tenha 10 dias de garantia de reembolso
+            Crie sua conta e ative sua assinatura com 10 dias de garantia
           </p>
         </div>
 
@@ -157,7 +160,7 @@ export default function SignupPage() {
                   disabled={isLoading}
                   data-testid="button-submit"
                 >
-                  {isLoading ? "Criando conta..." : "Criar conta e garantir acesso"}
+                  {isLoading ? "Criando conta..." : "Criar conta e abrir checkout"}
                 </Button>
               </form>
             </Form>
@@ -183,8 +186,31 @@ export default function SignupPage() {
             </p>
           </CardFooter>
         </Card>
+        {checkoutDismissed && !isCheckoutOpen && (
+          <div className="space-y-3 rounded-lg border border-dashed border-primary/30 bg-white/60 p-4 text-center">
+            <p className="text-sm text-muted-foreground">
+              Precisa concluir depois? Clique no botão abaixo para reabrir o checkout quando estiver pronto.
+            </p>
+            <Button variant="outline" onClick={() => setIsCheckoutOpen(true)}>
+              Reabrir checkout
+            </Button>
+          </div>
+        )}
       </div>
     </div>
+    <CaktoCheckoutModal
+      open={isCheckoutOpen}
+      onOpenChange={(open) => {
+        setIsCheckoutOpen(open);
+        if (!open) {
+          setCheckoutDismissed(true);
+        }
+      }}
+      intent="signup"
+      onFinished={() => {
+        setLocation("/dashboard");
+      }}
+    />
     </>
   );
 }

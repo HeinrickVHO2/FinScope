@@ -157,7 +157,7 @@ export default function LoginPage() {
               Não tem uma conta?{" "}
               <Link href="/signup">
                 <span className="text-primary hover:underline cursor-pointer" data-testid="link-signup">
-                  Criar conta grátis
+                  Criar conta
                 </span>
               </Link>
               

@@ -22,6 +22,7 @@ interface DashboardHeaderProps {
 export function DashboardHeader({ 
   userName = "Usuário", 
   userPlan = "pro",
+  trialDaysLeft 
 }: DashboardHeaderProps) {
   const [, setLocation] = useLocation();
   const { logout } = useAuth();
@@ -44,6 +45,11 @@ export function DashboardHeader({
     <header className="flex items-center justify-between gap-4 border-b p-4 bg-background">
       <div className="flex items-center gap-4">
         <SidebarTrigger data-testid="button-sidebar-toggle" />
+        {trialDaysLeft !== undefined && trialDaysLeft > 0 && (
+          <Badge variant="secondary" className="hidden sm:flex" data-testid="badge-trial">
+            {trialDaysLeft} dias restantes na garantia
+          </Badge>
+        )}
       </div>
       <div className="flex items-center gap-3">
         <Badge variant={planBadge.variant} data-testid="badge-plan">

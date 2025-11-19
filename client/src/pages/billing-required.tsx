@@ -9,7 +9,7 @@ import { useLocation } from "wouter";
 export default function BillingRequiredPage() {
   const { user, isLoading, refetchUser } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     if (!isLoading && user?.billingStatus === "active") {
@@ -18,11 +18,19 @@ export default function BillingRequiredPage() {
   }, [isLoading, user?.billingStatus, setLocation]);
 
   useEffect(() => {
-    const query = location.split("?")[1] || "";
-    if (query.includes("autoOpen=1")) {
+    setModalOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("autoOpen") === "1") {
       setModalOpen(true);
+      params.delete("autoOpen");
+      const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+      window.history.replaceState(null, "", next || window.location.pathname);
     }
-  }, [location]);
+  }, []);
 
   if (isLoading || !user) {
     return (
@@ -44,17 +52,16 @@ export default function BillingRequiredPage() {
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-6 w-6 text-destructive" />
             <CardTitle className="font-poppins text-2xl">
-              Pagamento pendente
+              Estamos tentando confirmar seu pagamento
             </CardTitle>
           </div>
           <CardDescription>
-            Ainda não recebemos a confirmação da Cakto. Conclua o checkout para liberar o acesso ao dashboard.
+            Assim que a operadora confirmar o pagamento, liberaremos imediatamente seu acesso ao FinScope.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm text-muted-foreground">
-            Assim que a Cakto confirmar a compra, seu plano será ativado automaticamente e você será redirecionado para o dashboard.
-            Você continua coberto pela nossa garantia de 10 dias: se cancelar nesse período, devolvemos todo o valor.
+            Caso o checkout precise ser reaberto, utilize os botões abaixo para retomar o processo.
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button className="flex-1" onClick={() => setModalOpen(true)}>
@@ -73,7 +80,13 @@ export default function BillingRequiredPage() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Se você já confirmou o pagamento, clique em &quot;Verificar pagamento&quot; e aguarde alguns segundos.
+            Prefere abrir o checkout em outra página? {""}
+            <button
+              onClick={() => setLocation("/billing?return=/billing-required&autoOpen=1")}
+              className="text-primary underline"
+            >
+              Clique aqui
+            </button>.
           </p>
         </CardContent>
       </Card>

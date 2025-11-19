@@ -64,9 +64,9 @@ export function CaktoCheckoutModal({ open, onOpenChange, intent, onFinished }: C
 
   const subtitle = useMemo(() => {
     if (intent === "signup") {
-      return "Finalize sua assinatura sem sair do FinScope. Caso não curta em até 10 dias, reembolsamos 100% do valor.";
+      return "Escolha seu plano e finalize sem sair do FinScope. Pagamento confirmado na hora e com 10 dias de garantia total.";
     }
-    return "Troque de plano imediatamente. Cancelamos o plano atual e criamos o novo sem período de teste.";
+    return "Troque de plano em segundos. A garantia de 10 dias também vale para upgrades e downgrades.";
   }, [intent]);
 
   async function createCheckout() {
@@ -130,19 +130,17 @@ export function CaktoCheckoutModal({ open, onOpenChange, intent, onFinished }: C
 
         {!checkoutUrl ? (
           <div className="space-y-4">
-            {intent === "signup" && (
-              <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">
-                <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
-                  <Clock3 className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-semibold text-primary">Garantia de 10 dias</p>
-                  <p className="text-muted-foreground">
-                    Pague agora e, se não gostar em até 10 dias, reembolsamos o valor integral sem burocracia.
-                  </p>
-                </div>
+            <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">
+              <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+                <Clock3 className="h-5 w-5 text-primary" />
               </div>
-            )}
+              <div>
+                <p className="font-semibold text-primary">Garantia total de 10 dias</p>
+                <p className="text-muted-foreground">
+                  Se o FinScope não fizer sentido para você dentro de 10 dias, devolvemos 100% do valor sem perguntas.
+                </p>
+              </div>
+            </div>
             <div className="grid md:grid-cols-2 gap-4">
               {PLAN_OPTIONS.map((plan) => (
                 <button
@@ -228,13 +226,11 @@ export function CaktoCheckoutModal({ open, onOpenChange, intent, onFinished }: C
               <div>
                 <p className="font-medium">Finalize o pagamento no modal</p>
                 <p className="text-sm text-muted-foreground">
-                  Após confirmar o pagamento, clique em &quot;Verificar pagamento&quot; para atualizar seu acesso.
+                  Após confirmar o pagamento, clique em &quot;Verificar pagamento&quot; ou feche esta janela para atualizar o status.
                 </p>
-                {intent === "signup" && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Lembre-se: você tem 10 dias para testar com tranquilidade. Se cancelar nesse prazo, devolvemos tudo.
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Sua assinatura continua com 10 dias de garantia para solicitar reembolso integral.
+                </p>
               </div>
             </div>
               <Button onClick={handleFinish}>

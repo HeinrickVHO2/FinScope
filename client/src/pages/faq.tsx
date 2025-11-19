@@ -7,8 +7,8 @@ import { ChevronDown } from "lucide-react";
 export default function FAQPage() {
   const faqs = [
     {
-      q: "Como funciona a garantia de 10 dias?",
-      a: "Você paga ao assinar, mas tem 10 dias para testar sem risco. Se não gostar, basta solicitar o cancelamento dentro desse período que devolvemos 100% do valor.",
+      q: "Tenho garantia ao contratar o FinScope?",
+      a: "Sim! Você paga agora, usa sem limitações e tem 10 dias para pedir reembolso total caso não curta a experiência.",
     },
     {
       q: "Posso usar tanto para vida pessoal quanto MEI?",
