@@ -1,22 +1,10 @@
-import nodemailer from "nodemailer";
+import { createTransporter } from "./transporter";
 
 console.log("MAIL_USER:", process.env.MAIL_USER);
 console.log("MAIL_PASS:", process.env.MAIL_PASS ? "***" : "EMPTY");
 
 export async function sendResetEmail(to: string, link: string) {
-  const transporter = nodemailer.createTransport({
-    host: "smtp.titan.email",
-    port: 465,
-    secure: true,
-    auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-  family: 4 // 👈 força IPv4
-} as nodemailer.TransportOptions);
+  const transporter = createTransporter();
 
   const html = `
 <div style="font-family: Inter, Arial, sans-serif; background:#f7f7f7; padding:40px 0;">

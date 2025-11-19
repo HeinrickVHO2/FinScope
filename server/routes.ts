@@ -4,6 +4,7 @@ import express from "express";
 import session from "express-session";
 import { supabase } from "./supabase";
 import { sendResetEmail } from "server/emails/resetEmail";
+import { sendContactEmail } from "server/emails/contactEmail";
 import MemoryStore from "memorystore";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -100,6 +101,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sessionId: req.session?.id || "no session",
       timestamp: new Date().toISOString(),
     });
+  });
+
+  app.post("/api/contact", async (req, res) => {
+    const { name, email, message } = req.body || {};
+
+    if (!name || !email || !message) {
+      return res.status(400).json({ error: "Todos os campos são obrigatórios." });
+    }
+
+    try {
+      await sendContactEmail({
+        name: String(name).trim(),
+        email: String(email).trim(),
+        message: String(message).trim(),
+      });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[CONTACT] Erro ao enviar mensagem:", error);
+      res.status(500).json({ error: "Não foi possível enviar sua mensagem agora." });
+    }
   });
 
   // Middleware to check authentication
