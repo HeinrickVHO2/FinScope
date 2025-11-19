@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 interface BillingCheckoutSectionProps {
   intent: "signup" | "upgrade";
   currentPlan?: string;
+  autoVerify?: boolean;
   title?: string;
   subtitle?: string;
   onFinished?: () => Promise<void> | void;
@@ -18,6 +19,7 @@ interface BillingCheckoutSectionProps {
 export function BillingCheckoutSection({
   intent,
   currentPlan,
+  autoVerify,
   title = "Finalize sua assinatura agora",
   subtitle,
   onFinished,
@@ -48,14 +50,16 @@ export function BillingCheckoutSection({
     return "Troque de plano em segundos. Toda nova cobrança também possui 10 dias de garantia para reembolso.";
   }, [intent, subtitle]);
 
+  const shouldAutoVerify = autoVerify ?? intent === "signup";
+
   useEffect(() => {
-    if (checkoutUrl) {
+    if (checkoutUrl && shouldAutoVerify) {
       startPolling();
     } else {
       stopPolling();
     }
     return stopPolling;
-  }, [checkoutUrl]);
+  }, [checkoutUrl, shouldAutoVerify]);
 
   function startPolling() {
     if (pollRef.current) return;
@@ -242,9 +246,9 @@ export function BillingCheckoutSection({
                 <div>
                   <p className="font-medium">Finalize o pagamento no painel</p>
                   <p className="text-sm text-muted-foreground">
-                    Seu acesso é liberado automaticamente após a confirmação. Se continuar vendo esta tela, clique em <strong>Verificar pagamento</strong>.
+                    Seu acesso é liberado automaticamente. Caso continue vendo esta tela, clique em <strong>Verificar pagamento</strong>.
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">Continuamos verificando em segundo plano para você.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Verificamos em segundo plano para você não se preocupar.</p>
                 </div>
               </div>
               <Button onClick={() => verifyPayment(true)} disabled={isVerifying}>
