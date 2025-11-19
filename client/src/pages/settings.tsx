@@ -37,12 +37,7 @@ export default function SettingsPage() {
   }
 
   const currentPlan = user.plan;
-  const guaranteeDaysLeft = user.trialEnd
-    ? Math.max(0, Math.ceil((new Date(user.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : 0;
-  const isWithinGuarantee = guaranteeDaysLeft > 0;
   const displayPlan = user.billingStatus === "active" ? user.plan : "pending";
-  const showGuaranteeBanner = displayPlan !== "pending" && isWithinGuarantee;
 
   useEffect(() => {
     const shouldShow = displayPlan === "pending";
@@ -85,30 +80,6 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {showGuaranteeBanner && (
-        <Card className="border-primary/50 bg-primary/5" data-testid="card-trial-banner">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h3 className="font-semibold mb-1">Garantia ativa</h3>
-                <p className="text-sm text-muted-foreground">
-                  Você tem {guaranteeDaysLeft} dias para solicitar reembolso total caso não esteja satisfeito.
-                </p>
-              </div>
-              <Button
-                variant="default"
-                data-testid="button-activate-plan"
-                onClick={() => {
-                  setCheckoutIntent("signup");
-                  setShowCheckoutSection(true);
-                }}
-              >
-                Gerenciar cobrança
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <Card data-testid="card-profile">
         <CardHeader>
@@ -161,9 +132,7 @@ export default function SettingsPage() {
                 <p className="text-sm text-muted-foreground">
                   {displayPlan === "pending"
                     ? "Conclua o checkout para liberar todos os recursos"
-                    : isWithinGuarantee
-                      ? `${guaranteeDaysLeft} dias restantes na garantia`
-                      : "Assinatura confirmada"}
+                    : "Assinatura confirmada"}
                 </p>
               </div>
             </div>
