@@ -57,7 +57,7 @@ export default function SettingsPage() {
       price: "R$ 29,90/mês",
       current: currentPlan === "premium",
       recommended: true,
-      features: ["Contas ilimitadas", "Dashboard avançado", "Categorização automática", "Gestão MEI completa", "Relatórios PDF"],
+      features: ["Contas ilimitadas", "Dashboard avançado", "Categorização automática", "Gestão empresarial completa", "Relatórios PDF"],
     },
   ];
 

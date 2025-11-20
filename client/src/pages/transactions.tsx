@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Filter, Search, ArrowUpRight, ArrowDownRight, Download, Trash2 } from "lucide-react";
+import { Plus, Filter, Search, ArrowUpRight, ArrowDownRight, Download, Trash2, FileDown } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -29,9 +29,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import ExportPdfPremiumModal from "@/components/ExportPdfPremiumModal";
 
 export default function TransactionsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPremiumExportOpen, setIsPremiumExportOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const { toast } = useToast();
@@ -160,7 +162,10 @@ export default function TransactionsPage() {
     return matchesSearch && matchesType;
   });
 
+  const isPremiumUser = user?.plan === "premium";
+
   return (
+    <>
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -169,7 +174,13 @@ export default function TransactionsPage() {
             Gerencie todas as suas movimentações financeiras
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {isPremiumUser && (
+            <Button variant="secondary" onClick={() => setIsPremiumExportOpen(true)}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Exportar PDF (Premium)
+            </Button>
+          )}
           <Button variant="outline" data-testid="button-export" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Exportar
@@ -469,5 +480,7 @@ export default function TransactionsPage() {
         </div>
       )}
     </div>
+    <ExportPdfPremiumModal open={isPremiumExportOpen} onOpenChange={setIsPremiumExportOpen} />
+    </>
   );
 }

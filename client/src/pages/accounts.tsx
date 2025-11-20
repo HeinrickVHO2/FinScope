@@ -35,9 +35,12 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import CaktoCheckoutModal from "@/components/CaktoCheckoutModal";
 
 export default function AccountsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -57,6 +60,7 @@ export default function AccountsPage() {
       name: "",
       type: "pf" as const,
       initialBalance: 0,
+      businessCategory: undefined,
     },
   });
 
@@ -67,13 +71,14 @@ export default function AccountsPage() {
         name: "",
         type: "pf" as const,
         initialBalance: 0,
+        businessCategory: undefined,
       });
     }
   }, [isDialogOpen, form]);
 
   // Create account mutation
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; type: string; initialBalance: number }) => {
+    mutationFn: async (data: { name: string; type: string; initialBalance: number; businessCategory?: string | null }) => {
       const response = await apiRequest("POST", "/api/accounts", data);
       return response.json();
     },
@@ -120,10 +125,12 @@ export default function AccountsPage() {
   });
 
   async function onSubmit(data: InsertAccount) {
-    console.log("Form submitted with data:", data);
-    console.log("Form errors:", form.formState.errors);
-    console.log("Form is valid:", form.formState.isValid);
-    createMutation.mutate(data);
+    createMutation.mutate({
+      name: data.name,
+      type: data.type,
+      initialBalance: data.initialBalance,
+      businessCategory: data.businessCategory ?? null,
+    });
   }
 
   function handleDelete(id: string) {
@@ -139,7 +146,17 @@ export default function AccountsPage() {
     return Number(account.initialBalance);
   }
 
+  const watchedType = form.watch("type");
+  const isBusinessAccount = watchedType === "pj";
+
+  useEffect(() => {
+    if (!isBusinessAccount && form.getValues("businessCategory")) {
+      form.setValue("businessCategory", undefined);
+    }
+  }, [form, isBusinessAccount]);
+
   return (
+    <>
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -192,7 +209,16 @@ export default function AccountsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tipo de Conta</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value ?? "pf"}>
+                      <Select
+                        onValueChange={(value) => {
+                          if (value === "pj" && currentPlan !== "premium") {
+                            setIsUpgradeModalOpen(true);
+                            return;
+                          }
+                          field.onChange(value);
+                        }}
+                        value={field.value ?? "pf"}
+                      >
                         <FormControl>
                           <SelectTrigger data-testid="select-account-type">
                             <SelectValue placeholder="Selecione o tipo" />
@@ -200,16 +226,45 @@ export default function AccountsPage() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="pf">Pessoa Física (PF)</SelectItem>
-                          <SelectItem value="pj">Pessoa Jurídica (PJ)</SelectItem>
-                          {currentPlan === "premium" && (
-                            <SelectItem value="mei">MEI (Premium)</SelectItem>
-                          )}
+                          <SelectItem value="pj" disabled={currentPlan !== "premium"}>
+                            Pessoa Jurídica (PJ)
+                          </SelectItem>
                         </SelectContent>
                       </Select>
+                      {currentPlan !== "premium" && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Disponível no plano Premium com gestão empresarial completa.
+                        </p>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                {isBusinessAccount && (
+                  <FormField
+                    control={form.control}
+                    name="businessCategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Categoria dentro da PJ</FormLabel>
+                        <div className="flex items-center justify-between rounded-xl border border-muted p-4">
+                          <div>
+                            <p className="text-sm font-medium">Tratar esta conta como MEI</p>
+                            <p className="text-xs text-muted-foreground">
+                              As contas MEI agora vivem dentro da estrutura PJ.
+                            </p>
+                          </div>
+                          <Switch
+                            checked={field.value === "mei"}
+                            onCheckedChange={(checked) => field.onChange(checked ? "mei" : undefined)}
+                            data-testid="switch-mei-category"
+                          />
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={form.control}
                   name="initialBalance"
@@ -287,7 +342,7 @@ export default function AccountsPage() {
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
                 <div className="flex items-start gap-3">
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    {account.type === "mei" || account.type === "pj" ? (
+                    {account.type === "pj" ? (
                       <Building2 className="h-5 w-5 text-primary" />
                     ) : (
                       <Wallet className="h-5 w-5 text-primary" />
@@ -298,7 +353,11 @@ export default function AccountsPage() {
                       {account.name}
                     </CardTitle>
                     <Badge variant="secondary" className="mt-1">
-                      {account.type === "mei" ? "MEI" : account.type === "pj" ? "PJ" : "PF"}
+                      {account.type === "pj"
+                        ? account.businessCategory === "mei"
+                          ? "PJ · MEI"
+                          : "PJ"
+                        : "PF"}
                     </Badge>
                   </div>
                 </div>
@@ -343,5 +402,11 @@ export default function AccountsPage() {
         </div>
       )}
     </div>
+    <CaktoCheckoutModal
+      open={isUpgradeModalOpen}
+      onOpenChange={setIsUpgradeModalOpen}
+      intent="upgrade"
+    />
+    </>
   );
 }

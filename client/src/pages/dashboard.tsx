@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, Plus, PiggyBank, Target } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, Plus, PiggyBank, Target, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -8,6 +9,8 @@ import { useQuery } from "@tanstack/react-query";
 import { type Transaction, INVESTMENT_TYPES } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
+import { useAuth } from "@/lib/auth";
+import ExportPdfPremiumModal from "@/components/ExportPdfPremiumModal";
 
 interface DashboardMetrics {
   totalBalance: number;
@@ -33,6 +36,8 @@ interface IncomeExpensesData {
 
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Fetch dashboard metrics
   const { data: metrics, isLoading: metricsLoading } = useQuery<DashboardMetrics>({
@@ -78,6 +83,7 @@ export default function DashboardPage() {
   })) || [];
 
   return (
+    <>
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -86,10 +92,18 @@ export default function DashboardPage() {
             Visão geral das suas finanças
           </p>
         </div>
-        <Button onClick={() => setLocation("/transactions")} data-testid="button-add-transaction">
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Transação
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {user?.plan === "premium" && (
+            <Button variant="secondary" onClick={() => setIsExportModalOpen(true)}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Exportar PDF (Premium)
+            </Button>
+          )}
+          <Button onClick={() => setLocation("/transactions")} data-testid="button-add-transaction">
+            <Plus className="mr-2 h-4 w-4" />
+            Nova Transação
+          </Button>
+        </div>
       </div>
 
       {/* Metrics Cards */}
@@ -444,5 +458,7 @@ export default function DashboardPage() {
         </Card>
       </div>
     </div>
+    <ExportPdfPremiumModal open={isExportModalOpen} onOpenChange={setIsExportModalOpen} />
+    </>
   );
 }

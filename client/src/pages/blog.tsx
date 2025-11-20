@@ -10,7 +10,7 @@ export default function BlogPage() {
       date: "10 Jan 2025",
     },
     {
-      title: "PF vs MEI: separação financeira sem dor de cabeça",
+      title: "PF vs PJ: separação financeira sem dor de cabeça",
       excerpt:
         "Como separar vida pessoal e negócio sem bagunçar seu fluxo de caixa.",
       date: "02 Jan 2025",

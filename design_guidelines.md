@@ -46,7 +46,7 @@
 ### Navigation
 - **Top Navigation**: Sticky header with logo left, main nav center, user menu/trial indicator right
 - **Sidebar** (Dashboard pages): Collapsible left sidebar with icon + label navigation, w-64 expanded, w-16 collapsed
-- **Mobile**: Bottom tab bar for primary navigation (Dashboard, Accounts, Transactions, MEI, Settings)
+- **Mobile**: Bottom tab bar for primary navigation (Dashboard, Accounts, Transactions, Settings)
 
 ### Cards & Containers
 - **Metric Cards**: Rounded corners (rounded-lg), subtle shadow (shadow-sm), white background
@@ -111,11 +111,11 @@
 - **Bulk Actions**: Checkbox selection with floating action bar for categorization/deletion
 - **Add Transaction**: Slide-in panel (right side) or modal with comprehensive form
 
-### MEI Management
-- **Business Selector**: Dropdown if multiple businesses (Premium)
-- **Split View**: Business cash flow chart (top) + transaction management (bottom)
-- **Quick Stats**: Revenue, Expenses, Net Profit in colored cards
-- **Documents Section**: Upload area for receipts/invoices
+### Gestão Empresarial
+- **Business Selector**: Dropdown para contas PJ e marcação de categoria (ex: MEI)
+- **Split View**: Fluxo de caixa empresarial (topo) + movimentações (base)
+- **Quick Stats**: Receita, Despesa e Lucro Líquido em cards destacados
+- **Documents Section**: Área para recibos/notas e comprovações fiscais
 
 ---
 

@@ -34,7 +34,7 @@ export interface IStorage {
   getAccount(id: string): Promise<Account | undefined>;
   getAccountsByUserId(userId: string): Promise<Account[]>;
   createAccount(account: InsertAccount): Promise<Account>;
-  updateAccount(id: string, updates: { name?: string; type?: string }): Promise<Account | undefined>;
+  updateAccount(id: string, updates: { name?: string; type?: string; businessCategory?: string | null }): Promise<Account | undefined>;
   deleteAccount(id: string): Promise<boolean>;
 
   // Transaction operations
@@ -205,6 +205,7 @@ export class MemStorage {
       userId: insertAccount.userId,
       name: insertAccount.name,
       type: insertAccount.type,
+      businessCategory: insertAccount.businessCategory ?? null,
       initialBalance: insertAccount.initialBalance, // Store as number
       createdAt: new Date(),
     };
@@ -213,7 +214,7 @@ export class MemStorage {
     return this.toApiAccount(account);
   }
 
-  async updateAccount(id: string, updates: { name?: string; type?: string }): Promise<Account | undefined> {
+  async updateAccount(id: string, updates: { name?: string; type?: string; businessCategory?: string | null }): Promise<Account | undefined> {
     const account = this.accounts.get(id);
     if (!account) return undefined;
 

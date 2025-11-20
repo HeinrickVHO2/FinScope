@@ -25,7 +25,7 @@ export default function SobrePage() {
             </h1>
             <p className="text-slate-600">
               O FinScope nasceu da necessidade real de separar, organizar e entender
-              finanças pessoais e MEI de forma simples, moderna e intuitiva.
+              finanças pessoais e empresariais de forma simples, moderna e intuitiva.
             </p>
           </motion.div>
 

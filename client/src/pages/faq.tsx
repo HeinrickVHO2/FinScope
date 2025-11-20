@@ -11,8 +11,8 @@ export default function FAQPage() {
       a: "Sim! Você paga agora, usa sem limitações e tem 10 dias para pedir reembolso total caso não curta a experiência.",
     },
     {
-      q: "Posso usar tanto para vida pessoal quanto MEI?",
-      a: "Sim, o FinScope possui separação completa entre PF e PJ dentro do painel.",
+      q: "Posso usar tanto para vida pessoal quanto para minha PJ?",
+      a: "Sim, o FinScope possui separação completa entre contas PF e PJ, com categorias empresariais (incluindo MEI) dentro do mesmo painel.",
     },
     {
       q: "Existe integração com bancos?",
@@ -32,7 +32,7 @@ export default function FAQPage() {
     },
     {
       q: "Consigo testar os recursos antes de contratar?",
-      a: "Todo novo cliente tem 10 dias de garantia. Aproveite esse período para explorar dashboards, cadastrar contas e experimentar a gestão MEI sem risco.",
+      a: "Todo novo cliente tem 10 dias de garantia. Aproveite esse período para explorar dashboards, cadastrar contas e testar o controle empresarial sem risco.",
     },
     {
       q: "Como o suporte funciona na prática?",
@@ -40,7 +40,7 @@ export default function FAQPage() {
     },
     {
       q: "O plano Premium vale a pena se eu já uso o Pro?",
-      a: "Sim, especialmente se você precisa de automações, relatórios e o módulo MEI. O upgrade é instantâneo e basta acessar as configurações para abrir o checkout novamente.",
+      a: "Sim, especialmente se você precisa de automações, relatórios e controles empresariais completos. O upgrade é instantâneo e basta acessar as configurações para abrir o checkout novamente.",
     },
   ];
 
