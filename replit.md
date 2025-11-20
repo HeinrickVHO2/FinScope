@@ -23,8 +23,8 @@
 - ✅ Fixed investment type labels: changed from hyphen to underscore (reserva_emergencia, renda_fixa, renda_variavel)
 - ✅ Charts now display professional labels: "Reserva de Emergência", "CDB", "Renda Fixa", "Renda Variável"
 - ✅ Added Income vs Expenses bar chart to dashboard with proper aggregation
-- ✅ Refactored account model: 'pessoal'/'empresa' → 'pf'/'pj'/'mei' (Pessoa Física, Pessoa Jurídica, MEI)
-- ✅ MEI accounts restricted to Premium users (enforced at backend API level)
+- ✅ Refactored account model: 'pessoal'/'empresa' → 'pf'/'pj' com categoria empresarial (ex: MEI)
+- ✅ MEI agora é uma categoria opcional dentro de contas PJ, mantendo compatibilidade com planos Premium
 - ✅ Database migration completed: accounts constraint updated to accept new types
 - ✅ Fixed Select component bug in account creation form (defaultValue → value)
 
@@ -41,7 +41,7 @@
 
 ## Overview
 
-FinScope is a B2C financial management platform offering personal finance tracking and microenterprise (MEI) management. It provides unified financial dashboards, intelligent expense categorization, goals tracking, and comprehensive transaction management for both personal and business accounts. The platform operates on a freemium model with tiered subscriptions and a 10-day trial period. Its design is minimalist, inspired by leading fintech applications.
+FinScope is a B2C financial management platform offering personal and business finance tracking (PF/PJ). It provides unified financial dashboards, intelligent expense categorization, goals tracking, and comprehensive transaction management for both personal and corporate accounts. The platform operates on a freemium model with tiered subscriptions and a 10-day trial period. Its design is minimalist, inspired by leading fintech applications.
 
 ## User Preferences
 

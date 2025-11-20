@@ -22,7 +22,8 @@ export const accounts = pgTable("accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
-  type: text("type").notNull(), // 'pf' | 'pj' | 'mei'
+  type: text("type").notNull(), // 'pf' | 'pj'
+  businessCategory: text("business_category"),
   initialBalance: decimal("initial_balance", { precision: 10, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -102,7 +103,8 @@ export const insertUserSchema = createInsertSchema(users, {
 
 export const insertAccountSchema = createInsertSchema(accounts, {
   name: z.string().min(1, "Nome da conta é obrigatório"),
-  type: z.enum(["pf", "pj", "mei"], { errorMap: () => ({ message: "Tipo inválido" }) }),
+  type: z.enum(["pf", "pj"], { errorMap: () => ({ message: "Tipo inválido" }) }),
+  businessCategory: z.enum(["mei"]).optional(),
   initialBalance: z.coerce.number().min(0, "Saldo deve ser positivo").refine(
     (val) => Number.isFinite(val) && Math.round(val * 100) === val * 100,
     "Saldo deve ter no máximo 2 casas decimais"
@@ -116,7 +118,8 @@ export const insertAccountSchema = createInsertSchema(accounts, {
 // Update schemas with strict validation (no userId changes allowed)
 export const updateAccountSchema = z.object({
   name: z.string().min(1, "Nome da conta é obrigatório").optional(),
-  type: z.enum(["pessoal", "empresa"]).optional(),
+  type: z.enum(["pf", "pj"]).optional(),
+  businessCategory: z.union([z.literal("mei"), z.null()]).optional(),
 }).strict();
 
 export const insertTransactionSchema = createInsertSchema(transactions, {
@@ -253,7 +256,7 @@ export type UpdateUserProfile = z.infer<typeof updateUserProfileSchema>;
 // Plan limits
 export const PLAN_LIMITS = {
   pro: { accounts: 3, features: ["basic_dashboard", "cash_flow", "csv_export", "alerts"] },
-  premium: { accounts: Infinity, features: ["advanced_dashboard", "auto_rules", "pdf_reports", "mei_management"] },
+  premium: { accounts: Infinity, features: ["advanced_dashboard", "auto_rules", "pdf_reports"] },
 } as const;
 
 // Categories (predefined)

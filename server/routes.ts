@@ -5,9 +5,14 @@ import session from "express-session";
 import { supabase } from "./supabase";
 import { sendResetEmail } from "server/emails/resetEmail";
 import { sendContactEmail } from "server/emails/contactEmail";
+import puppeteer from "puppeteer";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 import MemoryStore from "memorystore";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { buildPremiumInsights } from "./insights";
 import { 
   insertUserSchema, 
   loginSchema,
@@ -45,6 +50,13 @@ declare global {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+
+  const puppeteerExecutable = resolvePuppeteerExecutable();
+  if (!puppeteerExecutable) {
+    console.warn("[PDF EXPORT] Puppeteer executable not resolved, relying on bundled Chromium");
+  } else {
+    console.log("[PDF EXPORT] using browser executable:", puppeteerExecutable);
+  }
 
   app.use(express.json());      // 👈 OBRIGATÓRIO
   app.use(express.urlencoded({ extended: true }));  // (opcional, mas recomendado)
@@ -123,6 +135,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/pdf/export", requireAuth, requireActiveBilling, async (req: any, res) => {
+    const { type = "financeiro", period = "últimos 30 dias", includeCharts = true, includeInsights = true } = req.body || {};
+
+    try {
+      const user = req.currentUser || (await storage.getUser(req.session.userId));
+      if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+      const requestedReportType = String(req.body.reportType || "").toLowerCase();
+      const normalizedLabel = String(type).toLowerCase();
+      const isBusinessReport =
+        requestedReportType === "empresarial" ||
+        requestedReportType === "mei" ||
+        normalizedLabel.includes("empresarial") ||
+        normalizedLabel.includes("mei");
+      if (isBusinessReport && user.plan !== "premium") {
+        return res.status(403).json({ error: "Relatórios empresariais disponíveis apenas no plano Premium" });
+      }
+
+      const [metrics, transactions, categories] = await Promise.all([
+        storage.getDashboardMetrics(req.session.userId),
+        storage.getTransactionsByUserId(req.session.userId),
+        storage.getCategoryBreakdown(req.session.userId),
+      ]);
+
+      const insights = includeInsights ? buildPremiumInsights(transactions) : [];
+      const chartImage = includeCharts ? buildChartImage(categories) : null;
+      const html = buildReportHtml({
+        user,
+        type,
+        period,
+        metrics,
+        categories,
+        transactions,
+        chartImage,
+        includeCharts,
+        insights,
+      });
+
+      const browser = await puppeteer.launch({
+        headless: "new",
+        executablePath: puppeteerExecutable ?? undefined,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--single-process",
+          "--no-zygote",
+        ],
+        dumpio: process.env.NODE_ENV !== "production",
+      });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: "networkidle0" });
+      const pdfBuffer = await page.pdf({
+        format: "A4",
+        printBackground: true,
+        margin: { top: "20mm", bottom: "20mm", left: "12mm", right: "12mm" },
+      });
+      await browser.close();
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", "attachment; filename=finscope-report.pdf");
+      res.setHeader("Content-Length", pdfBuffer.length.toString());
+      res.status(200);
+      res.end(pdfBuffer);
+      return;
+    } catch (error) {
+      console.error("[PDF EXPORT] erro ao gerar PDF:", error);
+      return res.status(500).json({ error: "Não foi possível gerar o PDF agora." });
+    }
+  });
+
   // Middleware to check authentication
   function requireAuth(req: any, res: any, next: any) {
     if (!req.session || !req.session.userId) {
@@ -146,6 +230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   }
+
 
   // ===== AUTH ROUTES =====
 
@@ -418,7 +503,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/accounts", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const accounts = await storage.getAccountsByUserId(req.session.userId);
-      res.json(accounts);
+      const filtered = req.currentUser?.plan === "premium"
+        ? accounts
+        : accounts.filter((account) => account.type !== "pj");
+      res.json(filtered);
     } catch (error) {
       res.status(500).json({ error: "Erro ao buscar contas" });
     }
@@ -430,6 +518,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const account = await storage.getAccount(req.params.id);
       if (!account || account.userId !== req.session.userId) {
         return res.status(404).json({ error: "Conta não encontrada" });
+      }
+      if (account.type === "pj" && req.currentUser?.plan !== "premium") {
+        return res.status(403).json({ error: "Contas PJ disponíveis apenas no plano Premium" });
       }
       res.json(account);
     } catch (error) {
@@ -443,20 +534,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse the request body without userId first
       const validatedData = insertAccountSchema.parse(req.body);
 
-      const currentUser = req.currentUser!;
-
-      // Validate MEI restriction: only Premium users can create MEI accounts
-      if (validatedData.type === 'mei' && currentUser.plan !== 'premium') {
-        return res.status(403).json({ 
-          error: "Conta MEI disponível apenas para plano Premium" 
-        });
-      }
-
       // Add userId from session after validation
       const dataWithUserId = {
         ...validatedData,
         userId: req.session.userId,
       };
+
+      if (validatedData.type === "pj" && req.currentUser?.plan !== "premium") {
+        return res.status(403).json({ error: "Contas PJ disponíveis apenas no plano Premium" });
+      }
 
       const account = await storage.createAccount(dataWithUserId);
       res.json(account);
@@ -474,6 +560,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const account = await storage.getAccount(req.params.id);
       if (!account || account.userId !== req.session.userId) {
         return res.status(404).json({ error: "Conta não encontrada" });
+      }
+      if (account.type === "pj" && req.currentUser?.plan !== "premium") {
+        return res.status(403).json({ error: "Contas PJ disponíveis apenas no plano Premium" });
       }
 
       // Strict validation - only allow name and type updates
@@ -495,6 +584,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!account || account.userId !== req.session.userId) {
         return res.status(404).json({ error: "Conta não encontrada" });
       }
+      if (account.type === "pj" && req.currentUser?.plan !== "premium") {
+        return res.status(403).json({ error: "Contas PJ disponíveis apenas no plano Premium" });
+      }
 
       await storage.deleteAccount(req.params.id);
       res.json({ success: true });
@@ -509,6 +601,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/transactions", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const transactions = await storage.getTransactionsByUserId(req.session.userId);
+      if (req.currentUser?.plan !== "premium") {
+        const accounts = await storage.getAccountsByUserId(req.session.userId);
+        const allowedIds = new Set(accounts.filter((acc) => acc.type !== "pj").map((acc) => acc.id));
+        return res.json(transactions.filter((tx) => allowedIds.has(tx.accountId)));
+      }
       res.json(transactions);
     } catch (error) {
       res.status(500).json({ error: "Erro ao buscar transações" });
@@ -522,6 +619,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!account || account.userId !== req.session.userId) {
         return res.status(404).json({ error: "Conta não encontrada" });
       }
+      if (account.type === "pj" && req.currentUser?.plan !== "premium") {
+        return res.status(403).json({ error: "Transações de contas PJ disponíveis apenas no plano Premium" });
+      }
 
       const transactions = await storage.getTransactionsByAccountId(req.params.accountId);
       res.json(transactions);
@@ -533,11 +633,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create transaction
   app.post("/api/transactions", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
+      const accountId = req.body.accountId;
+      if (!accountId) {
+        return res.status(400).json({ error: "Conta é obrigatória" });
+      }
+      const account = await storage.getAccount(accountId);
+      if (!account || account.userId !== req.session.userId) {
+        return res.status(404).json({ error: "Conta não encontrada" });
+      }
+      if (account.type === "pj" && req.currentUser?.plan !== "premium") {
+        return res.status(403).json({ error: "Transações em contas PJ disponíveis apenas no plano Premium" });
+      }
+
       const data = insertTransactionSchema.parse({
         ...req.body,
         userId: req.session.userId,
       });
-      const transaction = await storage.createTransaction(data);
+      const transaction = await storage.createTransaction({ ...data, accountId });
       res.json(transaction);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -553,6 +665,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction || transaction.userId !== req.session.userId) {
         return res.status(404).json({ error: "Transação não encontrada" });
+      }
+      const transactionAccount = await storage.getAccount(transaction.accountId);
+      if (!transactionAccount) {
+        return res.status(404).json({ error: "Conta não encontrada" });
+      }
+      if (transactionAccount?.type === "pj" && req.currentUser?.plan !== "premium") {
+        return res.status(403).json({ error: "Transações em contas PJ disponíveis apenas no plano Premium" });
       }
 
       // Strict validation
@@ -573,6 +692,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transaction = await storage.getTransaction(req.params.id);
       if (!transaction || transaction.userId !== req.session.userId) {
         return res.status(404).json({ error: "Transação não encontrada" });
+      }
+      const transactionAccount = await storage.getAccount(transaction.accountId);
+      if (!transactionAccount) {
+        return res.status(404).json({ error: "Conta não encontrada" });
+      }
+      if (transactionAccount?.type === "pj" && req.currentUser?.plan !== "premium") {
+        return res.status(403).json({ error: "Transações em contas PJ disponíveis apenas no plano Premium" });
       }
 
       await storage.deleteTransaction(req.params.id);
@@ -999,15 +1125,17 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
     try {
       const transactions = await storage.getTransactionsByUserId(req.session.userId);
       const accounts = await storage.getAccountsByUserId(req.session.userId);
-      
-      // Create account lookup map
-      const accountMap = new Map(accounts.map(a => [a.id, a.name]));
+      const accountMap = new Map(accounts.map(a => [a.id, a]));
+      const exportTransactions =
+        req.currentUser?.plan === "premium"
+          ? transactions
+          : transactions.filter((t) => accountMap.get(t.accountId)?.type !== "pj");
       
       // Generate CSV
       const headers = ["Data", "Descrição", "Conta", "Tipo", "Categoria", "Valor"];
-      const rows = transactions.map(t => {
+      const rows = exportTransactions.map(t => {
         const date = new Date(t.date).toLocaleDateString('pt-BR');
-        const accountName = accountMap.get(t.accountId) || "Conta desconhecida";
+        const accountName = accountMap.get(t.accountId)?.name || "Conta desconhecida";
         const type = t.type === "entrada" ? "Entrada" : "Saída";
         const amount = `R$ ${parseFloat(t.amount).toFixed(2).replace('.', ',')}`;
         
@@ -1188,4 +1316,296 @@ app.post("/api/cakto/webhook", async (req, res) => {
 
   const httpServer = createServer(app);
   return httpServer;
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(Number(value) || 0);
+}
+
+function resolvePuppeteerExecutable() {
+  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  if (envPath && fs.existsSync(envPath)) {
+    return envPath;
+  }
+
+  const shellPath = findExecutableRecursive(
+    path.join(os.homedir(), ".cache/puppeteer"),
+    "chrome-headless-shell"
+  );
+  if (shellPath) {
+    return shellPath;
+  }
+
+  try {
+    const bundledPath = puppeteer.executablePath();
+    if (bundledPath && fs.existsSync(bundledPath)) {
+      return bundledPath;
+    }
+  } catch (error) {
+    console.warn("[PDF EXPORT] Unable to resolve bundled Chromium executable:", error);
+  }
+
+  return null;
+}
+
+function findExecutableRecursive(dir: string, executableName: string, depth = 0, maxDepth = 5): string | null {
+  if (!fs.existsSync(dir) || depth > maxDepth) {
+    return null;
+  }
+
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    if (entry.name === executableName) {
+      return path.join(dir, entry.name);
+    }
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const result = findExecutableRecursive(path.join(dir, entry.name), executableName, depth + 1, maxDepth);
+    if (result) {
+      return result;
+    }
+  }
+
+  return null;
+}
+
+function buildReportHtml({
+  user,
+  type,
+  period,
+  metrics,
+  categories,
+  transactions,
+  chartImage,
+  includeCharts,
+  insights,
+}: {
+  user: User;
+  type: string;
+  period: string;
+  metrics: { totalBalance: number; monthlyIncome: number; monthlyExpenses: number; netCashFlow: number };
+  categories: { category: string; amount: number }[];
+  transactions: any[];
+  chartImage: string | null;
+  includeCharts: boolean;
+  insights: string[];
+}) {
+  const summaryRows = transactions.slice(0, 6).map((tx) => {
+    const date = new Date(tx.date || tx.createdAt || Date.now());
+    return `
+      <tr class="border-b border-slate-200">
+        <td class="py-2 text-sm">${date.toLocaleDateString("pt-BR")}</td>
+        <td class="py-2 text-sm">${escapeHtml(tx.description ?? tx.category ?? "-")}</td>
+        <td class="py-2 text-sm">${escapeHtml(tx.category ?? "-")}</td>
+        <td class="py-2 text-sm text-right ${tx.type === "saida" ? "text-red-500" : "text-emerald-600"}">
+          ${tx.type === "saida" ? "-" : ""}${formatCurrency(Number(tx.amount || 0))}
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  const categoriesRows = categories.slice(0, 8).map((cat, index) => {
+    return `
+      <tr class="border-b border-slate-100">
+        <td class="py-3 text-xs font-semibold text-slate-500">${index + 1}</td>
+        <td class="py-3">
+          <p class="text-sm font-medium text-slate-900">${escapeHtml(cat.category)}</p>
+          <p class="text-xs text-slate-500">Participação ${((Number(cat.amount) / (metrics.monthlyExpenses || 1)) * 100).toFixed(1)}%</p>
+        </td>
+        <td class="py-3 text-right text-sm font-semibold text-slate-900">${formatCurrency(Number(cat.amount))}</td>
+      </tr>
+    `;
+  }).join("");
+
+  const kpiBlocks = [
+    { label: "Saldo total", value: formatCurrency(metrics.totalBalance) },
+    { label: "Receitas do período", value: formatCurrency(metrics.monthlyIncome) },
+    { label: "Despesas do período", value: formatCurrency(metrics.monthlyExpenses) },
+    { label: "Fluxo de caixa", value: formatCurrency(metrics.netCashFlow) },
+  ].map(
+    (kpi) => `
+    <div class="rounded-3xl border border-slate-100 bg-slate-50/70 p-5 shadow-[0_10px_40px_rgba(15,23,42,0.08)]">
+      <p class="text-xs uppercase tracking-wide text-slate-500">${kpi.label}</p>
+      <p class="text-3xl font-semibold text-slate-900 mt-2">${kpi.value}</p>
+    </div>`
+  ).join("");
+
+  const insightsList = `
+    <div class="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-6 shadow-sm">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg font-semibold text-slate-900">Insights inteligentes</h3>
+        <span class="text-xs font-medium text-emerald-600 bg-white/70 px-3 py-1 rounded-full border border-emerald-100">Premium</span>
+      </div>
+      ${
+        insights.length
+          ? `<ul class="space-y-2 text-sm text-slate-700 list-disc pl-5">${insights
+              .map((item) => `<li>${escapeHtml(item)}</li>`)
+              .join("")}</ul>`
+          : `<p class="text-sm text-slate-500 italic">Os insights estratégicos aparecerão aqui assim que tivermos dados suficientes.</p>`
+      }
+    </div>
+  `;
+
+  const chartBlock = `
+    <div class="rounded-3xl border border-slate-100 bg-slate-50/60 p-6 shadow-sm flex flex-col min-h-[320px]">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-xs uppercase tracking-wide text-slate-500">Distribuição por categoria</p>
+          <h3 class="text-lg font-semibold text-slate-900">Painel de gastos</h3>
+        </div>
+        <span class="text-xs text-slate-500">${includeCharts ? "Base64 embutido" : "Sem gráfico"}</span>
+      </div>
+      ${
+        includeCharts && chartImage
+          ? `<img src="${chartImage}" class="w-full rounded-xl border border-slate-200 shadow-inner bg-white object-cover flex-1" alt="Gráfico base64"/>`
+          : `<div class="flex-1 border border-dashed border-slate-300 rounded-xl grid place-items-center text-sm text-slate-400 italic">Cole aqui o gráfico em base64</div>`
+      }
+    </div>
+  `;
+
+  const categoriesTable = `
+    <div class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-xs uppercase tracking-wide text-slate-500">Principais categorias</p>
+          <h3 class="text-lg font-semibold text-slate-900">Ranking por impacto</h3>
+        </div>
+        <span class="text-xs text-slate-500">${categories.length ? "Top 8" : "Sem dados"}</span>
+      </div>
+      <table class="w-full text-left">
+        <thead>
+          <tr class="text-xs uppercase text-slate-500 border-b border-slate-200">
+            <th class="py-2 w-12">#</th>
+            <th class="py-2">Categoria</th>
+            <th class="py-2 text-right">Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${
+            categoriesRows ||
+            `<tr><td colspan="3" class="py-6 text-center text-sm text-slate-500">Sem categorias suficientes neste período.</td></tr>`
+          }
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  const generatedAt = new Date().toLocaleString("pt-BR", {
+    dateStyle: "long",
+    timeStyle: "short",
+  });
+
+  const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Relatório FinScope</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+      @page { size: A4 portrait; margin: 0; }
+      * { box-sizing: border-box; }
+      body { font-family: 'Inter', sans-serif; background: #f1f4fb; color: #0f172a; margin: 0; }
+    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-[#f1f4fb]">
+    <main class="mx-auto max-w-[900px] bg-white min-h-screen py-10 px-10 shadow-[0_40px_120px_rgba(15,23,42,0.12)]">
+      <header class="rounded-3xl bg-slate-900 text-white p-8 mb-10 flex flex-col gap-6">
+        <div class="flex items-center justify-between gap-6">
+          <div>
+            <p class="text-sm uppercase tracking-[0.2em] text-slate-300">FinScope Premium</p>
+            <h1 class="text-3xl font-semibold mt-2">Relatório ${escapeHtml(type)}</h1>
+            <p class="text-sm text-slate-200 mt-1">Formato A4 · Versão executiva</p>
+          </div>
+          <div class="text-right">
+            <p class="text-sm text-slate-300">Cliente</p>
+            <p class="text-xl font-semibold text-white">${escapeHtml(user.fullName)}</p>
+            <p class="text-sm text-slate-300">Período: ${escapeHtml(period)}</p>
+          </div>
+        </div>
+        <div class="border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.15em] text-slate-300">Resumo</p>
+            <p class="text-lg font-semibold">KPIs consolidados</p>
+          </div>
+          <p class="text-sm text-slate-300">Gerado em ${escapeHtml(generatedAt)}</p>
+        </div>
+      </header>
+
+      <section class="grid grid-cols-2 gap-6 mb-10">
+        ${kpiBlocks}
+      </section>
+
+      <section class="grid grid-cols-2 gap-6 mb-10">
+        ${chartBlock}
+        ${categoriesTable}
+      </section>
+
+      <section class="mb-10">
+        ${insightsList}
+      </section>
+
+      <section class="rounded-3xl border border-slate-100 p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <p class="text-xs uppercase tracking-wide text-slate-500">Movimentações recentes</p>
+            <h3 class="text-lg font-semibold text-slate-900">Resumo financeiro</h3>
+          </div>
+          <span class="text-xs text-slate-500">${transactions.length ? "Últimas 6 entradas" : "Sem movimentações"}</span>
+        </div>
+        <table class="w-full text-left">
+          <thead>
+            <tr class="text-xs uppercase text-slate-500 border-b border-slate-200">
+              <th class="py-2">Data</th>
+              <th class="py-2">Descrição</th>
+              <th class="py-2">Categoria</th>
+              <th class="py-2 text-right">Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${summaryRows || `<tr><td colspan="4" class="py-6 text-center text-sm text-slate-500">Sem movimentações recentes no período selecionado.</td></tr>`}
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>
+`;
+
+  return html;
+}
+
+function buildChartImage(categories: { category: string; amount: number }[]) {
+  if (!categories.length) return null;
+  const max = Math.max(...categories.map((c) => Number(c.amount) || 0), 1);
+  const bars = categories
+    .slice(0, 6)
+    .map((c, i) => {
+      const height = ((Number(c.amount) || 0) / max) * 180;
+      return `<rect x="${20 + i * 70}" y="${200 - height}" width="40" height="${height}" fill="#0f172a" rx="6"></rect>
+        <text x="${40 + i * 70}" y="215" font-size="12" text-anchor="middle" fill="#475569">${escapeHtml(c.category)}</text>`;
+    })
+    .join("");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="520" height="240" viewBox="0 0 520 240">
+    <rect width="100%" height="100%" fill="#f8fafc"/>
+    ${bars}
+  </svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

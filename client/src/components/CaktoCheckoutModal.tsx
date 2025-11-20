@@ -33,13 +33,13 @@ const PLAN_OPTIONS = [
     id: "premium",
     name: "Plano Premium",
     price: "R$ 29,90/mês",
-    description: "Tudo do Pro + recursos avançados para empresas e MEI.",
+    description: "Tudo do Pro + recursos avançados para contas PJ.",
     badge: "Mais popular",
     features: [
       "Contas ilimitadas",
       "Categorização automática",
       "Relatórios avançados",
-      "Gestão MEI completa",
+      "Gestão empresarial completa",
     ],
   },
 ] as const;

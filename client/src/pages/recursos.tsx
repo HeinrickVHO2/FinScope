@@ -31,9 +31,9 @@ export default function RecursosPage() {
     },
     {
       icon: TrendingUp,
-      title: "Gestão MEI Completa",
+      title: "Gestão Empresarial Completa",
       description:
-        "Separação total entre vida pessoal e CNPJ, com fluxo de caixa próprio.",
+        "Contas PJ com categoria MEI opcional, fluxo de caixa dedicado e relatórios profissionais.",
     },
   ];
 

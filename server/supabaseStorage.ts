@@ -172,6 +172,7 @@ export class SupabaseStorage implements IStorage {
       userId: data.user_id,
       name: data.name,
       type: data.type,
+      businessCategory: data.business_category,
       initialBalance: parseFloat(data.initial_balance).toFixed(2),
       createdAt: new Date(data.created_at),
     };
@@ -191,6 +192,7 @@ export class SupabaseStorage implements IStorage {
       userId: row.user_id,
       name: row.name,
       type: row.type,
+      businessCategory: row.business_category,
       initialBalance: parseFloat(row.initial_balance).toFixed(2),
       createdAt: new Date(row.created_at),
     }));
@@ -215,6 +217,7 @@ export class SupabaseStorage implements IStorage {
         user_id: insertAccount.userId,
         name: insertAccount.name,
         type: insertAccount.type,
+        business_category: insertAccount.businessCategory ?? null,
         initial_balance: insertAccount.initialBalance,
       })
       .select()
@@ -229,15 +232,23 @@ export class SupabaseStorage implements IStorage {
       userId: data.user_id,
       name: data.name,
       type: data.type,
+      businessCategory: data.business_category,
       initialBalance: parseFloat(data.initial_balance).toFixed(2),
       createdAt: new Date(data.created_at),
     };
   }
 
-  async updateAccount(id: string, updates: { name?: string; type?: string }): Promise<Account | undefined> {
+  async updateAccount(id: string, updates: { name?: string; type?: string; businessCategory?: string | null }): Promise<Account | undefined> {
+    const updateData: Record<string, any> = {};
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.type !== undefined) updateData.type = updates.type;
+    if (updates.businessCategory !== undefined) {
+      updateData.business_category = updates.businessCategory;
+    }
+
     const { data, error } = await supabase
       .from("accounts")
-      .update(updates)
+      .update(updateData)
       .eq("id", id)
       .select()
       .single();
@@ -249,6 +260,7 @@ export class SupabaseStorage implements IStorage {
       userId: data.user_id,
       name: data.name,
       type: data.type,
+      businessCategory: data.business_category,
       initialBalance: parseFloat(data.initial_balance).toFixed(2),
       createdAt: new Date(data.created_at),
     };

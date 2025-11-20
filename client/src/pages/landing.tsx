@@ -44,8 +44,8 @@ export default function LandingPage() {
     },
     {
       icon: BarChart3,
-      title: "Gestão MEI Simplificada",
-      description: "Controle separado para seu microempreendimento com fluxo de caixa e relatórios."
+      title: "Gestão Empresarial Simplificada",
+      description: "Controle suas contas PJ com fluxo de caixa dedicado e relatórios estratégicos."
     },
     {
       icon: Wallet,
@@ -82,14 +82,14 @@ export default function LandingPage() {
       name: "Premium",
       price: "R$ 29,90",
       period: "/mês",
-      description: "Solução completa para pessoa física e MEI",
+      description: "Solução completa para pessoa física e empresas",
       features: [
         "Contas ilimitadas",
         "Dashboard avançado",
         "Categorização automática inteligente",
         "Relatórios PDF profissionais",
         "Alertas avançados",
-        "Gestão completa MEI",
+        "Categoria MEI dentro da conta PJ",
         "Organização financeira total",
         "Acesso antecipado a recursos",
         "Backup automático"
@@ -252,7 +252,7 @@ export default function LandingPage() {
               Controle completo das suas finanças pessoais e do seu negócio em um só lugar
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl" data-testid="text-hero-subtitle">
-              Dashboards inteligentes, categorização automática e gestão MEI simplificada.
+              Dashboards inteligentes, categorização automática e controle empresarial/PJ em uma única plataforma.
               Tudo que você precisa para organizar sua vida financeira.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
