@@ -14,6 +14,7 @@ interface BillingCheckoutSectionProps {
   subtitle?: string;
   onFinished?: () => Promise<void> | void;
   className?: string;
+  initialPlanId?: CheckoutPlanId | null;
 }
 
 export function BillingCheckoutSection({
@@ -24,6 +25,7 @@ export function BillingCheckoutSection({
   subtitle,
   onFinished,
   className,
+  initialPlanId = null,
 }: BillingCheckoutSectionProps) {
   const { toast } = useToast();
   const [selectedPlan, setSelectedPlan] = useState<CheckoutPlanId | null>(null);
@@ -33,14 +35,27 @@ export function BillingCheckoutSection({
   const [isVerifying, setIsVerifying] = useState(false);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
+  const normalizedCurrentPlan = (currentPlan?.toLowerCase() ?? null) as CheckoutPlanId | null;
+  const hasSelectablePlan =
+    intent !== "upgrade" ? true : CHECKOUT_PLAN_OPTIONS.some((plan) => plan.id !== normalizedCurrentPlan);
+
   useEffect(() => {
-    setSelectedPlan(null);
     setCheckoutUrl(null);
     setErrorMessage(null);
     setIsCreatingCheckout(false);
     setIsVerifying(false);
     stopPolling();
-  }, [intent]);
+
+    if (intent === "upgrade") {
+      const defaultPlan =
+        (initialPlanId && initialPlanId !== normalizedCurrentPlan
+          ? initialPlanId
+          : CHECKOUT_PLAN_OPTIONS.find((plan) => plan.id !== normalizedCurrentPlan)?.id) ?? null;
+      setSelectedPlan(defaultPlan);
+    } else {
+      setSelectedPlan(initialPlanId);
+    }
+  }, [intent, normalizedCurrentPlan, initialPlanId]);
 
   const computedSubtitle = useMemo(() => {
     if (subtitle) return subtitle;
@@ -169,25 +184,38 @@ export function BillingCheckoutSection({
               </div>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
-              {CHECKOUT_PLAN_OPTIONS.map((plan) => (
+              {CHECKOUT_PLAN_OPTIONS.map((plan) => {
+                const isCurrent = intent === "upgrade" && normalizedCurrentPlan === plan.id;
+                return (
                 <button
                   key={plan.id}
                   type="button"
-                  onClick={() => setSelectedPlan(plan.id)}
+                  onClick={() => {
+                    if (isCurrent) return;
+                    setSelectedPlan(plan.id);
+                  }}
+                  disabled={isCurrent}
                   className={`rounded-xl border p-4 text-left transition-all ${
                     selectedPlan === plan.id ? "border-primary shadow-md" : "border-border hover:border-primary/60"
-                  }`}
+                  } ${isCurrent ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-poppins text-lg font-semibold">{plan.name}</p>
                       <p className="text-sm text-muted-foreground">{plan.price}</p>
                     </div>
-                    {plan.badge && (
-                      <Badge variant="secondary" className="text-xs">
-                        {plan.badge}
-                      </Badge>
-                    )}
+                    <div className="flex gap-1">
+                      {plan.badge && (
+                        <Badge variant="secondary" className="text-xs">
+                          {plan.badge}
+                        </Badge>
+                      )}
+                      {isCurrent && (
+                        <Badge variant="outline" className="text-xs">
+                          Plano atual
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <p className="text-sm text-muted-foreground mt-2">{plan.description}</p>
                   <ul className="mt-4 space-y-2 text-sm">
@@ -199,11 +227,17 @@ export function BillingCheckoutSection({
                     ))}
                   </ul>
                 </button>
-              ))}
+                );
+              })}
             </div>
+            {intent === "upgrade" && !hasSelectablePlan && (
+              <p className="text-sm text-muted-foreground">
+                Você já está no plano Premium. Nenhum outro plano disponível para upgrade.
+              </p>
+            )}
             {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
             <div className="flex justify-end">
-              <Button onClick={createCheckout} disabled={!selectedPlan || isCreatingCheckout}>
+              <Button onClick={createCheckout} disabled={!selectedPlan || isCreatingCheckout || !hasSelectablePlan}>
                 {isCreatingCheckout ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />

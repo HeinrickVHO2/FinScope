@@ -29,8 +29,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
-import CaktoCheckoutModal from "@/components/CaktoCheckoutModal";
+import ExportPdfPremiumModal from "@/components/ExportPdfPremiumModal";
+import UpgradeModal from "@/components/UpgradeModal";
 import { useDashboardView } from "@/context/dashboard-view";
+import { cn } from "@/lib/utils";
 
 type Scope = "PF" | "PJ" | "ALL";
 
@@ -74,11 +76,14 @@ export default function TransactionsPage() {
   const { selectedView, setSelectedView } = useDashboardView();
   const [scopeFilter, setScopeFilter] = useState<Scope>(selectedView);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [isPremiumPdfModalOpen, setIsPremiumPdfModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const { toast } = useToast();
   const { user } = useAuth();
   const isPremiumUser = user?.plan === "premium";
+  const isProUser = user?.plan === "pro";
+  const canAccessProPdf = Boolean(isPremiumUser || isProUser);
 
   // Fetch transactions and accounts
   const transactionsEndpoint = `/api/transactions?type=${scopeFilter}`;
@@ -232,43 +237,58 @@ export default function TransactionsPage() {
     setSelectedView(scope);
   };
 
-  async function handleExport() {
-    if (scopeFilter === "PJ" && !isPremiumUser) {
+  async function handleExportProPdf() {
+    const isTryingBusinessView = scopeFilter === "PJ" && !isPremiumUser;
+    if (!canAccessProPdf || isTryingBusinessView) {
       setIsUpgradeModalOpen(true);
       return;
     }
+
     try {
-      const response = await fetch(`/api/export/transactions?type=${scopeFilter}`, {
-        method: 'GET',
-        credentials: 'include',
+      const response = await fetch("/api/export/pro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          type: scopeFilter,
+          period: resolvePeriodLabel(),
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao exportar transações');
+        throw new Error("Erro ao gerar PDF");
       }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `transacoes_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `FinScope-pro-transacoes-${Date.now()}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      document.body.removeChild(anchor);
 
       toast({
-        title: "Exportação concluída",
-        description: "Suas transações foram exportadas com sucesso",
+        title: "PDF exportado",
+        description: "Seu relatório foi gerado com sucesso.",
       });
     } catch (error) {
       toast({
-        title: "Erro ao exportar",
-        description: "Não foi possível exportar as transações",
+        title: "Erro ao gerar PDF",
+        description: (error as Error).message || "Não foi possível gerar o relatório agora.",
         variant: "destructive",
       });
     }
   }
+
+  const handlePremiumPdfOpen = () => {
+    if (!isPremiumUser) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+    setIsPremiumPdfModalOpen(true);
+  };
 
   useEffect(() => {
     if (!isPremiumUser && selectedView === "PJ") {
@@ -284,8 +304,29 @@ export default function TransactionsPage() {
     return matchesSearch && matchesType;
   });
 
+  const resolvePeriodLabel = () => {
+    const dataset = transactions || [];
+    const timestamps = dataset
+      .map((tx) => {
+        const parsed = new Date(tx.date);
+        return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+      })
+      .filter((value): value is number => value !== null);
+
+    if (timestamps.length === 0) {
+      return "Sem movimentacoes registradas";
+    }
+
+    const startDate = new Date(Math.min(...timestamps));
+    const endDate = new Date(Math.max(...timestamps));
+    const formatLabel = (date: Date) =>
+      `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+    const startLabel = formatLabel(startDate);
+    const endLabel = formatLabel(endDate);
+    return startLabel === endLabel ? endLabel : `${startLabel} a ${endLabel}`;
+  };
+
   return (
-    <>
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -294,7 +335,7 @@ export default function TransactionsPage() {
             Gerencie todas as suas movimentações financeiras
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-2">
             <Button
               variant={scopeFilter === "PF" ? "default" : "outline"}
@@ -305,7 +346,7 @@ export default function TransactionsPage() {
             <Button
               variant={scopeFilter === "PJ" ? "default" : "outline"}
               onClick={() => handleScopeChange("PJ")}
-              disabled={!isPremiumUser}
+              aria-disabled={!isPremiumUser}
             >
               Conta Empresarial
               {!isPremiumUser && <Lock className="ml-2 h-4 w-4" />}
@@ -317,17 +358,32 @@ export default function TransactionsPage() {
               Todas
             </Button>
           </div>
-          <Button variant="outline" data-testid="button-export" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" />
-            Exportar
-          </Button>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-add-transaction">
-                <Plus className="mr-2 h-4 w-4" />
-                Nova Transação
-              </Button>
-            </DialogTrigger>
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            <Button
+              variant="secondary"
+              onClick={handleExportProPdf}
+              className={cn("bg-slate-900 hover:bg-slate-800", !canAccessProPdf && "opacity-60")}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Exportar PDF (PRO)
+              {(!canAccessProPdf || (scopeFilter === "PJ" && !isPremiumUser)) && <Lock className="ml-2 h-4 w-4" />}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handlePremiumPdfOpen}
+              className={cn(!isPremiumUser && "opacity-60")}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              PDF Premium
+              {!isPremiumUser && <Lock className="ml-2 h-4 w-4" />}
+            </Button>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-add-transaction">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nova Transação
+                </Button>
+              </DialogTrigger>
             <DialogContent data-testid="dialog-add-transaction">
               <DialogHeader>
                 <DialogTitle className="font-poppins">Adicionar Transação</DialogTitle>
@@ -505,6 +561,7 @@ export default function TransactionsPage() {
           </Dialog>
         </div>
       </div>
+      </div>
 
       {/* Filters */}
       <Card>
@@ -630,8 +687,8 @@ export default function TransactionsPage() {
           })}
         </div>
       )}
+      <ExportPdfPremiumModal open={isPremiumPdfModalOpen} onOpenChange={setIsPremiumPdfModalOpen} />
+      <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Exportações avançadas" />
     </div>
-    <CaktoCheckoutModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} intent="upgrade" />
-    </>
   );
 }

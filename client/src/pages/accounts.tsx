@@ -36,7 +36,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import CaktoCheckoutModal from "@/components/CaktoCheckoutModal";
+import UpgradeModal from "@/components/UpgradeModal";
 
 export default function AccountsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -402,11 +402,7 @@ export default function AccountsPage() {
         </div>
       )}
     </div>
-    <CaktoCheckoutModal
-      open={isUpgradeModalOpen}
-      onOpenChange={setIsUpgradeModalOpen}
-      intent="upgrade"
-    />
+    <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Contas PJ" />
     </>
   );
 }

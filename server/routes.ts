@@ -13,6 +13,7 @@ import MemoryStore from "memorystore";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { buildPremiumInsights } from "./insights";
+import { buildProTransactionsPdf } from "./pdf/proReport";
 import { 
   insertUserSchema, 
   loginSchema,
@@ -149,6 +150,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return String(value || "PF").toUpperCase() === "PJ" ? "PJ" : "PF";
   };
 
+  const scopeLabels: Record<AccountScope, string> = {
+    PF: "Conta Pessoal",
+    PJ: "Conta Empresarial",
+    ALL: "Consolidado PF + PJ",
+  };
+
+  const formatPtDate = (date: Date) => {
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const formatCurrencyBRL = (value: number) => {
+    const rounded = Number.isFinite(value) ? value : 0;
+    const parts = rounded.toFixed(2).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return `R$ ${parts.join(",")}`;
+  };
+
   const ensureScopeAccess = (scope: AccountScope, req: any, res: any) => {
     if (scope === "PJ" && req.currentUser?.plan !== "premium") {
       res.status(403).json({ error: "Recurso empresarial disponível apenas para o plano Premium" });
@@ -181,7 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
-  app.post("/api/pdf/export", requireAuth, requireActiveBilling, async (req: any, res) => {
+  app.post("/api/pdf/export", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
     const { type = "financeiro", period = "últimos 30 dias", includeCharts = true, includeInsights = true, accountScope } = req.body || {};
 
     try {
@@ -281,6 +302,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       next(error);
     }
+  }
+
+  function premiumRequired(req: any, res: any, next: any) {
+    const user = req.currentUser;
+    if (!user || user.plan !== "premium") {
+      return res.status(403).json({ error: "Recurso disponível apenas no plano Premium" });
+    }
+    next();
   }
 
 
@@ -1199,6 +1228,77 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
   });
 
   // ===== EXPORT ROUTES =====
+
+  app.post("/api/export/pro", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const user = req.currentUser || (await storage.getUser(req.session.userId));
+      if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+      if (!["pro", "premium"].includes(user.plan)) {
+        return res.status(403).json({ error: "Disponível apenas para planos Pro ou Premium" });
+      }
+
+      const scope = parseAccountScope(req.body?.type ?? req.query?.type);
+      if (!ensureScopeAccess(scope, req, res)) {
+        return;
+      }
+
+      const transactions = await storage.getTransactionsByUserId(user.id, scope);
+      const orderedTransactions = [...transactions].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      const printableTransactions = orderedTransactions.map((transaction) => {
+        const txDate = new Date(transaction.date);
+        const numericAmount =
+          typeof transaction.amount === "number" ? transaction.amount : Number(transaction.amount);
+        return {
+          date: Number.isNaN(txDate.getTime()) ? "-" : formatPtDate(txDate),
+          category: transaction.category || "Sem categoria",
+          amount: formatCurrencyBRL(numericAmount),
+          type: transaction.type === "entrada" ? "Entrada" : "Saida",
+          description: transaction.description || "-",
+        };
+      });
+
+      const rawPeriod = req.body?.period ?? req.query?.period;
+      const providedPeriod = rawPeriod ? String(rawPeriod).trim() : "";
+      let periodLabel = providedPeriod || "Sem movimentações registradas";
+      if (!providedPeriod) {
+        const validTimestamps = orderedTransactions
+          .map((transaction) => {
+            const asDate = new Date(transaction.date);
+            return Number.isNaN(asDate.getTime()) ? null : asDate.getTime();
+          })
+          .filter((value): value is number => value !== null);
+
+        if (validTimestamps.length > 0) {
+          const startDate = new Date(Math.min(...validTimestamps));
+          const endDate = new Date(Math.max(...validTimestamps));
+          const startLabel = formatPtDate(startDate);
+          const endLabel = formatPtDate(endDate);
+          periodLabel = startLabel === endLabel ? endLabel : `${startLabel} a ${endLabel}`;
+        }
+      }
+
+      const pdfBuffer = buildProTransactionsPdf({
+        userName: user.fullName || user.email,
+        scopeLabel: scopeLabels[scope],
+        periodLabel,
+        generatedAt: new Date(),
+        transactions: printableTransactions,
+      });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", "attachment; filename=finscope-pro-transactions.pdf");
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("[PRO PDF EXPORT] erro ao gerar PDF:", error);
+      res.status(500).json({ error: "Não foi possível gerar o PDF agora." });
+    }
+  });
 
   // Export transactions to CSV
   app.get("/api/export/transactions", requireAuth, requireActiveBilling, async (req: any, res) => {
