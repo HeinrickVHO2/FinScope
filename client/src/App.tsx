@@ -13,7 +13,6 @@ import LandingPage from "@/pages/landing";
 import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
 import DashboardPage from "@/pages/dashboard";
-import AccountsPage from "@/pages/accounts";
 import TransactionsPage from "@/pages/transactions";
 import InvestmentsPage from "@/pages/investments";
 import MEIPage from "@/pages/mei";
@@ -31,6 +30,7 @@ import BillingSettingsPage from "@/pages/settings-billing";
 import BillingRequiredPage from "@/pages/billing-required";
 import OnboardingSuccessPage from "@/pages/onboarding-success";
 import OnboardingErrorPage from "@/pages/onboarding-error";
+import { DashboardViewProvider } from "@/context/dashboard-view";
 
 
 
@@ -81,21 +81,23 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <DashboardHeader
-            userName={user.fullName}
-            userPlan={user.plan}
-            trialDaysLeft={guaranteeDaysLeft}
-          />
-          <main className="flex-1 overflow-auto">
-            {children}
-          </main>
+    <DashboardViewProvider>
+      <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+        <div className="flex h-screen w-full">
+          <AppSidebar />
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <DashboardHeader
+              userName={user.fullName}
+              userPlan={user.plan}
+              trialDaysLeft={guaranteeDaysLeft}
+            />
+            <main className="flex-1 overflow-auto">
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </DashboardViewProvider>
   );
 }
 
@@ -168,11 +170,6 @@ function Router() {
       <Route path="/billing-required">
         <DashboardLayout>
           <BillingRequiredPage />
-        </DashboardLayout>
-      </Route>
-      <Route path="/accounts">
-        <DashboardLayout>
-          <AccountsPage />
         </DashboardLayout>
       </Route>
       <Route path="/transactions">

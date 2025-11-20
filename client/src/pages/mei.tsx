@@ -175,7 +175,7 @@ export default function MEIPage() {
           <p className="text-sm text-muted-foreground">
             Adicione contas PJ e marque-as como MEI dentro do cadastro para vê-las aqui.
           </p>
-          <Button onClick={() => setLocation("/accounts")}>Adicionar conta PJ</Button>
+          <Button onClick={() => setIsUpgradeModalOpen(true)}>Desbloquear contas PJ</Button>
         </Card>
       ) : (
         <>

@@ -135,29 +135,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  type AccountScope = "PF" | "PJ" | "ALL";
+
+  const parseAccountScope = (value: any): AccountScope => {
+    const normalized = String(value || "ALL").toUpperCase();
+    if (normalized === "PF" || normalized === "PJ") {
+      return normalized;
+    }
+    return "ALL";
+  };
+
+  const normalizeAccountType = (value: any): "PF" | "PJ" => {
+    return String(value || "PF").toUpperCase() === "PJ" ? "PJ" : "PF";
+  };
+
+  const ensureScopeAccess = (scope: AccountScope, req: any, res: any) => {
+    if (scope === "PJ" && req.currentUser?.plan !== "premium") {
+      res.status(403).json({ error: "Recurso empresarial disponível apenas para o plano Premium" });
+      return false;
+    }
+    return true;
+  };
+
+  async function ensureDefaultAccounts(userId: string, plan: string) {
+    const accounts = await storage.getAccountsByUserId(userId);
+    const hasPF = accounts.some((account) => account.type?.toLowerCase() === "pf");
+    const hasPJ = accounts.some((account) => account.type?.toLowerCase() === "pj");
+
+    if (!hasPF) {
+      await storage.createAccount({
+        userId,
+        name: "Conta pessoal",
+        type: "pf",
+        initialBalance: 0,
+      });
+    }
+
+    if (plan === "premium" && !hasPJ) {
+      await storage.createAccount({
+        userId,
+        name: "Conta empresarial",
+        type: "pj",
+        initialBalance: 0,
+      });
+    }
+  }
+
   app.post("/api/pdf/export", requireAuth, requireActiveBilling, async (req: any, res) => {
-    const { type = "financeiro", period = "últimos 30 dias", includeCharts = true, includeInsights = true } = req.body || {};
+    const { type = "financeiro", period = "últimos 30 dias", includeCharts = true, includeInsights = true, accountScope } = req.body || {};
 
     try {
       const user = req.currentUser || (await storage.getUser(req.session.userId));
       if (!user) {
         return res.status(404).json({ error: "Usuário não encontrado" });
       }
-      const requestedReportType = String(req.body.reportType || "").toLowerCase();
       const normalizedLabel = String(type).toLowerCase();
-      const isBusinessReport =
-        requestedReportType === "empresarial" ||
-        requestedReportType === "mei" ||
-        normalizedLabel.includes("empresarial") ||
-        normalizedLabel.includes("mei");
-      if (isBusinessReport && user.plan !== "premium") {
-        return res.status(403).json({ error: "Relatórios empresariais disponíveis apenas no plano Premium" });
+      const scopeFromBody = parseAccountScope(accountScope);
+      let scope: AccountScope = "ALL";
+      if (normalizedLabel.includes("empresarial")) {
+        scope = "PJ";
+      } else if (normalizedLabel.includes("financeiro")) {
+        scope = "PF";
+      } else if (scopeFromBody) {
+        scope = scopeFromBody;
+      }
+
+      if (!ensureScopeAccess(scope, req, res)) {
+        return;
       }
 
       const [metrics, transactions, categories] = await Promise.all([
-        storage.getDashboardMetrics(req.session.userId),
-        storage.getTransactionsByUserId(req.session.userId),
-        storage.getCategoryBreakdown(req.session.userId),
+        storage.getDashboardMetrics(req.session.userId, scope),
+        storage.getTransactionsByUserId(req.session.userId, scope),
+        storage.getCategoryBreakdown(req.session.userId, scope),
       ]);
 
       const insights = includeInsights ? buildPremiumInsights(transactions) : [];
@@ -195,11 +245,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       await browser.close();
 
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", "attachment; filename=finscope-report.pdf");
-      res.setHeader("Content-Length", pdfBuffer.length.toString());
-      res.status(200);
-      res.end(pdfBuffer);
+      res.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": "attachment; filename=finscope-report.pdf",
+        "Content-Length": pdfBuffer.length,
+      });
+      res.end(pdfBuffer, "binary");
       return;
     } catch (error) {
       console.error("[PDF EXPORT] erro ao gerar PDF:", error);
@@ -221,6 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ error: "Usuário não encontrado" });
       }
+      await ensureDefaultAccounts(user.id, user.plan);
       req.currentUser = user;
       if (user.billingStatus !== "active") {
         return res.status(403).json({ error: "Pagamento pendente" });
@@ -511,6 +563,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Erro ao buscar contas" });
     }
   });
+  app.post("/api/accounts/ensure-default", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      await ensureDefaultAccounts(req.session.userId, req.currentUser.plan);
+      const accounts = await storage.getAccountsByUserId(req.session.userId);
+      res.json(accounts);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao garantir contas padrão" });
+    }
+  });
 
   // Get single account
   app.get("/api/accounts/:id", requireAuth, requireActiveBilling, async (req: any, res) => {
@@ -600,12 +661,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all transactions for user
   app.get("/api/transactions", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
-      const transactions = await storage.getTransactionsByUserId(req.session.userId);
-      if (req.currentUser?.plan !== "premium") {
-        const accounts = await storage.getAccountsByUserId(req.session.userId);
-        const allowedIds = new Set(accounts.filter((acc) => acc.type !== "pj").map((acc) => acc.id));
-        return res.json(transactions.filter((tx) => allowedIds.has(tx.accountId)));
+      const scope = parseAccountScope(req.query?.type);
+      if (!ensureScopeAccess(scope, req, res)) {
+        return;
       }
+      const transactions = await storage.getTransactionsByUserId(req.session.userId, scope);
       res.json(transactions);
     } catch (error) {
       res.status(500).json({ error: "Erro ao buscar transações" });
@@ -641,15 +701,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!account || account.userId !== req.session.userId) {
         return res.status(404).json({ error: "Conta não encontrada" });
       }
-      if (account.type === "pj" && req.currentUser?.plan !== "premium") {
+      const requestedAccountType = normalizeAccountType(req.body?.accountType ?? (account.type === "pj" ? "PJ" : "PF"));
+      if (requestedAccountType === "PJ" && req.currentUser?.plan !== "premium") {
         return res.status(403).json({ error: "Transações em contas PJ disponíveis apenas no plano Premium" });
       }
 
       const data = insertTransactionSchema.parse({
         ...req.body,
         userId: req.session.userId,
+        accountType: requestedAccountType,
       });
-      const transaction = await storage.createTransaction({ ...data, accountId });
+      const transaction = await storage.createTransaction({ ...data, accountId, accountType: requestedAccountType });
       res.json(transaction);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -675,8 +737,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Strict validation
-      const updates = updateTransactionSchema.parse(req.body);
-      const updated = await storage.updateTransaction(req.params.id, updates);
+      const parsedUpdates = updateTransactionSchema.parse(req.body);
+      if (parsedUpdates.accountType) {
+        parsedUpdates.accountType = normalizeAccountType(parsedUpdates.accountType);
+        if (parsedUpdates.accountType === "PJ" && req.currentUser?.plan !== "premium") {
+          return res.status(403).json({ error: "Transações em contas PJ disponíveis apenas no plano Premium" });
+        }
+      }
+      const updated = await storage.updateTransaction(req.params.id, parsedUpdates);
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -847,7 +915,11 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
   // Get dashboard metrics
   app.get("/api/dashboard/metrics", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
-      const metrics = await storage.getDashboardMetrics(req.session.userId);
+      const scope = parseAccountScope(req.query?.type);
+      if (!ensureScopeAccess(scope, req, res)) {
+        return;
+      }
+      const metrics = await storage.getDashboardMetrics(req.session.userId, scope);
       res.json(metrics);
     } catch (error) {
       res.status(500).json({ error: "Erro ao buscar métricas" });
@@ -857,7 +929,11 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
   // Get category breakdown
   app.get("/api/dashboard/categories", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
-      const categories = await storage.getCategoryBreakdown(req.session.userId);
+      const scope = parseAccountScope(req.query?.type);
+      if (!ensureScopeAccess(scope, req, res)) {
+        return;
+      }
+      const categories = await storage.getCategoryBreakdown(req.session.userId, scope);
       res.json(categories);
     } catch (error) {
       res.status(500).json({ error: "Erro ao buscar categorias" });
@@ -876,7 +952,11 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
 
   app.get("/api/dashboard/income-expenses", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
-      const data = await storage.getIncomeExpensesData(req.session.userId);
+      const scope = parseAccountScope(req.query?.type);
+      if (!ensureScopeAccess(scope, req, res)) {
+        return;
+      }
+      const data = await storage.getIncomeExpensesData(req.session.userId, scope);
       res.json(data);
     } catch (error) {
       res.status(500).json({ error: "Erro ao buscar receitas e despesas" });
@@ -1123,17 +1203,16 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
   // Export transactions to CSV
   app.get("/api/export/transactions", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
-      const transactions = await storage.getTransactionsByUserId(req.session.userId);
+      const scope = parseAccountScope(req.query?.type);
+      if (!ensureScopeAccess(scope, req, res)) {
+        return;
+      }
+      const transactions = await storage.getTransactionsByUserId(req.session.userId, scope);
       const accounts = await storage.getAccountsByUserId(req.session.userId);
       const accountMap = new Map(accounts.map(a => [a.id, a]));
-      const exportTransactions =
-        req.currentUser?.plan === "premium"
-          ? transactions
-          : transactions.filter((t) => accountMap.get(t.accountId)?.type !== "pj");
       
-      // Generate CSV
       const headers = ["Data", "Descrição", "Conta", "Tipo", "Categoria", "Valor"];
-      const rows = exportTransactions.map(t => {
+      const rows = transactions.map(t => {
         const date = new Date(t.date).toLocaleDateString('pt-BR');
         const accountName = accountMap.get(t.accountId)?.name || "Conta desconhecida";
         const type = t.type === "entrada" ? "Entrada" : "Saída";
@@ -1141,7 +1220,7 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
         
         return [
           date,
-          `"${t.description.replace(/"/g, '""')}"`, // Escape quotes
+          `"${t.description.replace(/"/g, '""')}"`,
           `"${accountName}"`,
           type,
           t.category,
@@ -1149,14 +1228,11 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
         ].join(',');
       });
 
-      
-      
       const csv = [headers.join(','), ...rows].join('\n');
       
-      // Set headers for file download
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="transacoes_${new Date().toISOString().split('T')[0]}.csv"`);
-      res.send('\uFEFF' + csv); // Add BOM for Excel UTF-8 support
+      res.send('\uFEFF' + csv);
     } catch (error) {
       res.status(500).json({ error: "Erro ao exportar transações" });
     }
@@ -1400,11 +1476,11 @@ function buildReportHtml({
   const summaryRows = transactions.slice(0, 6).map((tx) => {
     const date = new Date(tx.date || tx.createdAt || Date.now());
     return `
-      <tr class="border-b border-slate-200">
-        <td class="py-2 text-sm">${date.toLocaleDateString("pt-BR")}</td>
-        <td class="py-2 text-sm">${escapeHtml(tx.description ?? tx.category ?? "-")}</td>
-        <td class="py-2 text-sm">${escapeHtml(tx.category ?? "-")}</td>
-        <td class="py-2 text-sm text-right ${tx.type === "saida" ? "text-red-500" : "text-emerald-600"}">
+      <tr>
+        <td>${date.toLocaleDateString("pt-BR")}</td>
+        <td>${escapeHtml(tx.description ?? tx.category ?? "-")}</td>
+        <td>${escapeHtml(tx.category ?? "-")}</td>
+        <td class="${tx.type === "saida" ? "text-negative" : "text-positive"}">
           ${tx.type === "saida" ? "-" : ""}${formatCurrency(Number(tx.amount || 0))}
         </td>
       </tr>
@@ -1413,13 +1489,13 @@ function buildReportHtml({
 
   const categoriesRows = categories.slice(0, 8).map((cat, index) => {
     return `
-      <tr class="border-b border-slate-100">
-        <td class="py-3 text-xs font-semibold text-slate-500">${index + 1}</td>
-        <td class="py-3">
-          <p class="text-sm font-medium text-slate-900">${escapeHtml(cat.category)}</p>
-          <p class="text-xs text-slate-500">Participação ${((Number(cat.amount) / (metrics.monthlyExpenses || 1)) * 100).toFixed(1)}%</p>
+      <tr>
+        <td>${index + 1}</td>
+        <td>
+          <div class="table-title">${escapeHtml(cat.category)}</div>
+          <div class="table-subtitle">Participação ${((Number(cat.amount) / (metrics.monthlyExpenses || 1)) * 100).toFixed(1)}%</div>
         </td>
-        <td class="py-3 text-right text-sm font-semibold text-slate-900">${formatCurrency(Number(cat.amount))}</td>
+        <td class="text-right">${formatCurrency(Number(cat.amount))}</td>
       </tr>
     `;
   }).join("");
@@ -1431,66 +1507,66 @@ function buildReportHtml({
     { label: "Fluxo de caixa", value: formatCurrency(metrics.netCashFlow) },
   ].map(
     (kpi) => `
-    <div class="rounded-3xl border border-slate-100 bg-slate-50/70 p-5 shadow-[0_10px_40px_rgba(15,23,42,0.08)]">
-      <p class="text-xs uppercase tracking-wide text-slate-500">${kpi.label}</p>
-      <p class="text-3xl font-semibold text-slate-900 mt-2">${kpi.value}</p>
+    <div class="kpi-card">
+      <p class="kpi-label">${kpi.label}</p>
+      <p class="kpi-value">${kpi.value}</p>
     </div>`
   ).join("");
 
   const insightsList = `
-    <div class="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-6 shadow-sm">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-lg font-semibold text-slate-900">Insights inteligentes</h3>
-        <span class="text-xs font-medium text-emerald-600 bg-white/70 px-3 py-1 rounded-full border border-emerald-100">Premium</span>
+    <div class="card insights-card">
+      <div class="card-header">
+        <h3>Insights inteligentes</h3>
+        <span class="badge">Premium</span>
       </div>
       ${
         insights.length
-          ? `<ul class="space-y-2 text-sm text-slate-700 list-disc pl-5">${insights
+          ? `<ul class="insights-list">${insights
               .map((item) => `<li>${escapeHtml(item)}</li>`)
               .join("")}</ul>`
-          : `<p class="text-sm text-slate-500 italic">Os insights estratégicos aparecerão aqui assim que tivermos dados suficientes.</p>`
+          : `<p class="muted italic">Os insights estratégicos aparecerão aqui assim que tivermos dados suficientes.</p>`
       }
     </div>
   `;
 
   const chartBlock = `
-    <div class="rounded-3xl border border-slate-100 bg-slate-50/60 p-6 shadow-sm flex flex-col min-h-[320px]">
-      <div class="flex items-center justify-between mb-4">
+    <div class="card chart-card">
+      <div class="card-header">
         <div>
-          <p class="text-xs uppercase tracking-wide text-slate-500">Distribuição por categoria</p>
-          <h3 class="text-lg font-semibold text-slate-900">Painel de gastos</h3>
+          <p class="subtitle">Distribuição por categoria</p>
+          <h3>Painel de gastos</h3>
         </div>
-        <span class="text-xs text-slate-500">${includeCharts ? "Base64 embutido" : "Sem gráfico"}</span>
+        <span class="muted">${includeCharts ? "Base64 embutido" : "Sem gráfico"}</span>
       </div>
       ${
         includeCharts && chartImage
-          ? `<img src="${chartImage}" class="w-full rounded-xl border border-slate-200 shadow-inner bg-white object-cover flex-1" alt="Gráfico base64"/>`
-          : `<div class="flex-1 border border-dashed border-slate-300 rounded-xl grid place-items-center text-sm text-slate-400 italic">Cole aqui o gráfico em base64</div>`
+          ? `<img src="${chartImage}" class="chart-image" alt="Gráfico base64" />`
+          : `<div class="chart-placeholder">Cole aqui o gráfico em base64</div>`
       }
     </div>
   `;
 
   const categoriesTable = `
-    <div class="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-      <div class="flex items-center justify-between mb-4">
+    <div class="card">
+      <div class="card-header">
         <div>
-          <p class="text-xs uppercase tracking-wide text-slate-500">Principais categorias</p>
-          <h3 class="text-lg font-semibold text-slate-900">Ranking por impacto</h3>
+          <p class="subtitle">Principais categorias</p>
+          <h3>Ranking por impacto</h3>
         </div>
-        <span class="text-xs text-slate-500">${categories.length ? "Top 8" : "Sem dados"}</span>
+        <span class="muted">${categories.length ? "Top 8" : "Sem dados"}</span>
       </div>
-      <table class="w-full text-left">
+      <table class="data-table">
         <thead>
-          <tr class="text-xs uppercase text-slate-500 border-b border-slate-200">
-            <th class="py-2 w-12">#</th>
-            <th class="py-2">Categoria</th>
-            <th class="py-2 text-right">Valor</th>
+          <tr>
+            <th>#</th>
+            <th>Categoria</th>
+            <th>Valor</th>
           </tr>
         </thead>
         <tbody>
           ${
             categoriesRows ||
-            `<tr><td colspan="3" class="py-6 text-center text-sm text-slate-500">Sem categorias suficientes neste período.</td></tr>`
+            `<tr><td colspan="3" class="muted text-center">Sem categorias suficientes neste período.</td></tr>`
           }
         </tbody>
       </table>
@@ -1513,65 +1589,95 @@ function buildReportHtml({
       @page { size: A4 portrait; margin: 0; }
       * { box-sizing: border-box; }
       body { font-family: 'Inter', sans-serif; background: #f1f4fb; color: #0f172a; margin: 0; }
+      .report-container { max-width: 900px; margin: 0 auto; background: #ffffff; min-height: 100vh; padding: 40px; box-shadow: 0 40px 120px rgba(15,23,42,0.12); }
+      .report-header { border-radius: 28px; background: #0f172a; color: #fff; padding: 32px; margin-bottom: 40px; display: flex; flex-direction: column; gap: 24px; }
+      .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+      .header-title { text-transform: uppercase; letter-spacing: 0.2em; font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 6px; }
+      .header-summary { border: 1px solid rgba(255,255,255,0.2); border-radius: 18px; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+      .kpi-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-bottom: 40px; }
+      .kpi-card { border: 1px solid #e2e8f0; border-radius: 24px; padding: 20px; background: #f8fafc; box-shadow: 0 10px 40px rgba(15,23,42,0.08); }
+      .kpi-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.15em; color: #64748b; }
+      .kpi-value { margin-top: 10px; font-size: 30px; font-weight: 600; color: #0f172a; }
+      .two-column { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; margin-bottom: 40px; }
+      .card { border: 1px solid #e2e8f0; border-radius: 24px; padding: 24px; box-shadow: 0 20px 60px rgba(15,23,42,0.08); background: #fff; min-height: 100%; }
+      .card-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+      .card-header h3 { margin: 4px 0 0 0; font-size: 20px; color: #0f172a; }
+      .subtitle { text-transform: uppercase; letter-spacing: 0.2em; font-size: 11px; color: #94a3b8; }
+      .muted { color: #94a3b8; font-size: 12px; }
+      .chart-card { min-height: 320px; display:flex; flex-direction:column; }
+      .chart-image { width: 100%; border-radius: 16px; border:1px solid #e2e8f0; box-shadow: inset 0 4px 12px rgba(15,23,42,0.05); object-fit: cover; flex:1; }
+      .chart-placeholder { flex:1; border:1px dashed #cbd5f5; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:13px; color:#94a3b8; font-style:italic; min-height:220px; }
+      .insights-card { background: #ecfdf5; border-color: #a7f3d0; }
+      .insights-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; color: #0f172a; }
+      .badge { font-size: 11px; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(16,185,129,0.4); color: #047857; background: rgba(255,255,255,0.7); font-weight: 600; }
+      .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      .data-table th { text-transform: uppercase; letter-spacing: 0.1em; font-size: 11px; color: #64748b; border-bottom: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+      .data-table td { padding: 12px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+      .data-table tr:nth-child(even) { background: #f8fafc; }
+      .table-title { font-weight: 600; color: #0f172a; }
+      .table-subtitle { font-size: 12px; color: #94a3b8; }
+      .text-positive { color: #059669; text-align: right; font-weight: 600; }
+      .text-negative { color: #dc2626; text-align: right; font-weight: 600; }
+      .summary-section .card-header { margin-bottom: 0; }
+      .summary-section table { margin-top: 16px; }
+      .text-center { text-align: center; }
+      .italic { font-style: italic; }
     </style>
-    <script src="https://cdn.tailwindcss.com"></script>
   </head>
-  <body class="bg-[#f1f4fb]">
-    <main class="mx-auto max-w-[900px] bg-white min-h-screen py-10 px-10 shadow-[0_40px_120px_rgba(15,23,42,0.12)]">
-      <header class="rounded-3xl bg-slate-900 text-white p-8 mb-10 flex flex-col gap-6">
-        <div class="flex items-center justify-between gap-6">
+  <body>
+    <main class="report-container">
+      <header class="report-header">
+        <div class="header-row">
           <div>
-            <p class="text-sm uppercase tracking-[0.2em] text-slate-300">FinScope Premium</p>
-            <h1 class="text-3xl font-semibold mt-2">Relatório ${escapeHtml(type)}</h1>
-            <p class="text-sm text-slate-200 mt-1">Formato A4 · Versão executiva</p>
+            <p class="header-title">FinScope Premium</p>
+            <h1 style="font-size:32px; margin:0 0 6px 0;">Relatório ${escapeHtml(type)}</h1>
+            <p class="muted" style="color:rgba(255,255,255,0.8);">Formato A4 · Versão executiva</p>
           </div>
-          <div class="text-right">
-            <p class="text-sm text-slate-300">Cliente</p>
-            <p class="text-xl font-semibold text-white">${escapeHtml(user.fullName)}</p>
-            <p class="text-sm text-slate-300">Período: ${escapeHtml(period)}</p>
+          <div class="muted" style="text-align:right;color:rgba(255,255,255,0.8);">
+            <p style="margin:0 0 4px 0; font-size:13px;">Cliente</p>
+            <p style="margin:0;font-size:20px;font-weight:600;color:#fff;">${escapeHtml(user.fullName)}</p>
+            <p style="margin:4px 0 0 0; font-size:13px;">Período: ${escapeHtml(period)}</p>
           </div>
         </div>
-        <div class="border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+        <div class="header-summary">
           <div>
-            <p class="text-xs uppercase tracking-[0.15em] text-slate-300">Resumo</p>
-            <p class="text-lg font-semibold">KPIs consolidados</p>
+            <p class="subtitle" style="color:rgba(255,255,255,0.7);">Resumo</p>
+            <p style="margin:4px 0 0 0; font-size:18px; font-weight:600;">KPIs consolidados</p>
           </div>
-          <p class="text-sm text-slate-300">Gerado em ${escapeHtml(generatedAt)}</p>
+          <p class="muted" style="color:rgba(255,255,255,0.7);">Gerado em ${escapeHtml(generatedAt)}</p>
         </div>
       </header>
 
-      <section class="grid grid-cols-2 gap-6 mb-10">
+      <section class="kpi-grid">
         ${kpiBlocks}
       </section>
 
-      <section class="grid grid-cols-2 gap-6 mb-10">
+      <section class="two-column">
         ${chartBlock}
         ${categoriesTable}
       </section>
 
-      <section class="mb-10">
-        ${insightsList}
-      </section>
+      <section>${insightsList}</section>
 
-      <section class="rounded-3xl border border-slate-100 p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
+      <section class="card summary-section">
+        <div class="card-header">
           <div>
-            <p class="text-xs uppercase tracking-wide text-slate-500">Movimentações recentes</p>
-            <h3 class="text-lg font-semibold text-slate-900">Resumo financeiro</h3>
+            <p class="subtitle">Movimentações recentes</p>
+            <h3>Resumo financeiro</h3>
           </div>
-          <span class="text-xs text-slate-500">${transactions.length ? "Últimas 6 entradas" : "Sem movimentações"}</span>
+          <span class="muted">${transactions.length ? "Últimas 6 entradas" : "Sem movimentações"}</span>
         </div>
-        <table class="w-full text-left">
+        <table class="data-table">
           <thead>
-            <tr class="text-xs uppercase text-slate-500 border-b border-slate-200">
-              <th class="py-2">Data</th>
-              <th class="py-2">Descrição</th>
-              <th class="py-2">Categoria</th>
-              <th class="py-2 text-right">Valor</th>
+            <tr>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th>Categoria</th>
+              <th>Valor</th>
             </tr>
           </thead>
           <tbody>
-            ${summaryRows || `<tr><td colspan="4" class="py-6 text-center text-sm text-slate-500">Sem movimentações recentes no período selecionado.</td></tr>`}
+            ${summaryRows || `<tr><td colspan="4" class="muted text-center">Sem movimentações recentes no período selecionado.</td></tr>`}
           </tbody>
         </table>
       </section>

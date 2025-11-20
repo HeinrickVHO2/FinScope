@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Filter, Search, ArrowUpRight, ArrowDownRight, Download, Trash2, FileDown } from "lucide-react";
+import { Plus, Search, ArrowUpRight, ArrowDownRight, Download, Trash2, Lock } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,29 +22,76 @@ import {
 } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertTransactionSchema, type InsertTransaction, type Transaction, type Account, CATEGORIES } from "@shared/schema";
+import { insertTransactionSchema, type InsertTransaction, type Transaction, type Account } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
-import ExportPdfPremiumModal from "@/components/ExportPdfPremiumModal";
+import CaktoCheckoutModal from "@/components/CaktoCheckoutModal";
+import { useDashboardView } from "@/context/dashboard-view";
+
+type Scope = "PF" | "PJ" | "ALL";
+
+const CATEGORY_OPTIONS: Record<"PF" | "PJ", { entrada: string[]; saida: string[] }> = {
+  PF: {
+    entrada: ["Salário", "Renda extra", "Transferências", "Reembolso", "Outros"],
+    saida: [
+      "Mercado",
+      "Alimentação",
+      "Transporte / Combustível",
+      "Moradia",
+      "Lazer",
+      "Saúde",
+      "Educação",
+      "Streaming / Assinaturas",
+      "Pets",
+      "Compras gerais",
+      "Cartão de crédito",
+      "Outros",
+    ],
+  },
+  PJ: {
+    entrada: ["Faturamento / Receitas", "Serviços prestados", "Produtos vendidos", "Reembolsos empresariais", "Outros"],
+    saida: [
+      "Impostos",
+      "Fornecedores",
+      "Matéria-prima",
+      "Equipamentos",
+      "Serviços terceirizados",
+      "Marketing / Anúncios",
+      "Assinaturas empresariais",
+      "Transporte / Logística",
+      "Folha de pagamento",
+      "Outros",
+    ],
+  },
+};
 
 export default function TransactionsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isPremiumExportOpen, setIsPremiumExportOpen] = useState(false);
+  const { selectedView, setSelectedView } = useDashboardView();
+  const [scopeFilter, setScopeFilter] = useState<Scope>(selectedView);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const { toast } = useToast();
   const { user } = useAuth();
+  const isPremiumUser = user?.plan === "premium";
 
   // Fetch transactions and accounts
+  const transactionsEndpoint = `/api/transactions?type=${scopeFilter}`;
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
-    queryKey: ["/api/transactions"],
+    queryKey: [transactionsEndpoint],
+    enabled: !(scopeFilter === "PJ" && !isPremiumUser),
   });
 
-  const { data: accounts = [] } = useQuery<Account[]>({
+  const {
+    data: accounts = [],
+    isLoading: accountsLoading,
+    refetch: refetchAccounts,
+  } = useQuery<Account[]>({
     queryKey: ["/api/accounts"],
   });
 
@@ -57,12 +104,54 @@ export default function TransactionsPage() {
       category: "",
       date: new Date().toISOString().split('T')[0],
       accountId: accounts[0]?.id || "",
+      accountType: "PF" as const,
     },
   });
 
+  const personalAccount = useMemo(() => accounts.find((acc) => acc.type?.toLowerCase() === "pf"), [accounts]);
+  const businessAccount = useMemo(() => accounts.find((acc) => acc.type?.toLowerCase() === "pj"), [accounts]);
+  const accountType = form.watch("accountType");
+  const transactionType = form.watch("type");
+  const availableCategories = useMemo(() => {
+    const scope = accountType === "PJ" ? "PJ" : "PF";
+    const kind = transactionType === "entrada" ? "entrada" : "saida";
+    return CATEGORY_OPTIONS[scope][kind];
+  }, [accountType, transactionType]);
+
+  useEffect(() => {
+    if (!accountsLoading && accounts.length === 0) {
+      apiRequest("POST", "/api/accounts/ensure-default").finally(() => {
+        refetchAccounts();
+      });
+    }
+  }, [accounts, accountsLoading, refetchAccounts]);
+
+  useEffect(() => {
+    if (personalAccount?.id) {
+      form.setValue("accountId", personalAccount.id);
+    }
+  }, [personalAccount, form]);
+
+  useEffect(() => {
+    const nextAccount = accountType === "PJ" ? businessAccount : personalAccount;
+    if (nextAccount?.id) {
+      form.setValue("accountId", nextAccount.id);
+    }
+  }, [accountType, businessAccount, personalAccount, form]);
+
+  const invalidateFinanceQueries = () => {
+    const scopes: Scope[] = ["PF", "PJ", "ALL"];
+    scopes.forEach((scope) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/dashboard/metrics?type=${scope}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/dashboard/categories?type=${scope}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/dashboard/income-expenses?type=${scope}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/transactions?type=${scope}`] });
+    });
+  };
+
   // Create transaction mutation
   const createMutation = useMutation({
-    mutationFn: async (data: { description: string; type: string; amount: number; category: string; date: string; accountId: string }) => {
+    mutationFn: async (data: { description: string; type: string; amount: number; category: string; date: string; accountId: string; accountType: string }) => {
       const response = await apiRequest("POST", "/api/transactions", {
         ...data,
         date: new Date(data.date).toISOString(),
@@ -70,9 +159,7 @@ export default function TransactionsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/categories"] });
+      invalidateFinanceQueries();
       toast({
         title: "Transação criada!",
         description: "A transação foi adicionada com sucesso.",
@@ -95,9 +182,7 @@ export default function TransactionsPage() {
       await apiRequest("DELETE", `/api/transactions/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/categories"] });
+      invalidateFinanceQueries();
       toast({
         title: "Transação deletada!",
         description: "A transação foi removida.",
@@ -112,8 +197,24 @@ export default function TransactionsPage() {
     },
   });
 
+  const canSubmit = accountType === "PJ" ? isPremiumUser && !!businessAccount?.id : !!personalAccount?.id;
+
   async function onSubmit(data: InsertTransaction) {
-    createMutation.mutate(data);
+    const targetAccount = data.accountType === "PJ" ? businessAccount : personalAccount;
+    if (!targetAccount?.id) {
+      toast({
+        title: "Conta indisponível",
+        description: "Configure seu perfil financeiro antes de registrar a transação.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createMutation.mutate({
+      ...data,
+      accountId: targetAccount.id,
+      accountType: data.accountType || "PF",
+    });
   }
 
   function handleDelete(id: string) {
@@ -122,9 +223,22 @@ export default function TransactionsPage() {
     }
   }
 
+  const handleScopeChange = (scope: Scope) => {
+    if (scope === "PJ" && !isPremiumUser) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+    setScopeFilter(scope);
+    setSelectedView(scope);
+  };
+
   async function handleExport() {
+    if (scopeFilter === "PJ" && !isPremiumUser) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
     try {
-      const response = await fetch('/api/export/transactions', {
+      const response = await fetch(`/api/export/transactions?type=${scopeFilter}`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -156,13 +270,19 @@ export default function TransactionsPage() {
     }
   }
 
-  const filteredTransactions = transactions.filter(t => {
+  useEffect(() => {
+    if (!isPremiumUser && selectedView === "PJ") {
+      setSelectedView("PF");
+      return;
+    }
+    setScopeFilter(selectedView);
+  }, [selectedView, isPremiumUser, setSelectedView]);
+
+  const filteredTransactions = (transactions || []).filter(t => {
     const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === "all" || t.type === filterType;
     return matchesSearch && matchesType;
   });
-
-  const isPremiumUser = user?.plan === "premium";
 
   return (
     <>
@@ -175,19 +295,35 @@ export default function TransactionsPage() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          {isPremiumUser && (
-            <Button variant="secondary" onClick={() => setIsPremiumExportOpen(true)}>
-              <FileDown className="mr-2 h-4 w-4" />
-              Exportar PDF (Premium)
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={scopeFilter === "PF" ? "default" : "outline"}
+              onClick={() => handleScopeChange("PF")}
+            >
+              Conta Pessoal
             </Button>
-          )}
+            <Button
+              variant={scopeFilter === "PJ" ? "default" : "outline"}
+              onClick={() => handleScopeChange("PJ")}
+              disabled={!isPremiumUser}
+            >
+              Conta Empresarial
+              {!isPremiumUser && <Lock className="ml-2 h-4 w-4" />}
+            </Button>
+            <Button
+              variant={scopeFilter === "ALL" ? "default" : "outline"}
+              onClick={() => handleScopeChange("ALL")}
+            >
+              Todas
+            </Button>
+          </div>
           <Button variant="outline" data-testid="button-export" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Exportar
           </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button disabled={accounts.length === 0} data-testid="button-add-transaction">
+              <Button data-testid="button-add-transaction">
                 <Plus className="mr-2 h-4 w-4" />
                 Nova Transação
               </Button>
@@ -203,24 +339,37 @@ export default function TransactionsPage() {
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="accountId"
+                    name="accountType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Conta</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormLabel>Tipo de conta</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            if (value === "PJ" && !isPremiumUser) {
+                              setIsUpgradeModalOpen(true);
+                              return;
+                            }
+                            field.onChange(value);
+                          }}
+                          value={field.value}
+                        >
                           <FormControl>
-                            <SelectTrigger data-testid="select-account">
-                              <SelectValue placeholder="Selecione a conta" />
+                            <SelectTrigger>
+                              <SelectValue />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {accounts.map((account) => (
-                              <SelectItem key={account.id} value={account.id}>
-                                {account.name}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="PF">Pessoal (PF)</SelectItem>
+                            <SelectItem value="PJ" disabled={!isPremiumUser}>
+                              Empresarial (PJ)
+                            </SelectItem>
                           </SelectContent>
                         </Select>
+                        {!isPremiumUser && (
+                          <p className="text-xs text-muted-foreground">
+                            Ganhe acesso à conta empresarial no plano Premium.
+                          </p>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -249,7 +398,7 @@ export default function TransactionsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Tipo</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger data-testid="select-type">
                                 <SelectValue />
@@ -261,9 +410,24 @@ export default function TransactionsPage() {
                             </SelectContent>
                           </Select>
                           <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                          {accountType === "PJ" && !isPremiumUser && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Disponível apenas para assinantes Premium.
+                            </p>
+                          )}
+                          {accountType === "PJ" && isPremiumUser && !businessAccount && !accountsLoading && (
+                            <p className="text-xs text-destructive mt-1">
+                              Configure seu perfil empresarial para registrar lançamentos PJ.
+                            </p>
+                          )}
+                          {accountType === "PF" && !personalAccount && !accountsLoading && (
+                            <p className="text-xs text-destructive mt-1">
+                              Nenhuma estrutura de conta pessoal encontrada.
+                            </p>
+                          )}
+                      </FormItem>
+                    )}
+                  />
                     <FormField
                       control={form.control}
                       name="amount"
@@ -291,14 +455,14 @@ export default function TransactionsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Categoria</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-category">
                               <SelectValue placeholder="Selecione a categoria" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {CATEGORIES.map((category) => (
+                            {availableCategories.map((category) => (
                               <SelectItem key={category} value={category}>
                                 {category}
                               </SelectItem>
@@ -329,7 +493,7 @@ export default function TransactionsPage() {
                   <DialogFooter>
                     <Button 
                       type="submit" 
-                      disabled={createMutation.isPending}
+                      disabled={createMutation.isPending || !canSubmit}
                       data-testid="button-create-transaction"
                     >
                       {createMutation.isPending ? "Criando..." : "Criar Transação"}
@@ -341,22 +505,6 @@ export default function TransactionsPage() {
           </Dialog>
         </div>
       </div>
-
-      {accounts.length === 0 && (
-        <Card className="bg-muted/30 border-dashed">
-          <CardContent className="flex items-center justify-between p-6">
-            <div>
-              <h3 className="font-semibold mb-1">Nenhuma conta encontrada</h3>
-              <p className="text-sm text-muted-foreground">
-                Crie uma conta para começar a registrar transações
-              </p>
-            </div>
-            <Button variant="default">
-              Criar Conta
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Filters */}
       <Card>
@@ -446,6 +594,9 @@ export default function TransactionsPage() {
                           <Badge variant="outline" className="text-xs" data-testid={`badge-category-${index}`}>
                             {transaction.category}
                           </Badge>
+                          <Badge variant="secondary" className="text-xs">
+                            {transaction.accountType || "PF"}
+                          </Badge>
                           {account && (
                             <span className="text-xs text-muted-foreground">
                               {account.name}
@@ -480,7 +631,7 @@ export default function TransactionsPage() {
         </div>
       )}
     </div>
-    <ExportPdfPremiumModal open={isPremiumExportOpen} onOpenChange={setIsPremiumExportOpen} />
+    <CaktoCheckoutModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} intent="upgrade" />
     </>
   );
 }
