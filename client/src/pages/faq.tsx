@@ -22,6 +22,26 @@ export default function FAQPage() {
       q: "Meus dados ficam seguros?",
       a: "O sistema foi construído com práticas de AppSec, criptografia e isolamento de dados.",
     },
+    {
+      q: "Preciso inserir todas as transações manualmente?",
+      a: "Você pode cadastrar contas e movimentações manualmente, importar arquivos CSV ou usar as automações do plano Premium para categorizar e registrar lançamentos em lote.",
+    },
+    {
+      q: "O FinScope funciona no celular?",
+      a: "Sim. A aplicação foi desenhada para ser responsiva e funcionar tanto no desktop quanto em smartphones, sem necessidade de download de app.",
+    },
+    {
+      q: "Consigo testar os recursos antes de contratar?",
+      a: "Todo novo cliente tem 10 dias de garantia. Aproveite esse período para explorar dashboards, cadastrar contas e experimentar a gestão MEI sem risco.",
+    },
+    {
+      q: "Como o suporte funciona na prática?",
+      a: "Além do e-mail contato@finscope.com.br, você recebe tutoriais dentro do app e atualizações constantes. Responderemos em até 6 horas úteis.",
+    },
+    {
+      q: "O plano Premium vale a pena se eu já uso o Pro?",
+      a: "Sim, especialmente se você precisa de automações, relatórios e o módulo MEI. O upgrade é instantâneo e basta acessar as configurações para abrir o checkout novamente.",
+    },
   ];
 
   const [open, setOpen] = useState<number | null>(null);
