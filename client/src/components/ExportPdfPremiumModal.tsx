@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import CaktoCheckoutModal from "@/components/CaktoCheckoutModal";
+import UpgradeModal from "@/components/UpgradeModal";
 import { FileDown, Loader2, Lock } from "lucide-react";
 import { useDashboardView } from "@/context/dashboard-view";
 
@@ -274,11 +274,7 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
           {modalBody}
         </DialogContent>
       </Dialog>
-      <CaktoCheckoutModal
-        open={isUpgradeModalOpen}
-        onOpenChange={setIsUpgradeModalOpen}
-        intent="upgrade"
-      />
+      <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Relatórios Premium" />
     </>
   );
 }

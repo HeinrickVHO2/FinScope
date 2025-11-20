@@ -9,7 +9,7 @@ import type { Account, Transaction } from "@shared/schema";
 import { useLocation } from "wouter";
 import { ArrowDownRight, ArrowUpRight, BarChart3, Building2, Lock, TrendingUp, TrendingDown } from "lucide-react";
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Bar, Tooltip, Legend } from "recharts";
-import CaktoCheckoutModal from "@/components/CaktoCheckoutModal";
+import UpgradeModal from "@/components/UpgradeModal";
 
 type ViewMode = "pj" | "mei";
 
@@ -135,10 +135,10 @@ export default function MEIPage() {
             </CardContent>
           </Card>
         </div>
-        <CaktoCheckoutModal
+        <UpgradeModal
           open={isUpgradeModalOpen}
           onOpenChange={setIsUpgradeModalOpen}
-          intent="upgrade"
+          featureName="Gestão Empresarial"
         />
       </>
     );
@@ -306,10 +306,10 @@ export default function MEIPage() {
         </>
       )}
     </div>
-    <CaktoCheckoutModal
+    <UpgradeModal
       open={isUpgradeModalOpen}
       onOpenChange={setIsUpgradeModalOpen}
-      intent="upgrade"
+      featureName="Gestão Empresarial"
     />
     </>
   );

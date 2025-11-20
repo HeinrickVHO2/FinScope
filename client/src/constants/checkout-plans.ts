@@ -8,7 +8,7 @@ export const CHECKOUT_PLAN_OPTIONS = [
       "Até 3 contas",
       "Dashboard completo",
       "Alertas de pagamento",
-      "Exportação CSV",
+      "Exportação PDF básico",
     ],
   },
   {

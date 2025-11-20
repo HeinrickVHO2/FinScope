@@ -71,7 +71,7 @@ export default function LandingPage() {
         "Fluxo de caixa mensal",
         "Categorização manual",
         "Alertas simples de pagamento",
-        "Exportação CSV",
+        "Exportação PDF básico",
         "Suporte via e-mail"
       ],
       cta: "Assinar plano Pro",

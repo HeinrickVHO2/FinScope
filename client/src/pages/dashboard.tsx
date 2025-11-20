@@ -9,7 +9,7 @@ import { type Transaction } from "@shared/schema";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, FileDown, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ExportPdfPremiumModal from "@/components/ExportPdfPremiumModal";
-import CaktoCheckoutModal from "@/components/CaktoCheckoutModal";
+import UpgradeModal from "@/components/UpgradeModal";
 import { useDashboardView, type DashboardScope } from "@/context/dashboard-view";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from "recharts";
 
@@ -135,23 +135,44 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-poppins font-bold">Dashboard Unificado</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => handleScopeClick("PF")} className={cn(selectedView === "PF" && "border-indigo-500 text-indigo-600")}>Conta Pessoal</Button>
+          <Button
+            variant="outline"
+            onClick={() => handleScopeClick("PF")}
+            className={cn(selectedView === "PF" && "border-indigo-500 text-indigo-600")}
+          >
+            Conta Pessoal
+          </Button>
           <Button
             variant="outline"
             onClick={() => handleScopeClick("PJ")}
             className={cn(selectedView === "PJ" && "border-purple-500 text-purple-600")}
-            disabled={!isPremium}
+            aria-disabled={!isPremium}
           >
             Conta Empresarial
             {!isPremium && <Lock className="ml-2 h-4 w-4" />}
           </Button>
-          <Button variant="outline" onClick={() => setSelectedView("ALL")} className={cn(selectedView === "ALL" && "border-slate-500 text-slate-600")}>Visão Total</Button>
-          {isPremium && (
-            <Button variant="secondary" onClick={() => setIsExportModalOpen(true)}>
-              <FileDown className="mr-2 h-4 w-4" />
-              Exportar PDF
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            onClick={() => setSelectedView("ALL")}
+            className={cn(selectedView === "ALL" && "border-slate-500 text-slate-600")}
+          >
+            Visão Total
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              if (!isPremium) {
+                setIsUpgradeModalOpen(true);
+                return;
+              }
+              setIsExportModalOpen(true);
+            }}
+            className={cn(!isPremium && "opacity-60")}
+          >
+            <FileDown className="mr-2 h-4 w-4" />
+            Exportar PDF Premium
+            {!isPremium && <Lock className="ml-2 h-4 w-4" />}
+          </Button>
         </div>
       </div>
 
@@ -193,7 +214,7 @@ export default function DashboardPage() {
       {selectedView === "ALL" && <DashboardBlock scope="ALL" data={totalData} />}
 
       <ExportPdfPremiumModal open={isExportModalOpen} onOpenChange={setIsExportModalOpen} />
-      <CaktoCheckoutModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} intent="upgrade" />
+      <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Relatórios Premium" />
     </div>
   );
 }

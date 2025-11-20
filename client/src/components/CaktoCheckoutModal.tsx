@@ -26,7 +26,7 @@ const PLAN_OPTIONS = [
       "Até 3 contas",
       "Dashboard completo",
       "Alertas de pagamento",
-      "Exportação CSV",
+      "Exportação PDF básico",
     ],
   },
   {
@@ -46,11 +46,14 @@ const PLAN_OPTIONS = [
 
 export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinished }: CaktoCheckoutModalProps) {
   const { toast } = useToast();
-  const { refetchUser } = useAuth();
+  const { refetchUser, user } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<CheckoutPlanId | null>(null);
   const [isCreatingCheckout, setIsCreatingCheckout] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const currentPlan = (user?.plan as CheckoutPlanId | undefined) ?? null;
+  const hasSelectablePlan =
+    intent !== "upgrade" ? true : CHECKOUT_PLAN_OPTIONS.some((plan) => plan.id !== currentPlan);
 
   useEffect(() => {
     if (!open) {
@@ -69,6 +72,16 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
     }
     return "Troque de plano em segundos. A garantia de 10 dias também vale para upgrades e downgrades.";
   }, [intent]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (intent === "upgrade") {
+      const defaultPlan = CHECKOUT_PLAN_OPTIONS.find((plan) => plan.id !== currentPlan)?.id ?? null;
+      setSelectedPlan(defaultPlan);
+    } else {
+      setSelectedPlan(null);
+    }
+  }, [open, intent, currentPlan]);
 
   async function createCheckout() {
     if (!selectedPlan) {
@@ -143,25 +156,38 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
               </div>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
-              {CHECKOUT_PLAN_OPTIONS.map((plan) => (
+              {CHECKOUT_PLAN_OPTIONS.map((plan) => {
+                const isCurrentPlan = intent === "upgrade" && currentPlan === plan.id;
+                return (
                 <button
                   key={plan.id}
                   type="button"
-                  onClick={() => setSelectedPlan(plan.id)}
+                  onClick={() => {
+                    if (isCurrentPlan) return;
+                    setSelectedPlan(plan.id);
+                  }}
+                  disabled={isCurrentPlan}
                   className={`rounded-xl border p-4 text-left transition-all ${
                     selectedPlan === plan.id ? "border-primary shadow-md" : "border-border hover:border-primary/60"
-                  }`}
+                  } ${isCurrentPlan ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-poppins text-lg font-semibold">{plan.name}</p>
                       <p className="text-sm text-muted-foreground">{plan.price}</p>
                     </div>
-                    {plan.badge && (
-                      <Badge variant="secondary" className="text-xs">
-                        {plan.badge}
-                      </Badge>
-                    )}
+                    <div className="flex gap-1">
+                      {plan.badge && (
+                        <Badge variant="secondary" className="text-xs">
+                          {plan.badge}
+                        </Badge>
+                      )}
+                      {isCurrentPlan && (
+                        <Badge variant="outline" className="text-xs">
+                          Plano atual
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <p className="text-sm text-muted-foreground mt-2">{plan.description}</p>
                   <ul className="mt-4 space-y-2 text-sm">
@@ -173,8 +199,14 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
                     ))}
                   </ul>
                 </button>
-              ))}
+                );
+              })}
             </div>
+            {intent === "upgrade" && !hasSelectablePlan && (
+              <p className="text-sm text-muted-foreground">
+                Você já está no plano Premium. Nenhum upgrade disponível no momento.
+              </p>
+            )}
             {errorMessage && (
               <p className="text-sm text-destructive">{errorMessage}</p>
             )}
@@ -182,7 +214,7 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button onClick={createCheckout} disabled={!selectedPlan || isCreatingCheckout}>
+              <Button onClick={createCheckout} disabled={!selectedPlan || isCreatingCheckout || !hasSelectablePlan}>
                 {isCreatingCheckout ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />

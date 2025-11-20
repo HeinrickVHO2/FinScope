@@ -1,6 +1,8 @@
-import { Home, ArrowLeftRight, Settings, PiggyBank, Building2 } from "lucide-react";
+import { useState } from "react";
+import { Home, ArrowLeftRight, Settings, PiggyBank, Building2, Lock } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import UpgradeModal from "@/components/UpgradeModal";
 import {
   Sidebar,
   SidebarContent,
@@ -23,11 +25,16 @@ const baseMenuItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
-  const menuItems = user?.plan === "premium"
-    ? [...baseMenuItems.slice(0, 1), { title: "Gestão PJ/MEI", url: "/mei", icon: Building2 }, ...baseMenuItems.slice(1)]
-    : baseMenuItems;
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const isPremium = user?.plan === "premium";
+  const menuItems = [
+    baseMenuItems[0],
+    { title: "Gestão PJ/MEI", url: "/mei", icon: Building2, requiresPremium: true },
+    ...baseMenuItems.slice(1),
+  ];
 
   return (
+    <>
     <Sidebar data-testid="sidebar">
       <SidebarHeader className="p-4">
         <a href="/dashboard" className="flex items-center gap-2">
@@ -48,24 +55,42 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navegação</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location === item.url}
-                    data-testid={`sidebar-link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    <a href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {menuItems.map((item) => {
+                const isLocked = item.requiresPremium && !isPremium;
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={!isLocked && location === item.url}
+                      data-testid={`sidebar-link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                      className={isLocked ? "opacity-60" : undefined}
+                    >
+                      {isLocked ? (
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2"
+                          onClick={() => setIsUpgradeModalOpen(true)}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                          <Lock className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <a href={item.url}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </a>
+                      )}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>
+    <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Gestão PJ/MEI" />
+    </>
   );
 }
