@@ -38,7 +38,15 @@ export const transactions = pgTable("transactions", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   category: text("category").notNull(),
   date: timestamp("date").notNull(),
+  accountType: text("account_type").notNull().default("PF"),
   autoRuleApplied: boolean("auto_rule_applied").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const businessProfiles = pgTable("business_profile", {
+  userId: varchar("user_id").primaryKey().notNull(),
+  cnpj: text("cnpj"),
+  businessType: text("business_type"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -131,6 +139,7 @@ export const insertTransactionSchema = createInsertSchema(transactions, {
   ),
   category: z.string().min(1, "Categoria é obrigatória"),
   date: z.coerce.date(),
+  accountType: z.enum(["PF", "PJ"]).default("PF"),
 }).omit({
   id: true,
   createdAt: true,
@@ -145,6 +154,7 @@ export const updateTransactionSchema = z.object({
   ).optional(),
   category: z.string().min(1, "Categoria é obrigatória").optional(),
   date: z.coerce.date().optional(),
+  accountType: z.enum(["PF", "PJ"]).optional(),
 }).strict();
 
 export const insertRuleSchema = createInsertSchema(rules, {
@@ -234,6 +244,7 @@ export type Account = typeof accounts.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema> & {userId: string; accountId: string;};
 export type UpdateTransaction = z.infer<typeof updateTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
+export type BusinessProfile = typeof businessProfiles.$inferSelect;
 
 export type InsertRule = z.infer<typeof insertRuleSchema> & {userID: string;};
 export type UpdateRule = z.infer<typeof updateRuleSchema>;

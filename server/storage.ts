@@ -21,6 +21,12 @@ import bcrypt from "bcrypt";
 // Internal types with numeric amounts for calculations
 type StoredAccount = Omit<Account, 'initialBalance'> & { initialBalance: number };
 type StoredTransaction = Omit<Transaction, 'amount'> & { amount: number };
+type AccountScope = "PF" | "PJ" | "ALL";
+
+const matchesScope = (accountType: string, scope: AccountScope) => {
+  if (scope === "ALL") return true;
+  return (accountType || "PF").toUpperCase() === scope;
+};
 
 export interface IStorage {
   // User operations
@@ -39,10 +45,10 @@ export interface IStorage {
 
   // Transaction operations
   getTransaction(id: string): Promise<Transaction | undefined>;
-  getTransactionsByUserId(userId: string): Promise<Transaction[]>;
+  getTransactionsByUserId(userId: string, scope?: AccountScope): Promise<Transaction[]>;
   getTransactionsByAccountId(accountId: string): Promise<Transaction[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
-  updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date }): Promise<Transaction | undefined>;
+  updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ" }): Promise<Transaction | undefined>;
   deleteTransaction(id: string): Promise<boolean>;
 
   // Rule operations
@@ -70,18 +76,18 @@ export interface IStorage {
   createInvestmentTransaction(transaction: InsertInvestmentTransaction): Promise<InvestmentTransaction>;
 
   // Aggregations
-  getDashboardMetrics(userId: string): Promise<{
+  getDashboardMetrics(userId: string, scope?: AccountScope): Promise<{
     totalBalance: number;
     monthlyIncome: number;
     monthlyExpenses: number;
     netCashFlow: number;
   }>;
-  getCategoryBreakdown(userId: string): Promise<{ category: string; amount: number }[]>;
+  getCategoryBreakdown(userId: string, scope?: AccountScope): Promise<{ category: string; amount: number }[]>;
   getInvestmentsSummary(userId: string): Promise<{
     totalInvested: number;
     byType: { type: string; amount: number; goal?: number }[];
   }>;
-  getIncomeExpensesData(userId: string): Promise<{
+  getIncomeExpensesData(userId: string, scope?: AccountScope): Promise<{
     income: number;
     expenses: number;
   }>;
@@ -99,6 +105,12 @@ export class MemStorage {
     this.accounts = new Map();
     this.transactions = new Map();
     this.rules = new Map();
+  }
+
+  private getScopedTransactions(userId: string, scope: AccountScope) {
+    return Array.from(this.transactions.values()).filter(
+      (transaction) => transaction.userId === userId && matchesScope(transaction.accountType || "PF", scope)
+    );
   }
 
   // Helper to convert stored account to API account (number -> string)
@@ -238,11 +250,10 @@ export class MemStorage {
     return transaction ? this.toApiTransaction(transaction) : undefined;
   }
 
-  async getTransactionsByUserId(userId: string): Promise<Transaction[]> {
-    return Array.from(this.transactions.values())
-      .filter((transaction) => transaction.userId === userId)
+  async getTransactionsByUserId(userId: string, scope: AccountScope = "ALL"): Promise<Transaction[]> {
+    return this.getScopedTransactions(userId, scope)
       .sort((a, b) => b.date.getTime() - a.date.getTime())
-      .map(this.toApiTransaction);
+      .map((transaction) => this.toApiTransaction(transaction));
   }
 
   async getTransactionsByAccountId(accountId: string): Promise<Transaction[]> {
@@ -281,6 +292,7 @@ export class MemStorage {
       amount: insertTransaction.amount, // Store as number
       category: finalCategory,
       date: insertTransaction.date,
+      accountType: insertTransaction.accountType ?? "PF",
       autoRuleApplied,
       createdAt: new Date(),
     };
@@ -289,7 +301,7 @@ export class MemStorage {
     return this.toApiTransaction(transaction);
   }
 
-  async updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date }): Promise<Transaction | undefined> {
+  async updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ" }): Promise<Transaction | undefined> {
     const transaction = this.transactions.get(id);
     if (!transaction) return undefined;
 
@@ -343,25 +355,18 @@ export class MemStorage {
   }
 
   // Aggregations - all math done with numbers
-  async getDashboardMetrics(userId: string): Promise<{
+  async getDashboardMetrics(userId: string, scope: AccountScope = "ALL"): Promise<{
     totalBalance: number;
     monthlyIncome: number;
     monthlyExpenses: number;
     netCashFlow: number;
   }> {
-    const storedAccounts = Array.from(this.accounts.values())
-      .filter(a => a.userId === userId);
-    const storedTransactions = Array.from(this.transactions.values())
-      .filter(t => t.userId === userId);
+    const storedTransactions = this.getScopedTransactions(userId, scope);
 
-    // Calculate current month start
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Filter transactions for current month
-    const monthlyTransactions = storedTransactions.filter(
-      (t) => t.date >= monthStart
-    );
+    const monthlyTransactions = storedTransactions.filter((t) => t.date >= monthStart);
 
     const monthlyIncome = monthlyTransactions
       .filter((t) => t.type === "entrada")
@@ -371,19 +376,9 @@ export class MemStorage {
       .filter((t) => t.type === "saida")
       .reduce((sum, t) => sum + t.amount, 0);
 
-    // Calculate total balance (initial + all transactions)
-    let totalBalance = 0;
-    for (const account of storedAccounts) {
-      const accountTransactions = storedTransactions.filter(t => t.accountId === account.id);
-      const income = accountTransactions
-        .filter(t => t.type === "entrada")
-        .reduce((sum, t) => sum + t.amount, 0);
-      const expenses = accountTransactions
-        .filter(t => t.type === "saida")
-        .reduce((sum, t) => sum + t.amount, 0);
-      
-      totalBalance += account.initialBalance + income - expenses;
-    }
+    const totalBalance = storedTransactions.reduce((acc, tx) => {
+      return acc + (tx.type === "entrada" ? tx.amount : -tx.amount);
+    }, 0);
 
     return {
       totalBalance: Number(totalBalance.toFixed(2)),
@@ -393,9 +388,8 @@ export class MemStorage {
     };
   }
 
-  async getCategoryBreakdown(userId: string): Promise<{ category: string; amount: number }[]> {
-    const storedTransactions = Array.from(this.transactions.values())
-      .filter(t => t.userId === userId);
+  async getCategoryBreakdown(userId: string, scope: AccountScope = "ALL"): Promise<{ category: string; amount: number }[]> {
+    const storedTransactions = this.getScopedTransactions(userId, scope);
     
     // Calculate current month start
     const now = new Date();
@@ -418,6 +412,23 @@ export class MemStorage {
       .map(([category, amount]) => ({ category, amount: Number(amount.toFixed(2)) }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5); // Top 5 categories
+  }
+
+  async getIncomeExpensesData(userId: string, scope: AccountScope = "ALL"): Promise<{
+    income: number;
+    expenses: number;
+  }> {
+    const storedTransactions = this.getScopedTransactions(userId, scope);
+    const income = storedTransactions
+      .filter((t) => t.type === "entrada")
+      .reduce((sum, t) => sum + t.amount, 0);
+    const expenses = storedTransactions
+      .filter((t) => t.type === "saida")
+      .reduce((sum, t) => sum + t.amount, 0);
+    return {
+      income: Number(income.toFixed(2)),
+      expenses: Number(expenses.toFixed(2)),
+    };
   }
 }
 

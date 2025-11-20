@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import CaktoCheckoutModal from "@/components/CaktoCheckoutModal";
 import { FileDown, Loader2, Lock } from "lucide-react";
+import { useDashboardView } from "@/context/dashboard-view";
 
 const REPORT_TYPES = [
   {
@@ -43,6 +44,7 @@ interface ExportPdfPremiumModalProps {
 export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumModalProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { selectedView } = useDashboardView();
 
   const [reportType, setReportType] = useState<typeof REPORT_TYPES[number]["value"]>("financeiro");
   const [period, setPeriod] = useState<typeof PERIOD_OPTIONS[number]["value"]>("last_30_days");
@@ -63,7 +65,31 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
     [period]
   );
 
+  const dashboardScope = useMemo<"PF" | "PJ" | "ALL">(() => {
+    if (selectedView === "PJ") return "PJ";
+    if (selectedView === "PF") return "PF";
+    return "ALL";
+  }, [selectedView]);
+
+  const reportScope = useMemo<"PF" | "PJ" | "ALL">(() => {
+    if (reportType === "empresarial") return "PJ";
+    return dashboardScope;
+  }, [reportType, dashboardScope]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (selectedView === "PJ" && isPremiumUser) {
+      setReportType("empresarial");
+    } else {
+      setReportType("financeiro");
+    }
+  }, [selectedView, open, isPremiumUser]);
+
   async function handleExport() {
+    if (reportScope === "PJ" && !isPremiumUser) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
     setIsExporting(true);
     try {
       const response = await fetch("/api/pdf/export", {
@@ -76,6 +102,7 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
           includeCharts,
           includeInsights,
           reportType: reportType,
+          accountScope: reportScope,
         }),
       });
 

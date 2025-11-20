@@ -294,17 +294,24 @@ export class SupabaseStorage implements IStorage {
       amount: parseFloat(data.amount).toFixed(2),
       category: data.category,
       date: new Date(data.date),
+      accountType: data.account_type ?? "PF",
       autoRuleApplied: data.auto_rule_applied,
       createdAt: new Date(data.created_at),
     };
   }
 
-  async getTransactionsByUserId(userId: string): Promise<Transaction[]> {
-    const { data, error } = await supabase
+  async getTransactionsByUserId(userId: string, scope: AccountScope = "ALL"): Promise<Transaction[]> {
+    let query = supabase
       .from("transactions")
       .select("*")
       .eq("user_id", userId)
       .order("date", { ascending: false });
+
+    if (scope !== "ALL") {
+      query = query.eq("account_type", scope);
+    }
+
+    const { data, error } = await query;
 
     if (error || !data) return [];
 
@@ -317,6 +324,7 @@ export class SupabaseStorage implements IStorage {
       amount: parseFloat(row.amount).toFixed(2),
       category: row.category,
       date: new Date(row.date),
+      accountType: row.account_type ?? "PF",
       autoRuleApplied: row.auto_rule_applied,
       createdAt: new Date(row.created_at),
     }));
@@ -340,6 +348,7 @@ export class SupabaseStorage implements IStorage {
       amount: parseFloat(row.amount).toFixed(2),
       category: row.category,
       date: new Date(row.date),
+      accountType: row.account_type ?? "PF",
       autoRuleApplied: row.auto_rule_applied,
       createdAt: new Date(row.created_at),
     }));
@@ -373,6 +382,7 @@ export class SupabaseStorage implements IStorage {
         amount: insertTransaction.amount,
         category: finalCategory,
         date: insertTransaction.date.toISOString(),
+        account_type: insertTransaction.accountType ?? "PF",
         auto_rule_applied: autoRuleApplied,
       })
       .select()
@@ -391,18 +401,22 @@ export class SupabaseStorage implements IStorage {
       amount: parseFloat(data.amount).toFixed(2),
       category: data.category,
       date: new Date(data.date),
+      accountType: data.account_type ?? "PF",
       autoRuleApplied: data.auto_rule_applied,
       createdAt: new Date(data.created_at),
     };
   }
 
-  async updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date }): Promise<Transaction | undefined> {
+  async updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ" }): Promise<Transaction | undefined> {
     const updateData: any = {};
     if (updates.description !== undefined) updateData.description = updates.description;
     if (updates.type !== undefined) updateData.type = updates.type;
     if (updates.amount !== undefined) updateData.amount = updates.amount;
     if (updates.category !== undefined) updateData.category = updates.category;
     if (updates.date !== undefined) updateData.date = updates.date.toISOString();
+    if (updates.accountType !== undefined) {
+      updateData.account_type = updates.accountType;
+    }
 
     const { data, error } = await supabase
       .from("transactions")
@@ -542,14 +556,13 @@ export class SupabaseStorage implements IStorage {
   }
 
   // Aggregations
-  async getDashboardMetrics(userId: string): Promise<{
+  async getDashboardMetrics(userId: string, scope: AccountScope = "ALL"): Promise<{
     totalBalance: number;
     monthlyIncome: number;
     monthlyExpenses: number;
     netCashFlow: number;
   }> {
-    const accounts = await this.getAccountsByUserId(userId);
-    const transactions = await this.getTransactionsByUserId(userId);
+    const transactions = await this.getTransactionsByUserId(userId, scope);
 
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -566,18 +579,10 @@ export class SupabaseStorage implements IStorage {
       .filter((t) => t.type === "saida")
       .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
-    let totalBalance = 0;
-    for (const account of accounts) {
-      const accountTransactions = transactions.filter(t => t.accountId === account.id);
-      const income = accountTransactions
-        .filter(t => t.type === "entrada")
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-      const expenses = accountTransactions
-        .filter(t => t.type === "saida")
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-      
-      totalBalance += parseFloat(account.initialBalance) + income - expenses;
-    }
+    const totalBalance = transactions.reduce((acc, tx) => {
+      const amount = parseFloat(tx.amount);
+      return acc + (tx.type === "entrada" ? amount : -amount);
+    }, 0);
 
     return {
       totalBalance: Number(totalBalance.toFixed(2)),
@@ -587,8 +592,8 @@ export class SupabaseStorage implements IStorage {
     };
   }
 
-  async getCategoryBreakdown(userId: string): Promise<{ category: string; amount: number }[]> {
-    const transactions = await this.getTransactionsByUserId(userId);
+  async getCategoryBreakdown(userId: string, scope: AccountScope = "ALL"): Promise<{ category: string; amount: number }[]> {
+    const transactions = await this.getTransactionsByUserId(userId, scope);
     
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -900,11 +905,11 @@ export class SupabaseStorage implements IStorage {
   }
 
   // Income vs Expenses aggregation
-  async getIncomeExpensesData(userId: string): Promise<{
+  async getIncomeExpensesData(userId: string, scope: AccountScope = "ALL"): Promise<{
     income: number;
     expenses: number;
   }> {
-    const transactions = await this.getTransactionsByUserId(userId);
+    const transactions = await this.getTransactionsByUserId(userId, scope);
     
     let income = 0;
     let expenses = 0;

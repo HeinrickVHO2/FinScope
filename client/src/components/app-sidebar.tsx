@@ -1,4 +1,4 @@
-import { Home, Wallet, ArrowLeftRight, Settings, PiggyBank, Building2 } from "lucide-react";
+import { Home, ArrowLeftRight, Settings, PiggyBank, Building2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import {
@@ -15,7 +15,6 @@ import {
 
 const baseMenuItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "Contas", url: "/accounts", icon: Wallet },
   { title: "Transações", url: "/transactions", icon: ArrowLeftRight },
   { title: "Investimentos", url: "/investments", icon: PiggyBank },
   { title: "Configurações", url: "/settings", icon: Settings },
@@ -25,7 +24,7 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
   const menuItems = user?.plan === "premium"
-    ? [...baseMenuItems.slice(0, 3), { title: "Gestão PJ/MEI", url: "/mei", icon: Building2 }, ...baseMenuItems.slice(3)]
+    ? [...baseMenuItems.slice(0, 1), { title: "Gestão PJ/MEI", url: "/mei", icon: Building2 }, ...baseMenuItems.slice(1)]
     : baseMenuItems;
 
   return (
