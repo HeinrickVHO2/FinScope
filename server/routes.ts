@@ -1507,12 +1507,13 @@ function resolvePuppeteerExecutable() {
     return envPath;
   }
 
-  const shellPath = findExecutableRecursive(
-    path.join(os.homedir(), ".cache/puppeteer"),
-    "chrome-headless-shell"
-  );
-  if (shellPath) {
-    return shellPath;
+  const cacheDir = path.join(os.homedir(), ".cache/puppeteer");
+  const executableCandidates = ["chrome-headless-shell", "chrome", "chromium", "chrome.exe"];
+  for (const candidate of executableCandidates) {
+    const candidatePath = findExecutableRecursive(cacheDir, candidate);
+    if (candidatePath) {
+      return candidatePath;
+    }
   }
 
   try {
