@@ -255,9 +255,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--disable-software-rasterizer",
           "--single-process",
           "--no-zygote",
         ],
+        protocolTimeout: 60000, // 60 seconds timeout for DevTools protocol
         dumpio: process.env.NODE_ENV !== "production",
       });
       const page = await browser.newPage();
@@ -1512,6 +1515,13 @@ function resolvePuppeteerExecutable() {
     return envPath;
   }
 
+  // Check for Chromium from Nix (available in deployments)
+  const nixChromiumPath = findChromiumInPath();
+  if (nixChromiumPath) {
+    console.log("[PDF EXPORT] Usando Chromium do sistema (Nix):", nixChromiumPath);
+    return nixChromiumPath;
+  }
+
   const cacheDir = path.join(os.homedir(), ".cache/puppeteer");
   const executableCandidates = ["chrome-headless-shell", "chrome", "chromium", "chrome.exe"];
   if (fs.existsSync(cacheDir)) {
@@ -1544,10 +1554,34 @@ function resolvePuppeteerExecutable() {
       return bundledPath;
     }
   } catch (error) {
-    console.warn("[PDF EXPORT] Unable to resolve bundled Chromium executable:", error);
+    console.warn("[PDF EXPORT] Erro ao resolver Chrome empacotado:", error);
   }
 
-  console.warn("[PDF EXPORT] Nenhum executável do Chrome foi encontrado. Defina PUPPETEER_EXECUTABLE_PATH.");
+  console.error("[PDF EXPORT] ⚠️ NENHUM EXECUTÁVEL DO CHROME FOI ENCONTRADO!");
+  console.error("[PDF EXPORT] Para corrigir em deployment:");
+  console.error("[PDF EXPORT] 1. Adicione 'chromium' como dependência do sistema via Nix");
+  console.error("[PDF EXPORT] 2. OU defina PUPPETEER_EXECUTABLE_PATH com caminho do Chrome");
+  console.error("[PDF EXPORT] PDF exports NÃO funcionarão até que Chrome/Chromium esteja disponível.");
+  return null;
+}
+
+function findChromiumInPath(): string | null {
+  try {
+    // Try to find chromium in PATH (works with Nix-installed chromium)
+    const result = spawnSync("which", ["chromium"], { encoding: "utf8" });
+    if (result.status === 0 && result.stdout) {
+      const chromiumPath = result.stdout.trim();
+      if (fs.existsSync(chromiumPath)) {
+        return chromiumPath;
+      } else {
+        console.warn("[PDF EXPORT] Chromium encontrado no PATH mas arquivo não existe:", chromiumPath);
+      }
+    } else {
+      console.log("[PDF EXPORT] Chromium não encontrado no PATH (which retornou status", result.status, ")");
+    }
+  } catch (error) {
+    console.warn("[PDF EXPORT] Erro ao procurar Chromium no PATH:", error);
+  }
   return null;
 }
 
