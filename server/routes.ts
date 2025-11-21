@@ -246,9 +246,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         insights,
       });
 
+      const protocolTimeout = Number(process.env.PUPPETEER_PROTOCOL_TIMEOUT || "90000");
       const browser = await puppeteer.launch({
         headless: "new",
         executablePath: puppeteerExecutable ?? undefined,
+        protocolTimeout,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
@@ -259,6 +261,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dumpio: process.env.NODE_ENV !== "production",
       });
       const page = await browser.newPage();
+      page.setDefaultNavigationTimeout(protocolTimeout);
+      page.setDefaultTimeout(protocolTimeout);
       await page.setContent(html, { waitUntil: "networkidle0" });
       const pdfBuffer = await page.pdf({
         format: "A4",

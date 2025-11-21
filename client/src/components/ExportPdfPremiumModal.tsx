@@ -142,11 +142,17 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
 
   const modalBody = isPremiumUser ? (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-        <p className="text-sm font-medium text-slate-900">Formato Premium A4</p>
-        <p className="text-xs text-slate-500">
-          Exportação com KPIs consolidados, tabelas estilizadas, placeholders para gráficos base64 e insights automáticos.
-        </p>
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-2">
+        <div>
+          <p className="text-sm font-medium text-slate-900">Formato Premium A4</p>
+          <p className="text-xs text-slate-500">
+            Exportação com KPIs consolidados, tabelas estilizadas, placeholders para gráficos base64 e insights automáticos.
+          </p>
+        </div>
+        <div className="rounded-lg bg-white/80 p-3 border border-amber-200 text-amber-900 text-xs">
+          <strong>Atenção:</strong> o processo pode levar alguns minutos para carregar o engine de PDF no servidor. 
+          O download iniciará automaticamente assim que o processamento for concluído.
+        </div>
       </div>
 
       <div className="space-y-4">
