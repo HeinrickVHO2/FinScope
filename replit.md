@@ -2,6 +2,13 @@
 
 ## Recent Changes (November 14, 2025)
 
+**PDF Export Fix for Production - READY FOR TESTING ✅**
+- ✅ Added Chromium system dependency via Nix packages (resolves `libglib-2.0.so.0` error)
+- ✅ Updated Puppeteer executable resolution to prioritize system Chromium over bundled Chrome
+- ✅ Enhanced error logging to help debug Chrome/Chromium availability issues
+- ✅ Chromium verified in development: `/nix/store/.../bin/chromium`
+- ⚠️ **TESTING REQUIRED**: Deploy and test PDF export functionality in production environment
+
 **Deployment Fixes - READY FOR DEPLOYMENT ✅**
 - ✅ Fixed dotenv loading issue: conditional check prevents loading .env files in production/deployment
 - ✅ Added `/health` endpoint for Autoscale (Cloud Run) health checks
