@@ -1509,9 +1509,13 @@ function resolvePuppeteerExecutable() {
 
   const cacheDir = path.join(os.homedir(), ".cache/puppeteer");
   const executableCandidates = ["chrome-headless-shell", "chrome", "chromium", "chrome.exe"];
+  if (fs.existsSync(cacheDir)) {
+    console.log("[PDF EXPORT] Procurando Chrome em", cacheDir);
+  }
   for (const candidate of executableCandidates) {
     const candidatePath = findExecutableRecursive(cacheDir, candidate);
     if (candidatePath) {
+      console.log("[PDF EXPORT] Chrome localizado automaticamente em:", candidatePath);
       return candidatePath;
     }
   }
@@ -1519,16 +1523,23 @@ function resolvePuppeteerExecutable() {
   try {
     const bundledPath = puppeteer.executablePath();
     if (bundledPath && fs.existsSync(bundledPath)) {
+      console.log("[PDF EXPORT] Usando Chrome empacotado em:", bundledPath);
       return bundledPath;
     }
   } catch (error) {
     console.warn("[PDF EXPORT] Unable to resolve bundled Chromium executable:", error);
   }
 
+  console.warn("[PDF EXPORT] Nenhum executável do Chrome foi encontrado. Defina PUPPETEER_EXECUTABLE_PATH.");
   return null;
 }
 
-function findExecutableRecursive(dir: string, executableName: string, depth = 0, maxDepth = 5): string | null {
+function findExecutableRecursive(
+  dir: string,
+  executableName: string,
+  depth = 0,
+  maxDepth = 8
+): string | null {
   if (!fs.existsSync(dir) || depth > maxDepth) {
     return null;
   }
@@ -1536,8 +1547,11 @@ function findExecutableRecursive(dir: string, executableName: string, depth = 0,
   const entries = fs.readdirSync(dir, { withFileTypes: true });
 
   for (const entry of entries) {
-    if (!entry.isFile()) continue;
-    if (entry.name === executableName) {
+    const isExecutableFile =
+      entry.isFile() || (entry.isSymbolicLink && entry.isSymbolicLink());
+    if (!isExecutableFile) continue;
+
+    if (entry.name === executableName || entry.name.startsWith(`${executableName}.`)) {
       return path.join(dir, entry.name);
     }
   }
