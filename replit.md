@@ -6,6 +6,8 @@
 - ✅ Added Chromium system dependency via Nix packages (resolves `libglib-2.0.so.0` error)
 - ✅ Updated Puppeteer executable resolution to prioritize system Chromium over bundled Chrome
 - ✅ Enhanced error logging to help debug Chrome/Chromium availability issues
+- ✅ Increased `protocolTimeout` to 60 seconds (fixes "Network.enable timed out" error)
+- ✅ Added GPU-disabling flags for better headless stability (`--disable-gpu`, `--disable-software-rasterizer`)
 - ✅ Chromium verified in development: `/nix/store/.../bin/chromium`
 - ⚠️ **TESTING REQUIRED**: Deploy and test PDF export functionality in production environment
 

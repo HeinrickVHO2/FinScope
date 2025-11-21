@@ -253,9 +253,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--disable-software-rasterizer",
           "--single-process",
           "--no-zygote",
         ],
+        protocolTimeout: 60000, // 60 seconds timeout for DevTools protocol
         dumpio: process.env.NODE_ENV !== "production",
       });
       const page = await browser.newPage();
