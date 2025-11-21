@@ -9,6 +9,7 @@ import puppeteer from "puppeteer";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { spawnSync } from "node:child_process";
 import MemoryStore from "memorystore";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -1520,6 +1521,18 @@ function resolvePuppeteerExecutable() {
     }
   }
 
+  console.warn("[PDF EXPORT] Nenhum Chrome encontrado. Tentando instalar via npx...");
+  const installSucceeded = installChromeBrowser(cacheDir);
+  if (installSucceeded) {
+    for (const candidate of executableCandidates) {
+      const candidatePath = findExecutableRecursive(cacheDir, candidate);
+      if (candidatePath) {
+        console.log("[PDF EXPORT] Chrome instalado e localizado em:", candidatePath);
+        return candidatePath;
+      }
+    }
+  }
+
   try {
     const bundledPath = puppeteer.executablePath();
     if (bundledPath && fs.existsSync(bundledPath)) {
@@ -1532,6 +1545,29 @@ function resolvePuppeteerExecutable() {
 
   console.warn("[PDF EXPORT] Nenhum executável do Chrome foi encontrado. Defina PUPPETEER_EXECUTABLE_PATH.");
   return null;
+}
+
+function installChromeBrowser(cacheDir: string) {
+  try {
+    const result = spawnSync("npx", ["puppeteer", "browsers", "install", "chrome"], {
+      cwd: process.cwd(),
+      stdio: "inherit",
+      timeout: 120_000,
+      env: {
+        ...process.env,
+        PUPPETEER_CACHE_DIR: cacheDir,
+      },
+    });
+    if (result.status === 0) {
+      console.log("[PDF EXPORT] Instalação do Chrome concluída via npx puppeteer.");
+      return true;
+    }
+    console.warn("[PDF EXPORT] Falha ao instalar Chrome automaticamente. status:", result.status);
+    return false;
+  } catch (error) {
+    console.error("[PDF EXPORT] Erro ao executar instalação automática do Chrome:", error);
+    return false;
+  }
 }
 
 function findExecutableRecursive(
