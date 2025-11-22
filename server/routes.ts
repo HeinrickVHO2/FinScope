@@ -42,6 +42,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import fetch from "node-fetch";
 import { buildFinancialContext } from "../ai/buildFinancialContext";
+import { sanitizeUserInput, generateSafeRejectionMessage } from "../ai/sanitizeInput";
 
 
 // Extend Express session type
@@ -2183,7 +2184,65 @@ type AiInterpretationResult =
       return res.status(401).json({ error: "Sessão expirada" });
     }
 
-    const content = validation.data.content.trim();
+    const rawContent = validation.data.content.trim();
+    
+    // Sanitize input to prevent prompt injection
+    const { clean, isDangerous, reason } = sanitizeUserInput(rawContent);
+    
+    if (isDangerous) {
+      console.warn(`[AI SECURITY] Prompt injection attempt detected: ${reason} - User: ${user.id}`);
+      const rejectionMessage = generateSafeRejectionMessage();
+      
+      // Clear conversation state and pending actions to prevent stale operations
+      resetConversationState(user.id);
+      
+      try {
+        // Save user message with proper DB persistence
+        const { data: userMessage, error: userMessageError } = await supabase
+          .from("ai_messages")
+          .insert({
+            user_id: user.id,
+            role: "user",
+            content: clean,
+          })
+          .select()
+          .single();
+        
+        if (userMessageError || !userMessage) {
+          console.error("[AI SECURITY] Failed to save dangerous message:", userMessageError);
+          return res.status(500).json({ error: "Não foi possível registrar sua mensagem agora." });
+        }
+        
+        // Save rejection response with proper DB persistence
+        const { data: assistantMessage, error: assistantMessageError } = await supabase
+          .from("ai_messages")
+          .insert({
+            user_id: user.id,
+            role: "assistant",
+            content: rejectionMessage,
+          })
+          .select()
+          .single();
+        
+        if (assistantMessageError || !assistantMessage) {
+          console.error("[AI SECURITY] Failed to save rejection response:", assistantMessageError);
+          return res.status(500).json({ error: "Mensagem registrada, mas não foi possível gerar a resposta agora." });
+        }
+        
+        return res.json({
+          success: true,
+          data: {
+            userMessage: mapAiMessage(userMessage),
+            assistantMessage: mapAiMessage(assistantMessage),
+          },
+        });
+      } catch (error) {
+        console.error("[AI SECURITY] Unexpected error handling dangerous input:", error);
+        return res.status(500).json({ error: "Erro ao processar mensagem." });
+      }
+    }
+    
+    const content = clean;
     const state = getConversationState(user.id);
     logConversationState(user.id, "before");
 
