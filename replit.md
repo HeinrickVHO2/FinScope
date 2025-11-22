@@ -5,23 +5,26 @@
 **IA: Sistema Unificado de Actions[] - PRODUÇÃO ✅**
 - ✅ **Transações imediatas via IA**: System actions[{type: "transaction"}] funcional para PF/PJ
 - ✅ **Dados reais em transações**: Corrigido bug de "placeholder" - agora usa description/amount da IA
-- ✅ **Investimentos criados pela IA**: "Quero 500 para renda fixa" → Cria investment + investment_transaction (deposit)
-- ✅ **Pipeline de investimentos**: Saca da conta PF e adiciona ao investimento (igual ao fluxo manual)
+- ✅ **Investimentos com depósito vs meta**: IA detecta `deposit_amount` (valor investido AGORA) e `target_value` (meta futura) separadamente
+- ✅ **Fluxo correto de investimentos**: 
+  - Depósito: "Adicionei 500 em CDB" → Investment com saldo 500 + Transação negativa (saida) -500 na conta PF
+  - Meta+Depósito: "Adicionei 500... Pretendo 12k" → Investment com saldo 500, meta 12k + Transação negativa -500
+  - Apenas meta: "Quero 20k" → Investment com saldo 20k (sem transação negativa)
+- ✅ **Transações negativas criadas**: Investimentos não mais aparecem como entrada (+) mas como saída (-) na conta PF
 - ✅ **Pipeline único**: Todas ações (transaction/future_bill/goal) processadas via actions[]
 - ✅ **Early return**: Sistema antigo não executa quando actions[] são processadas (evita duplicação)
 - ✅ **Tratamento de erro completo**: 
   - Transaction: Mensagem clara quando conta PF/PJ não existe + fallback em erros Supabase
-  - Future_bill: Valida dueDate obrigatório + múltiplos formatos (dueDate/due_date/date) + erro handling
-  - Goal: Cria investment + investment_transaction com tratamento de erro completo
+  - Future_bill: Valida dueDate obrigatório + múltiplos formatos + erro handling
+  - Goal: Cria investment com current_amount correto + transação negativa quando há depósito
 - ✅ **Validação conversationalMessage**: Fallback quando IA retorna "placeholder" ou mensagem vazia
-- ✅ **Logs de debug**: Rastreamento completo do fluxo (OpenAI → actions[] → DB)
+- ✅ **Logs de debug**: Rastreamento completo (OpenAI → deposit_amount/target_value → actions[] → DB)
 - ✅ **Testes funcionais**:
-  - Transaction PF: "Gastei 87 reais" → criada corretamente (-R$ 87,00)
-  - Future_bill: "Internet 199 dia 25/12" → persistida com dados reais
-  - Investment Goal: "Juntar 500 para renda fixa" → investment criado + investment_transaction (deposit)
-  - conversationalMessage: Sem placeholder, com fallback quando necessário
-- 📌 **Comportamento investimentos**: "Quero 500 para emergência" → Cria investment + saca 500 da PF
-- 📌 **Arquitetura**: routes.ts linhas 2489-2640 (processamento actions[] + validação + fallbacks)
+  - "Adicionei 500 em CDB. Pretendo 12k" → Investment (500) + Transação negativa (-500)
+  - "Quero 20k para carro" → Investment (20k) + sem transação
+  - Transações aparecem **negativas** na conta PF (comportamento correto)
+- 📌 **Prompt melhorado**: Detecta "adicionei X" → deposit_amount, "pretendo Y" → target_value (VALORES SEPARADOS)
+- 📌 **Arquitetura**: conversationalPrompt.ts (exemplo 4-5 com explicação de deposit_amount), routes.ts linhas 2572-2639
 
 **IA: Detecção de Contas Futuras - 100% FUNCIONAL ✅**
 - ✅ **Infraestrutura completa**: Backend preparado para processar `actions[]` da IA

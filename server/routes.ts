@@ -2569,17 +2569,22 @@ INSTRUÇÕES:
           } else if (action.type === "goal" && action.data) {
             if (isDevMode) console.log("[AI DEBUG] Creating goal/investment:", JSON.stringify(action.data));
             try {
+              // Suportar tanto deposit_amount (valor adicionado agora) quanto target_value (meta)
+              const depositAmount = action.data.deposit_amount || 0;
               const targetAmount = action.data.target_value || 0;
               const investmentTitle = action.data.title || "Meta de Investimento";
               
-              // 1. Criar investment (será a reserva/meta em si)
+              // Se há depósito, usar esse valor como current_amount. Senão, usar target como initial
+              const currentAmount = depositAmount > 0 ? depositAmount : targetAmount;
+              
+              // 1. Criar investment
               const { data: investment, error: investmentError } = await supabase
                 .from("investments")
                 .insert({
                   user_id: user.id,
                   name: investmentTitle,
                   type: "reserva_emergencia",
-                  current_amount: String(targetAmount),
+                  current_amount: String(currentAmount),
                 })
                 .select()
                 .single();
@@ -2591,31 +2596,29 @@ INSTRUÇÕES:
 
               if (isDevMode) console.log("[AI ACTION] Investment criado:", investment);
 
-              // 2. Se houver valor, criar investment transaction (deposit)
-              if (targetAmount > 0 && investment) {
+              // 2. Se há depósito (deposit_amount), criar transação negativa (saida) na conta PF
+              if (depositAmount > 0 && investment) {
                 const accounts = await storage.getAccountsByUserId(user.id);
                 const pfAccount = accounts.find((a) => a.type?.toLowerCase() === "pf");
                 
                 if (pfAccount) {
-                  const { data: invTx, error: txError } = await supabase
-                    .from("investment_transactions")
+                  // Criar transação negativa (saida) na conta PF
+                  const { error: txError } = await supabase
+                    .from("transactions")
                     .insert({
                       user_id: user.id,
-                      investment_id: investment.id,
-                      source_account_id: pfAccount.id,
-                      amount: String(targetAmount),
-                      type: "deposit",
+                      account_id: pfAccount.id,
+                      type: "saida",
+                      amount: String(depositAmount),
+                      category: "Investimento",
+                      description: `Depósito em investimento: ${investmentTitle}`,
                       date: new Date().toISOString(),
-                      note: `Depósito inicial para ${investmentTitle}`,
-                    })
-                    .select()
-                    .single();
+                    });
 
                   if (txError) {
-                    console.error("[AI ACTION] Supabase error ao criar investment transaction:", txError);
-                    // Não fazer throw - investimento foi criado, só a transação falhou
+                    console.error("[AI ACTION] Supabase error ao criar transaction (deposit):", txError);
                   } else {
-                    if (isDevMode) console.log("[AI ACTION] Investment transaction criada:", invTx);
+                    if (isDevMode) console.log("[AI ACTION] Transaction (saida) criada para depósito");
                   }
                 }
               }
