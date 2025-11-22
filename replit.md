@@ -2,17 +2,17 @@
 
 ## Recent Changes (November 22, 2025)
 
-**AI Financial Assistant Improvements - PRODUCTION READY ✅**
-- ✅ Fixed `buildFinancialContext()`: corrected table references (investment_goals, future_transactions) and added `formatContextAsPrompt()` for better LLM comprehension
-- ✅ Implemented comprehensive security: `sanitizeUserInput()` detects prompt injection attempts (15+ dangerous patterns), enforces 500-char limit, logs security events
-- ✅ Enhanced security flow: clears conversation state (`resetConversationState`) and pending actions when dangerous input detected to prevent stale operations
-- ✅ Fixed message persistence: rejection responses now use proper DB IDs/timestamps via `.select().single()` instead of mock UUIDs
-- ✅ Updated system prompt: Brazilian financial consultant personality (friendly, direct, never robotic), context-aware responses, automatic intent detection
-- ✅ Reinforced guardrails: mandatory rules prevent prompt injection, loop detection stops repetitive questions, automatic transaction/goal creation
-- ✅ Architect-approved security implementation: proper error handling, audit logging, and state management for dangerous inputs
-- ✅ Improved regex patterns: flexible matching for variations like "ignore todas as instruções anteriores" (catches up to 30 chars between trigger words)
-- ✅ E2E tests passing: safe messages processed normally, dangerous inputs rejected politely, conversation continues after rejection
-- ⚠️ **MONITORING REQUIRED**: Track logs post-deployment to tune dangerous-pattern detection based on real-world traffic
+**AI Financial Assistant Complete Refactoring - PRODUCTION READY ✅**
+- ✅ **Consolidated all prompts** into single `ai/conversationalPrompt.ts` with clear structure (system prompt + user prompt with context)
+- ✅ **Redesigned state management**: conversations auto-reset after success/failure, new conversations start in idle state, no stale data
+- ✅ **Refactored confirmation logic**: AI generates humanized conversational messages, backend only validates/executes JSON actions
+- ✅ **Fixed response priority**: (1) AI conversational message, (2) AI clarification, (3) hardcoded fallbacks only when AI fails
+- ✅ **Fixed date handling**: system prompt includes current date (2025-11-22) so AI uses correct dates instead of 1970-01-01
+- ✅ **Preserved conversationalMessage field**: `interpretTransactionFromMessage()` now returns AI-generated messages to frontend
+- ✅ **Enhanced personality**: Brazilian financial consultant (friendly, direct, never robotic), context-aware, automatic intent detection
+- ✅ **Security maintained**: `sanitizeUserInput()` detects 15+ injection patterns, resets state on dangerous input, logs security events
+- ✅ **E2E tests passing**: humanized messages appear correctly, dates accurate, transactions created successfully, recurring detection works
+- ⚠️ **MONITORING REQUIRED**: Track real-world conversational quality and adjust system prompt based on user feedback
 
 **PDF Export Fix for Production - READY FOR TESTING ✅**
 - ✅ Added Chromium system dependency via Nix packages (resolves `libglib-2.0.so.0` error)
