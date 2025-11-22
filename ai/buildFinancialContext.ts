@@ -38,7 +38,7 @@ export async function buildFinancialContext(
     .from("investment_goals")
     .select("*")
     .eq("user_id", userId)
-    .order("created_at", { descending: true })
+    .order("created_at", { ascending: false })
     .limit(10);
 
   // Plano do usuário

@@ -1,0 +1,136 @@
+Corrija o módulo de IA do projeto FinScope para que ele tenha controle real do sistema e interaja com todas as abas da plataforma.
+
+Atualmente:
+- A IA só responde texto
+- Não cria transações reais
+- Não cria contas futuras
+- Não atualiza dashboard
+- Mostra JSON bruto na interface
+- Os botões de "insight" não funcionam
+
+Isso precisa ser transformado em um verdadeiro AGENTE de produto.
+
+====================================
+1. CONTROLE REAL DA PLATAFORMA
+====================================
+
+A IA deve conseguir:
+
+- Inserir dados em "transacoes"
+- Inserir dados em "contas_a_pagar" (futureBills)
+- Criar metas financeiras
+- Atualizar dashboard
+
+Quando o usuário disser algo como:
+
+"Preciso pagar meu aluguel no dia 10, no valor de 2 mil reais"
+
+O sistema deve:
+
+- Criar uma futureBill
+- Exibir essa conta na aba "Contas a Pagar"
+- Atualizar widgets do dashboard
+
+Quando o usuário disser:
+
+"Gastei 30 reais no mercado"
+
+O sistema deve:
+
+- Criar registro real em 'transactions'
+- Atualizar dashboard
+- Aplicar categoria correta automaticamente
+
+====================================
+2. JSON NÃO DEVE APARECER NA UI
+====================================
+
+Hoje o sistema está exibindo o JSON da IA no meio da tela.
+
+Corrija:
+
+- O JSON deve ser consumido apenas por código.
+- A UI deve exibir apenas cards visuais formatados.
+
+Remover completamente:
+
+<pre>{json}</pre>
+ou qualquer preview bruto
+
+====================================
+3. BOTÕES DE INSIGHT DEVEM FUNCIONAR
+====================================
+
+Os botões:
+
+- "Foco em economia"
+- "Foco em dívidas"
+- "Foco em investimentos"
+
+Devem alterar:
+
+- O prompt enviado à IA
+- O tipo de insights exibidos
+
+Exemplo:
+Se "Foco em Dívidas" estiver ativo, a IA deve priorizar análises sobre contas futuras, parcelamentos e riscos.
+
+====================================
+4. DICAS NÃO PODEM SER GENÉRICAS
+====================================
+
+A IA deve usar:
+
+- Histórico do usuário
+- contas futuras
+- gastos reais
+- metas existentes
+
+Para gerar dicas contextualizadas.
+
+Exemplo proibido:
+"Considere criar um fundo de emergência"
+
+Exemplo esperado:
+"Você gastou R$ 420 em mercado no mês. Se reduzir 10%, sobra R$ 42 para investir."
+
+====================================
+5. PADRÃO DE COMANDO DO AGENTE
+====================================
+
+Todas as respostas da IA devem seguir o padrão:
+
+Se for criar algo:
+{
+  "action": "create_transaction" | "create_future_bill" | "create_goal"
+  "data": { ... }
+}
+
+O frontend deve escutar esse retorno e executar a ação automaticamente.
+
+====================================
+6. SINCRONIA ENTRE ABAS
+====================================
+
+Sempre que algo for criado pela IA:
+
+- Atualizar a aba correspondente
+- Atualizar dashboard automaticamente
+- Recalcular indicadores
+
+====================================
+7. LIMPAR EXPERIÊNCIA
+====================================
+
+- Remover JSON visível
+- Melhorar UX do chat
+- Sem travas
+- Inserir animação ao criar registros
+
+====================================
+RESULTADO ESPERADO
+====================================
+
+A IA deve agir como um controlador do sistema, não apenas como um chatbot.
+
+Implemente essas mudanças agora.
