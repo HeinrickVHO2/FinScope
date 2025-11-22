@@ -2569,14 +2569,14 @@ INSTRUÇÕES:
           } else if (action.type === "goal" && action.data) {
             if (isDevMode) console.log("[AI DEBUG] Creating goal:", JSON.stringify(action.data));
             try {
+              // O banco já tem current_amount com default value
+              // investment_id é requerido, usar um UUID dummy
               const { data: goal, error } = await supabase
                 .from("investment_goals")
                 .insert({
                   user_id: user.id,
-                  title: action.data.title || "Meta",
-                  description: action.data.description,
-                  target_value: String(action.data.target_value || 0),
-                  current_amount: "0",
+                  investment_id: user.id, // Usar user_id como placeholder (schema requer NOT NULL)
+                  target_amount: String(action.data.target_value || 0),
                   target_date: new Date().toISOString(),
                 })
                 .select()
