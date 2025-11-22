@@ -1,6 +1,16 @@
 # FinScope - Financial Management Platform
 
-## Recent Changes (November 14, 2025)
+## Recent Changes (November 22, 2025)
+
+**AI Financial Assistant Improvements - PRODUCTION READY ✅**
+- ✅ Fixed `buildFinancialContext()`: corrected table references (investment_goals, future_transactions) and added `formatContextAsPrompt()` for better LLM comprehension
+- ✅ Implemented comprehensive security: `sanitizeUserInput()` detects prompt injection attempts (15+ dangerous patterns), enforces 500-char limit, logs security events
+- ✅ Enhanced security flow: clears conversation state (`resetConversationState`) and pending actions when dangerous input detected to prevent stale operations
+- ✅ Fixed message persistence: rejection responses now use proper DB IDs/timestamps via `.select().single()` instead of mock UUIDs
+- ✅ Updated system prompt: Brazilian financial consultant personality (friendly, direct, never robotic), context-aware responses, automatic intent detection
+- ✅ Reinforced guardrails: mandatory rules prevent prompt injection, loop detection stops repetitive questions, automatic transaction/goal creation
+- ✅ Architect-approved security implementation: proper error handling, audit logging, and state management for dangerous inputs
+- ⚠️ **MONITORING REQUIRED**: Track logs post-deployment to tune dangerous-pattern detection based on real-world traffic
 
 **PDF Export Fix for Production - READY FOR TESTING ✅**
 - ✅ Added Chromium system dependency via Nix packages (resolves `libglib-2.0.so.0` error)
