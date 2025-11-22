@@ -2395,21 +2395,22 @@ type AiInterpretationResult =
         return await sendAssistantResponse();
       }
 
-      if (state.step === "confirming_transaction" && pendingAction && !confirmationIntent) {
-        assistantText = 'Só preciso de um "sim" para salvar ou "cancelar" para descartar.';
-        return await sendAssistantResponse();
-      }
+      // ⚡ REMOVIDO: Confirmação desnecessária - registro automático agora
+      // if (state.step === "confirming_transaction" && pendingAction && !confirmationIntent) {
+      //   return await sendAssistantResponse();
+      // }
 
-      // DETECTAR SE É PERGUNTA GERAL (não transação)
+      // ⚡ Otimização: Apenas buscar contexto financeiro se for pergunta geral
       const isGeneralQuestion = detectFinanceQuestion(content) && state.step === "idle";
       
-      const [recentConversation, financialContext] = await Promise.all([
-        fetchRecentConversation(user.id, 6),
-        buildFinancialContext(user.id, "ALL"),
-      ]);
-
-      // SE É PERGUNTA GERAL, RESPONDER COM CONTEXTO
+      const recentConversation = await fetchRecentConversation(user.id, 6);
+      let financialContext;
       if (isGeneralQuestion) {
+        financialContext = await buildFinancialContext(user.id, "ALL");
+      }
+
+      // SE É PERGUNTA GERAL, RESPONDER COM CONTEXTO (financialContext já foi carregado acima)
+      if (isGeneralQuestion && financialContext) {
         const questionPrompt = `
 O usuário fez uma pergunta sobre suas finanças. Use o contexto para responder de forma útil e personalizada.
 
