@@ -1,5 +1,5 @@
 const DANGEROUS_PATTERNS = [
-  /ignore\s+(instruções|instrucoes|previous|anteriores|tudo)/i,
+  /ignore\s+.{0,30}?(instruções|instrucoes|previous|anteriores|rules|prompts?)/i,
   /revele?\s+(seu\s+)?prompt/i,
   /finja\s+que\s+(você\s+)?[ée]/i,
   /você\s+agora\s+[ée]/i,
@@ -9,6 +9,11 @@ const DANGEROUS_PATTERNS = [
   /new\s+instructions/i,
   /desconsidera?\s+(as\s+)?regras/i,
   /não\s+siga\s+as\s+regras/i,
+  /me\s+diga\s+(seu|o)\s+prompt/i,
+  /mostre\s+(seu|o)\s+prompt/i,
+  /quais\s+são\s+suas\s+instruções/i,
+  /delete\s+.{0,20}?(rules|instructions)/i,
+  /altere\s+suas\s+regras/i,
 ];
 
 const MAX_INPUT_LENGTH = 500;

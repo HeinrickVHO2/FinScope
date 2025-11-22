@@ -1508,7 +1508,12 @@ type AiInterpretationResult =
       }
       await ensureDefaultAccounts(user.id, user.plan);
       req.currentUser = user;
-      if (user.billingStatus !== "active") {
+      
+      // Allow access if billing is active OR user is in trial period
+      const isInTrial = user.trialEnd && new Date(user.trialEnd) > new Date();
+      const hasActiveBilling = user.billingStatus === "active";
+      
+      if (!hasActiveBilling && !isInTrial) {
         return res.status(403).json({ error: "Pagamento pendente" });
       }
       next();
