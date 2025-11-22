@@ -1,15 +1,9 @@
-import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { FinScopeHeader } from "@/components/site/FinScopeHeader";
+import { FinScopeFooter } from "@/components/site/FinScopeFooter";
 import {
   TrendingUp,
   PieChart,
@@ -20,11 +14,9 @@ import {
   FileText,
   Check,
   ArrowRight,
-  Menu
 } from "lucide-react";
 
 export default function LandingPage() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const benefits = [
     {
@@ -59,6 +51,29 @@ export default function LandingPage() {
     }
   ];
 
+  const futurePlanningBenefits = [
+    {
+      title: "Controle do que você gastou",
+      description: "Dashboard que consolida todas as movimentações e mostra onde o seu dinheiro realmente ficou."
+    },
+    {
+      title: "Planejamento do que vai gastar",
+      description: "Cadastre despesas futuras, boletos e assinaturas e já veja o impacto no seu caixa."
+    },
+    {
+      title: "Previsão do quanto vai sobrar",
+      description: "O FinScope estima o saldo livre depois de pagar as contas para você tomar decisões com antecedência."
+    },
+    {
+      title: "Lembretes inteligentes",
+      description: "Receba avisos antes dos vencimentos para nunca mais esquecer um pagamento."
+    },
+    {
+      title: "Relatórios automáticos",
+      description: "PDFs que mostram gastos reais x previstos e projeções completas, prontos para compartilhar."
+    },
+  ];
+
   const plans = [
     {
       name: "Pro",
@@ -67,10 +82,10 @@ export default function LandingPage() {
       description: "Ideal para controle pessoal completo",
       features: [
         "Até 3 contas financeiras",
-        "Dashboard financeiro básico",
-        "Fluxo de caixa mensal",
-        "Categorização manual",
-        "Alertas simples de pagamento",
+        "Controle de gastos passados",
+        "Planejamento básico de contas a pagar",
+        "Previsão simples do saldo",
+        "Alertas por e-mail",
         "Exportação PDF básico",
         "Suporte via e-mail"
       ],
@@ -84,13 +99,13 @@ export default function LandingPage() {
       period: "/mês",
       description: "Solução completa para pessoa física e empresas",
       features: [
-        "Contas ilimitadas",
-        "Dashboard avançado",
-        "Categorização automática inteligente",
-        "Relatórios PDF profissionais",
-        "Alertas avançados",
+        "Contas ilimitadas PF + PJ",
+        "Dashboard avançado com previsões",
+        "Planejamento detalhado de gastos futuros",
+        "Relatórios Premium com projeção de saldo",
+        "Lembretes inteligentes e automações",
         "Categoria MEI dentro da conta PJ",
-        "Organização financeira total",
+        "Economia recomendada e insights",
         "Acesso antecipado a recursos",
         "Backup automático"
       ],
@@ -102,158 +117,21 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="FinScope"
-              className="h-15 max-h-20 w-auto"
-            />
-          </div>
-
-
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-6">
-            <a href="#beneficios" className="text-sm font-medium hover:text-primary transition-colors">Benefícios</a>
-            <a href="#planos" className="text-sm font-medium hover:text-primary transition-colors">Planos</a>
-            <Link href="/recursos" className="text-sm font-medium hover:text-primary transition-colors">Recursos</Link>
-            <Link href="/faq" className="text-sm font-medium hover:text-primary transition-colors">FAQ</Link>
-            <Link href="/sobre" className="text-sm font-medium hover:text-primary transition-colors">Sobre</Link>
-            <Link href="/blog" className="text-sm font-medium hover:text-primary transition-colors">Blog</Link>
-            <Link href="/contato" className="text-sm font-medium hover:text-primary transition-colors">Contato</Link>
-
-            <Link href="/login">
-              <Button variant="ghost">Entrar</Button>
-            </Link>
-            <Link href="/signup">
-              <Button>Criar Conta</Button>
-            </Link>
-          </nav>
-
-
-          {/* Mobile Navigation */}
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon" data-testid="button-mobile-menu">
-                <Menu className="h-6 w-6" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[300px]">
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                  <img
-                    src="/logo.png"
-                    alt="FinScope"
-                    className="h-19 max-h-20 w-auto"
-                  />
-                </SheetTitle>
-              </SheetHeader>
-              <nav className="flex flex-col gap-4 mt-8">
-
-  <a 
-    href="#beneficios"
-    className="text-base font-medium hover:text-primary transition-colors py-2"
-    onClick={() => setMobileMenuOpen(false)}
-  >
-    Benefícios
-  </a>
-
-  <a 
-    href="#planos"
-    className="text-base font-medium hover:text-primary transition-colors py-2"
-    onClick={() => setMobileMenuOpen(false)}
-  >
-    Planos
-  </a>
-
-  <Link href="/recursos">
-    <span 
-      className="text-base font-medium py-2 block hover:text-primary transition-colors"
-      onClick={() => setMobileMenuOpen(false)}
-    >
-      Recursos
-    </span>
-  </Link>
-
-  <Link href="/faq">
-    <span 
-      className="text-base font-medium py-2 block hover:text-primary transition-colors"
-      onClick={() => setMobileMenuOpen(false)}
-    >
-      FAQ
-    </span>
-  </Link>
-
-  <Link href="/sobre">
-    <span 
-      className="text-base font-medium py-2 block hover:text-primary transition-colors"
-      onClick={() => setMobileMenuOpen(false)}
-    >
-      Sobre
-    </span>
-  </Link>
-
-  <Link href="/blog">
-    <span 
-      className="text-base font-medium py-2 block hover:text-primary transition-colors"
-      onClick={() => setMobileMenuOpen(false)}
-    >
-      Blog
-    </span>
-  </Link>
-
-  <Link href="/contato">
-    <span 
-      className="text-base font-medium py-2 block hover:text-primary transition-colors"
-      onClick={() => setMobileMenuOpen(false)}
-    >
-      Contato
-    </span>
-  </Link>
-
-  <div className="border-t pt-4 mt-2 space-y-3">
-    <Link href="/login">
-      <Button
-        variant="outline"
-        className="w-full justify-start"
-        onClick={() => setMobileMenuOpen(false)}
-      >
-        Entrar
-      </Button>
-    </Link>
-    
-    <Link href="/signup">
-      <Button
-        className="w-full justify-start"
-        onClick={() => setMobileMenuOpen(false)}
-      >
-        Criar Conta
-      </Button>
-    </Link>
-  </div>
-
-</nav>
-
-            </SheetContent>
-          </Sheet>
-        </div>
-      </header>
+      <FinScopeHeader />
 
       {/* Hero Section */}
-      <section className="container py-20 md:py-32">
+      <section className="max-w-6xl mx-auto px-4 py-20 md:py-32">
         <div className="grid lg:grid-cols-2 gap-12 items-center max-w-7xl mx-auto">
           <div className="space-y-6 text-center lg:text-left">
             <Badge variant="secondary" className="w-fit" data-testid="badge-hero">
-              Garantia de reembolso em 10 dias
+              Planejamento financeiro completo
             </Badge>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-poppins font-bold tracking-tight" data-testid="text-hero-title">
-              Controle completo das suas finanças pessoais e do seu negócio em um só lugar
+              Veja o que gastou, planeje o que vai gastar e saiba quanto vai sobrar
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl" data-testid="text-hero-subtitle">
-              Dashboards inteligentes, categorização automática e controle empresarial/PJ em uma única plataforma.
-              Tudo que você precisa para organizar sua vida financeira.
+              O FinScope reúne contas PF e PJ com controle do histórico, planejamento de despesas futuras e previsões automáticas
+              para que você tome decisões com semanas de antecedência.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/signup">
@@ -307,7 +185,7 @@ export default function LandingPage() {
 
       {/* Benefits Section */}
       <section id="beneficios" className="py-20 bg-muted/30">
-        <div className="container">
+        <div className="max-w-6xl mx-auto px-4">
           <div className="text-center space-y-4 mb-16">
             <h2 className="text-3xl md:text-4xl font-poppins font-bold" data-testid="text-benefits-title">
               Tudo que você precisa para gerenciar suas finanças
@@ -332,6 +210,63 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section id="planejamento" className="py-20">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="grid lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
+            <div className="space-y-5">
+              <Badge variant="outline" className="w-fit">
+                Planeje o seu futuro financeiro
+              </Badge>
+              <h2 className="text-3xl md:text-4xl font-poppins font-bold">
+                Controle hoje e antecipe amanhã
+              </h2>
+              <p className="text-lg text-muted-foreground">
+                O FinScope combina o histórico das suas finanças com previsões automáticas para você saber exatamente
+                quanto vai precisar e quanto dinheiro vai sobrar em cada período.
+              </p>
+              <div className="space-y-3">
+                {futurePlanningBenefits.map((item, index) => (
+                  <div key={index} className="flex gap-3">
+                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Check className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{item.title}</p>
+                      <p className="text-sm text-muted-foreground">{item.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <Card className="bg-card/70 backdrop-blur border-primary/20 shadow-xl">
+              <CardHeader>
+                <CardTitle className="font-poppins">Exemplo de previsão</CardTitle>
+                <CardDescription>Saldo projetado após contas futuras</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-xl border p-4">
+                  <p className="text-sm text-muted-foreground">Saldo previsto</p>
+                  <p className="text-2xl font-semibold text-primary">R$ 15.380,00</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-xl border p-4">
+                    <p className="text-xs text-muted-foreground">Gastos futuros</p>
+                    <p className="text-lg font-semibold text-destructive">R$ 4.820,00</p>
+                  </div>
+                  <div className="rounded-xl border p-4">
+                    <p className="text-xs text-muted-foreground">Dinheiro livre</p>
+                    <p className="text-lg font-semibold text-emerald-600">R$ 6.560,00</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  * Valores ilustrativos com base nas contas a pagar e receitas previstas cadastradas.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section */}
       <section id="planos" className="py-20">
         <div className="container">
@@ -340,7 +275,7 @@ export default function LandingPage() {
               Escolha o plano ideal para você
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto" data-testid="text-pricing-subtitle">
-              Assine com 10 dias de garantia. Não gostou? Devolvemos 100% do valor.
+              Assine com 10 dias de garantia e tenha controle do que gastou, vai gastar e do quanto vai sobrar.
             </p>
           </div>
           <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto justify-items-center">
@@ -405,47 +340,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-    {/* Footer */}
-<footer className="border-t py-12 bg-muted/30">
-  <div className="container">
-    <div className="grid md:grid-cols-4 gap-8">
-
-      {/* ... logo & texto ... */}
-
-      <div>
-        <h3 className="font-semibold mb-4">Produto</h3>
-        <ul className="space-y-2 text-sm text-muted-foreground">
-          <li><Link href="/recursos" className="hover:text-foreground transition-colors">Recursos</Link></li>
-          <li><a href="#planos" className="hover:text-foreground transition-colors">Preços</a></li>
-          <li><Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link></li>
-        </ul>
-      </div>
-
-      <div>
-        <h3 className="font-semibold mb-4">Empresa</h3>
-        <ul className="space-y-2 text-sm text-muted-foreground">
-          <li><Link href="/sobre" className="hover:text-foreground transition-colors">Sobre</Link></li>
-          <li><Link href="/blog" className="hover:text-foreground transition-colors">Blog</Link></li>
-          <li><Link href="/contato" className="hover:text-foreground transition-colors">Contato</Link></li>
-        </ul>
-      </div>
-
-      <div>
-        <h3 className="font-semibold mb-4">Legal</h3>
-        <ul className="space-y-2 text-sm text-muted-foreground">
-          <li><Link href="/privacidade" className="hover:text-foreground transition-colors">Privacidade</Link></li>
-          <li><Link href="/termos" className="hover:text-foreground transition-colors">Termos</Link></li>
-        </ul>
-      </div>
-
-    </div>
-
-    <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
-      <p>&copy; 2025 FinScope. Todos os direitos reservados.</p>
-    </div>
-  </div>
-</footer>
+      <FinScopeFooter />
 
     </div>
   );

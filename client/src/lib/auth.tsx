@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useLocation } from "wouter";
 import type { User } from "@shared/schema";
+import { apiFetch } from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
@@ -23,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function fetchCurrentUser() {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/me", {
+      const response = await apiFetch("/api/auth/me", {
         credentials: "include",
       });
 
@@ -42,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    await fetch("/api/auth/logout", {
+    await apiFetch("/api/auth/logout", {
       method: "POST",
       credentials: "include",
     });

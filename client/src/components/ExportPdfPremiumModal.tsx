@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth";
 import UpgradeModal from "@/components/UpgradeModal";
 import { FileDown, Loader2, Lock } from "lucide-react";
 import { useDashboardView } from "@/context/dashboard-view";
+import { apiFetch } from "@/lib/api";
 
 const REPORT_TYPES = [
   {
@@ -92,7 +93,7 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
     }
     setIsExporting(true);
     try {
-      const response = await fetch("/api/pdf/export", {
+      const response = await apiFetch("/api/pdf/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

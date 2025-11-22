@@ -17,6 +17,8 @@ import TransactionsPage from "@/pages/transactions";
 import InvestmentsPage from "@/pages/investments";
 import MEIPage from "@/pages/mei";
 import SettingsPage from "@/pages/settings";
+import FutureExpensesPage from "@/pages/future-expenses";
+import AIClientPage from "@/pages/ai";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
 import SobrePage from "@/pages/sobre";
@@ -31,6 +33,7 @@ import BillingRequiredPage from "@/pages/billing-required";
 import OnboardingSuccessPage from "@/pages/onboarding-success";
 import OnboardingErrorPage from "@/pages/onboarding-error";
 import { DashboardViewProvider } from "@/context/dashboard-view";
+import { FloatingAIChat } from "@/components/FloatingAIChat";
 
 
 
@@ -177,6 +180,16 @@ function Router() {
           <TransactionsPage />
         </DashboardLayout>
       </Route>
+      <Route path="/future-expenses">
+        <DashboardLayout>
+          <FutureExpensesPage />
+        </DashboardLayout>
+      </Route>
+      <Route path="/ai">
+        <DashboardLayout>
+          <AIClientPage />
+        </DashboardLayout>
+      </Route>
       <Route path="/investments">
         <DashboardLayout>
           <InvestmentsPage />
@@ -208,6 +221,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <FloatingAIChat />
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

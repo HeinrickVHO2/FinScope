@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import dotenv from "dotenv";
+import { scheduleWeeklyFinanceSummaryJob } from "./jobs/weeklyFinanceSummary";
 
 // Only load .env files in development (not in production/deployment)
 if (process.env.NODE_ENV !== 'production' && !process.env.REPLIT_DEPLOYMENT) {
@@ -68,6 +69,7 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
+  scheduleWeeklyFinanceSummaryJob();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

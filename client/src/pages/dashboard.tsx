@@ -5,13 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
-import { type Transaction } from "@shared/schema";
+import { type Transaction, type FutureTransaction } from "@shared/schema";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, FileDown, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ExportPdfPremiumModal from "@/components/ExportPdfPremiumModal";
 import UpgradeModal from "@/components/UpgradeModal";
 import { useDashboardView, type DashboardScope } from "@/context/dashboard-view";
-import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend, LineChart, Line } from "recharts";
+import { AiReportCard } from "@/components/AiReportCard";
 
 interface DashboardMetrics {
   totalBalance: number;
@@ -28,6 +29,36 @@ interface CategoryData {
 interface IncomeExpensesData {
   income: number;
   expenses: number;
+}
+
+interface AiProjectionMetrics {
+  expectedEndBalance: number;
+  negativeRisk: number;
+  safeSpendingMargin: number;
+  projectedIncome: number;
+  projectedExpenses: number;
+}
+
+interface CashflowForecast {
+  currentBalance: number;
+  expectedIncome: number;
+  previousIncome: number;
+  incomeDelta: number;
+  futureExpensesTotal: number;
+  forecastBalance: number;
+  freeCash: number;
+  projections?: AiProjectionMetrics;
+}
+
+interface FutureTotals {
+  totalToPay: number;
+  totalToReceive: number;
+  futureBalance: number;
+}
+
+interface FutureSummaryResponse {
+  items: FutureTransaction[];
+  totals: FutureTotals;
 }
 
 const formatCurrency = (value = 0) =>
@@ -127,6 +158,62 @@ export default function DashboardPage() {
       ]
     : [];
 
+  const forecastEnabled = !(selectedView === "PJ" && !isPremium);
+  const forecastQuery = useQuery<CashflowForecast>({
+    queryKey: [`/api/cashflow/forecast?type=${selectedView}`],
+    enabled: forecastEnabled,
+  });
+  const forecastData = forecastQuery.data;
+  const forecastLoading = forecastQuery.isLoading;
+  const futureSummaryQuery = useQuery<FutureSummaryResponse>({
+    queryKey: [`/api/future?type=${selectedView}`],
+    enabled: forecastEnabled,
+  });
+  const futureTotals = futureSummaryQuery.data?.totals;
+  const futureLoading = futureSummaryQuery.isLoading;
+  const plannedExpenses = futureTotals?.totalToPay ?? 0;
+  const plannedIncome = futureTotals?.totalToReceive ?? 0;
+  const actualExpenses = summaryData.metrics?.monthlyExpenses ?? 0;
+  const actualIncome = summaryData.metrics?.monthlyIncome ?? 0;
+  const expenseDiff = actualExpenses - plannedExpenses;
+  const expensePct = plannedExpenses > 0 ? (expenseDiff / plannedExpenses) * 100 : 0;
+  const accuracyPercent =
+    plannedExpenses > 0 ? Math.max(0, 100 - Math.abs(expensePct)) : 100;
+  const expenseMessage =
+    plannedExpenses === 0 && actualExpenses === 0
+      ? "Sem valores planejados para comparar este mês."
+      : expenseDiff > 0
+      ? `Você gastou ${Math.abs(expensePct).toFixed(0)}% a mais que o planejado.`
+      : expenseDiff < 0
+      ? `Você gastou ${Math.abs(expensePct).toFixed(0)}% a menos que o planejado.`
+      : "Você gastou exatamente o que estava planejado.";
+  const savingsMessage =
+    expenseDiff < 0
+      ? `Você economizou ${formatCurrency(Math.abs(expenseDiff))} do previsto.`
+      : expenseDiff > 0
+      ? `Você ultrapassou ${formatCurrency(Math.abs(expenseDiff))} do previsto.`
+      : "Nenhuma diferença entre planejado e realizado.";
+  const plannedVsActualLineData = [
+    {
+      name: "Receitas",
+      Planejado: plannedIncome,
+      Realizado: actualIncome,
+    },
+    {
+      name: "Despesas",
+      Planejado: plannedExpenses,
+      Realizado: actualExpenses,
+    },
+  ];
+  const projectionMetrics = forecastData?.projections;
+  const riskIndicator = projectionMetrics
+    ? projectionMetrics.negativeRisk >= 70
+      ? { label: "Risco alto", textClass: "text-rose-600", bgClass: "bg-rose-50" }
+      : projectionMetrics.negativeRisk >= 30
+      ? { label: "Risco moderado", textClass: "text-amber-600", bgClass: "bg-amber-50" }
+      : { label: "Risco controlado", textClass: "text-emerald-600", bgClass: "bg-emerald-50" }
+    : null;
+
   return (
     <div className="p-6 space-y-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -207,11 +294,239 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
+      <AiReportCard />
 
-      {selectedView === "PF" && <DashboardBlock scope="PF" data={pfData} />}
-      {selectedView === "PJ" &&
-        (isPremium ? <DashboardBlock scope="PJ" data={pjData} premium /> : <LockedCard onUpgrade={() => setIsUpgradeModalOpen(true)} />)}
-      {selectedView === "ALL" && <DashboardBlock scope="ALL" data={totalData} />}
+      <section className="rounded-3xl border bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <p className="text-sm text-muted-foreground">Agenda financeira</p>
+            <h2 className="text-2xl font-semibold text-slate-900">Valores previstos</h2>
+            <p className="text-xs text-muted-foreground">
+              Tudo o que a IA e você cadastraram como pagamentos e recebimentos futuros.
+            </p>
+          </div>
+        </div>
+        {futureLoading ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-24" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="border-none bg-rose-50">
+              <CardHeader className="pb-1">
+                <p className="text-sm text-rose-600">Previsto a pagar</p>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-semibold text-rose-700">
+                  {formatCurrency(futureTotals?.totalToPay || 0)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="border-none bg-emerald-50">
+              <CardHeader className="pb-1">
+                <p className="text-sm text-emerald-600">Previsto a receber</p>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-semibold text-emerald-700">
+                  {formatCurrency(futureTotals?.totalToReceive || 0)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="border-none bg-slate-50">
+              <CardHeader className="pb-1">
+                <p className="text-sm text-muted-foreground">Saldo futuro estimado</p>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-semibold text-slate-900">
+                  {formatCurrency(futureTotals?.futureBalance || 0)}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-3xl border bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-6">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Planejado vs Realizado</p>
+            <h2 className="text-2xl font-semibold text-slate-900">Como você está seguindo o plano</h2>
+            <p className="text-sm text-muted-foreground max-w-2xl">
+              Cruzamos o que foi previsto pelo Assistente AI com as transações reais do mês atual para mostrar o quanto você acertou.
+            </p>
+          </div>
+        </div>
+        {summaryData.loading || futureLoading ? (
+          <div className="grid gap-4 md:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-28" />
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card className="border-none bg-slate-50">
+                <CardHeader className="pb-1">
+                  <p className="text-sm text-muted-foreground">Previsto gastar</p>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-semibold text-slate-900">{formatCurrency(plannedExpenses)}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-none bg-slate-50">
+                <CardHeader className="pb-1">
+                  <p className="text-sm text-muted-foreground">Gasto real</p>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-semibold text-slate-900">{formatCurrency(actualExpenses)}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-none bg-slate-50">
+                <CardHeader className="pb-1">
+                  <p className="text-sm text-muted-foreground">Diferença</p>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-semibold text-slate-900">{formatCurrency(expenseDiff)}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-none bg-slate-50">
+                <CardHeader className="pb-1">
+                  <p className="text-sm text-muted-foreground">Percentual de acerto</p>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-semibold text-slate-900">{accuracyPercent.toFixed(0)}%</p>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <Card className="border-none bg-slate-50">
+                <CardContent className="space-y-2 pt-6">
+                  <p className="text-base font-semibold">{expenseMessage}</p>
+                  <p className="text-sm text-muted-foreground">{savingsMessage}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-none bg-slate-50">
+                <CardContent className="pt-2">
+                  <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={plannedVsActualLineData}
+                        margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="Planejado" stroke="#94a3b8" strokeWidth={3} />
+                        <Line type="monotone" dataKey="Realizado" stroke="#4f46e5" strokeWidth={3} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
+      </section>
+
+      <Card className="rounded-3xl border bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Previsão de Caixa</p>
+            <h2 className="text-2xl font-semibold text-slate-900">Saldo após contas previstas</h2>
+            <p className="text-sm text-muted-foreground">
+              Considera receitas esperadas e despesas futuras cadastradas.
+            </p>
+          </div>
+          {forecastData && (
+            <Badge
+              variant={forecastData.incomeDelta >= 0 ? "secondary" : "outline"}
+              className={forecastData.incomeDelta >= 0 ? "text-emerald-700" : "text-rose-600"}
+            >
+              {forecastData.incomeDelta >= 0 ? <ArrowUpRight className="h-3.5 w-3.5 mr-1" /> : <ArrowDownRight className="h-3.5 w-3.5 mr-1" />}
+              {forecastData.incomeDelta >= 0 ? "+" : "-"}
+              {formatCurrency(Math.abs(forecastData.incomeDelta))} vs. mês anterior
+            </Badge>
+          )}
+        </div>
+        {forecastLoading ? (
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+          </div>
+        ) : forecastData ? (
+          <>
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border bg-slate-50 p-4">
+                <p className="text-sm text-muted-foreground">Saldo previsto</p>
+                <p className="text-3xl font-semibold text-slate-900">{formatCurrency(forecastData.forecastBalance)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Saldo atual {formatCurrency(forecastData.currentBalance)} + receitas previstas {formatCurrency(forecastData.expectedIncome)} - gastos futuros {formatCurrency(forecastData.futureExpensesTotal)}
+                </p>
+              </div>
+              <div className="rounded-2xl border bg-white p-4">
+                <p className="text-sm text-muted-foreground">Gastos já previstos</p>
+                <p className="text-2xl font-semibold text-rose-600">{formatCurrency(forecastData.futureExpensesTotal)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Contas a pagar em aberto cadastradas</p>
+              </div>
+              <div className="rounded-2xl border bg-white p-4">
+                <p className="text-sm text-muted-foreground">Dinheiro livre esperado</p>
+                <p className="text-2xl font-semibold text-emerald-600">{formatCurrency(forecastData.freeCash)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Receitas previstas ({formatCurrency(forecastData.expectedIncome)}) - gastos futuros
+                </p>
+              </div>
+            </div>
+            {projectionMetrics && (
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <div className="rounded-2xl border bg-white p-4">
+                  <p className="text-sm text-muted-foreground">Saldo final estimado (AI)</p>
+                  <p className="text-2xl font-semibold text-slate-900">{formatCurrency(projectionMetrics.expectedEndBalance)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Considerando receitas fixas e despesas recorrentes.
+                  </p>
+                </div>
+                <div className="rounded-2xl border bg-slate-50 p-4">
+                  <p className="text-sm text-muted-foreground">Margem segura de gastos</p>
+                  <p className="text-2xl font-semibold text-emerald-600">
+                    {formatCurrency(projectionMetrics.safeSpendingMargin)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Quanto ainda cabe no orçamento sem comprometer o saldo final.
+                  </p>
+                </div>
+                <div className="rounded-2xl border p-4">
+                  <p className="text-sm text-muted-foreground">Risco de saldo negativo</p>
+                  <div
+                    className={cn(
+                      "rounded-xl px-3 py-2 mt-2 inline-flex items-center gap-2 text-sm font-medium",
+                      riskIndicator?.bgClass || "bg-slate-50",
+                      riskIndicator?.textClass || "text-slate-700"
+                    )}
+                  >
+                    {riskIndicator?.label || "Dados insuficientes"}
+                    {projectionMetrics && <span>({projectionMetrics.negativeRisk}%)</span>}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Baseado na diferença entre receitas fixas e despesas projetadas.
+                  </p>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground mt-4">Sem dados suficientes para calcular a previsão.</p>
+        )}
+      </Card>
+
+{selectedView === "PF" && <DashboardBlock scope="PF" data={pfData} hideSummary />}
+{selectedView === "PJ" &&
+        (isPremium ? <DashboardBlock scope="PJ" data={pjData} hideSummary premium /> : <LockedCard onUpgrade={() => setIsUpgradeModalOpen(true)} />)}
+{selectedView === "ALL" && <DashboardBlock scope="ALL" data={totalData} hideSummary />}
 
       <ExportPdfPremiumModal open={isExportModalOpen} onOpenChange={setIsExportModalOpen} />
       <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Relatórios Premium" />
@@ -223,9 +538,10 @@ interface DashboardBlockProps {
   scope: Scope;
   data: ReturnType<typeof useDashboardScope>;
   premium?: boolean;
+  hideSummary?: boolean;
 }
 
-function DashboardBlock({ scope, data, premium }: DashboardBlockProps) {
+function DashboardBlock({ scope, data, premium, hideSummary }: DashboardBlockProps) {
   const { title, description, accent, badge } = scopeLabels[scope];
   const transactions = data.transactions?.slice(0, 5) || [];
   const categories = data.categories || [];
@@ -265,26 +581,30 @@ function DashboardBlock({ scope, data, premium }: DashboardBlockProps) {
 
   return (
     <section className="rounded-3xl border bg-white shadow-sm overflow-hidden">
-      <div className={cn("p-6 border-b", `bg-gradient-to-br ${accent}`)}>
+      <div className={cn("p-6 border-b", hideSummary ? "bg-slate-50" : `bg-gradient-to-br ${accent}`)}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{scope === "PF" ? "Conta pessoal" : scope === "PJ" ? "Conta empresarial" : "Consolidado"}</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              {hideSummary ? "Detalhes do contexto" : scope === "PF" ? "Conta pessoal" : scope === "PJ" ? "Conta empresarial" : "Consolidado"}
+            </p>
             <h3 className="text-2xl font-semibold text-slate-900 mt-1">{title}</h3>
-            <p className="text-sm text-muted-foreground mt-1">{description}</p>
+            {!hideSummary && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
           </div>
           <Badge variant="secondary">{badge}</Badge>
         </div>
       </div>
       <div className="p-6 space-y-6">
-        {data.loading ? (
-          <Skeleton className="h-24 w-full" />
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <SmallStat label="Saldo" value={data.metrics?.totalBalance} />
-            <SmallStat label="Receitas" value={data.metrics?.monthlyIncome} trend="up" />
-            <SmallStat label="Despesas" value={data.metrics?.monthlyExpenses} trend="down" />
-            <SmallStat label="Fluxo" value={data.metrics?.netCashFlow} />
-          </div>
+        {!hideSummary && (
+          data.loading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <SmallStat label="Saldo" value={data.metrics?.totalBalance} />
+              <SmallStat label="Receitas" value={data.metrics?.monthlyIncome} trend="up" />
+              <SmallStat label="Despesas" value={data.metrics?.monthlyExpenses} trend="down" />
+              <SmallStat label="Fluxo" value={data.metrics?.netCashFlow} />
+            </div>
+          )
         )}
         <div className="grid gap-4 lg:grid-cols-3">
           <Card>

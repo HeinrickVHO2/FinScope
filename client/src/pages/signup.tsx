@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import CaktoCheckoutModal from "@/components/CaktoCheckoutModal";
+import { apiFetch } from "@/lib/api";
 
 export default function SignupPage() {
   const [, setLocation] = useLocation();
@@ -32,7 +33,7 @@ export default function SignupPage() {
   async function onSubmit(data: InsertUser) {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/register", {
+      const response = await apiFetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

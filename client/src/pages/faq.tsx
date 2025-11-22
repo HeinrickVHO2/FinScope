@@ -15,16 +15,20 @@ export default function FAQPage() {
       a: "Sim, o FinScope possui separação completa entre contas PF e PJ, com categorias empresariais (incluindo MEI) dentro do mesmo painel.",
     },
     {
+      q: "Como funciona o planejamento de contas futuras?",
+      a: "Você cadastra cada despesa prevista (boletos, assinaturas, impostos) e o FinScope calcula o impacto no saldo. As ações “Aqui já foi pago” e “Marcar como atrasada” mantêm o planejamento atualizado.",
+    },
+    {
+      q: "O sistema calcula quanto dinheiro vai sobrar?",
+      a: "Sim. A Previsão de Caixa considera saldo atual, receitas previstas e contas futuras para mostrar o dinheiro livre esperado e a economia recomendada.",
+    },
+    {
       q: "Existe integração com bancos?",
-      a: "Está em desenvolvimento via Open Finance, planejado para próxima versão.",
+      a: "Estamos preparando o módulo de Open Finance. Enquanto isso, você importa CSV ou cadastra via automações Premium.",
     },
     {
-      q: "Meus dados ficam seguros?",
-      a: "O sistema foi construído com práticas de AppSec, criptografia e isolamento de dados.",
-    },
-    {
-      q: "Preciso inserir todas as transações manualmente?",
-      a: "Você pode cadastrar contas e movimentações manualmente, importar arquivos CSV ou usar as automações do plano Premium para categorizar e registrar lançamentos em lote.",
+      q: "Posso automatizar a categorização?",
+      a: "No Premium você cria regras automáticas que identificam palavras-chave e classificam as transações sozinhas.",
     },
     {
       q: "O FinScope funciona no celular?",
@@ -50,7 +54,7 @@ export default function FAQPage() {
     <div className="min-h-screen bg-white text-slate-900">
       <FinScopeHeader />
 
-      <main className="container py-24 max-w-4xl mx-auto space-y-16">
+      <main className="max-w-4xl mx-auto px-4 py-24 space-y-16">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}

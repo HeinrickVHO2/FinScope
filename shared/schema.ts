@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, timestamp, decimal, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { uuid, numeric } from "drizzle-orm/pg-core";
 
 // Users table with plan and trial information
 export const users = pgTable("users", {
@@ -40,7 +41,64 @@ export const transactions = pgTable("transactions", {
   date: timestamp("date").notNull(),
   accountType: text("account_type").notNull().default("PF"),
   autoRuleApplied: boolean("auto_rule_applied").default(false),
+  source: text("source").notNull().default("manual"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const futureExpenses = pgTable("future_expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  accountType: text("account_type").notNull().default("PF"),
+  title: text("title").notNull(),
+  category: text("category").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  isRecurring: boolean("is_recurring").default(false),
+  recurrenceType: text("recurrence_type"),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const futureTransactions = pgTable("future_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  type: text("type").notNull(), // 'income' | 'expense'
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  expectedDate: timestamp("expected_date").notNull(),
+  accountType: text("account_type").notNull().default("PF"),
+  status: text("status").notNull().default("pending"),
+  isScheduled: boolean("is_scheduled").notNull().default(false),
+  dueDate: timestamp("due_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const recurringTransactions = pgTable("recurring_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  type: text("type").notNull(),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  frequency: text("frequency").notNull(),
+  nextDate: timestamp("next_date").notNull(),
+  accountType: text("account_type").notNull().default("PF"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const aiMessages = pgTable("ai_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const aiReportSettings = pgTable("ai_report_settings", {
+  userId: varchar("user_id").primaryKey().notNull(),
+  focusEconomy: boolean("focus_economy").notNull().default(false),
+  focusDebt: boolean("focus_debt").notNull().default(false),
+  focusInvestments: boolean("focus_investments").notNull().default(false),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const businessProfiles = pgTable("business_profile", {
@@ -140,9 +198,80 @@ export const insertTransactionSchema = createInsertSchema(transactions, {
   category: z.string().min(1, "Categoria é obrigatória"),
   date: z.coerce.date(),
   accountType: z.enum(["PF", "PJ"]).default("PF"),
+  source: z.enum(["manual", "ai"]).default("manual"),
 }).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertFutureExpenseSchema = createInsertSchema(futureExpenses, {
+  title: z.string().min(1, "Título é obrigatório"),
+  category: z.string().min(1, "Categoria é obrigatória"),
+  amount: z.coerce.number().positive("Valor deve ser maior que zero").refine(
+    (val) => Number.isFinite(val) && Math.round(val * 100) === val * 100,
+    "Valor deve ter no máximo 2 casas decimais"
+  ),
+  dueDate: z.coerce.date(),
+  accountType: z.enum(["PF", "PJ"]),
+  isRecurring: z.boolean().default(false),
+  recurrenceType: z.enum(["monthly", "yearly"]).optional().nullable(),
+  status: z.enum(["pending", "paid", "overdue"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+});
+
+export const insertFutureTransactionSchema = createInsertSchema(futureTransactions, {
+  type: z.enum(["income", "expense"]),
+  description: z.string().min(1, "Descrição é obrigatória"),
+  amount: z.coerce.number().positive("Valor deve ser maior que zero").refine(
+    (val) => Number.isFinite(val) && Math.round(val * 100) === val * 100,
+    "Valor deve ter no máximo 2 casas decimais"
+  ),
+  expectedDate: z.coerce.date(),
+  accountType: z.enum(["PF", "PJ"]).default("PF"),
+  status: z.enum(["pending", "paid", "received"]).optional(),
+  isScheduled: z.boolean().optional(),
+  dueDate: z.coerce.date().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+});
+
+export const insertRecurringTransactionSchema = createInsertSchema(recurringTransactions, {
+  type: z.enum(["income", "expense"]),
+  description: z.string().min(1, "Descrição é obrigatória"),
+  amount: z.coerce.number().positive("Valor deve ser maior que zero").refine(
+    (val) => Number.isFinite(val) && Math.round(val * 100) === val * 100,
+    "Valor deve ter no máximo 2 casas decimais"
+  ),
+  frequency: z.enum(["monthly", "weekly"]),
+  nextDate: z.coerce.date(),
+  accountType: z.enum(["PF", "PJ"]).default("PF"),
+}).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+});
+
+export const insertAiMessageSchema = createInsertSchema(aiMessages, {
+  role: z.enum(["user", "assistant"]),
+  content: z.string().min(1, "Conteúdo é obrigatório"),
+}).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+});
+
+export const insertAiReportSettingSchema = createInsertSchema(aiReportSettings, {
+  focusEconomy: z.boolean().optional(),
+  focusDebt: z.boolean().optional(),
+  focusInvestments: z.boolean().optional(),
+}).omit({
+  userId: true,
+  updatedAt: true,
 });
 
 export const updateTransactionSchema = z.object({
@@ -155,6 +284,7 @@ export const updateTransactionSchema = z.object({
   category: z.string().min(1, "Categoria é obrigatória").optional(),
   date: z.coerce.date().optional(),
   accountType: z.enum(["PF", "PJ"]).optional(),
+  source: z.enum(["manual", "ai"]).optional(),
 }).strict();
 
 export const insertRuleSchema = createInsertSchema(rules, {
@@ -246,6 +376,21 @@ export type UpdateTransaction = z.infer<typeof updateTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type BusinessProfile = typeof businessProfiles.$inferSelect;
 
+export type InsertFutureExpense = z.infer<typeof insertFutureExpenseSchema> & { userId: string };
+export type FutureExpense = typeof futureExpenses.$inferSelect;
+
+export type InsertFutureTransaction = z.infer<typeof insertFutureTransactionSchema> & { userId: string };
+export type FutureTransaction = typeof futureTransactions.$inferSelect;
+
+export type InsertRecurringTransaction = z.infer<typeof insertRecurringTransactionSchema> & { userId: string };
+export type RecurringTransaction = typeof recurringTransactions.$inferSelect;
+
+export type InsertAiMessage = z.infer<typeof insertAiMessageSchema> & { userId: string };
+export type AiMessage = typeof aiMessages.$inferSelect;
+
+export type AiReportSetting = typeof aiReportSettings.$inferSelect;
+export type InsertAiReportSetting = z.infer<typeof insertAiReportSettingSchema> & { userId: string };
+
 export type InsertRule = z.infer<typeof insertRuleSchema> & {userID: string;};
 export type UpdateRule = z.infer<typeof updateRuleSchema>;
 export type Rule = typeof rules.$inferSelect;
@@ -293,3 +438,24 @@ export const INVESTMENT_TYPES = [
   { value: "renda_fixa", label: "Renda Fixa" },
   { value: "renda_variavel", label: "Renda Variável" },
 ] as const;
+
+export const futureBills = pgTable("future_bills", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull(),
+  title: text("title").notNull(),
+  amount: numeric("amount").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  type: text("type").$type<'PF' | 'PJ'>().notNull(),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+export const goals = pgTable("goals", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull(),
+  title: text("title").notNull(),
+  targetValue: numeric("target_value").notNull(),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+
+

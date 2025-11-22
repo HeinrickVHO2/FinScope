@@ -6,6 +6,7 @@ import { Check, ArrowLeft, Loader2, CreditCard, Clock3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { CHECKOUT_PLAN_OPTIONS, type CheckoutPlanId } from "@/constants/checkout-plans";
+import { apiFetch } from "@/lib/api";
 
 type CheckoutIntent = "signup" | "upgrade";
 
@@ -97,7 +98,7 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
     setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/checkout/create", {
+      const response = await apiFetch("/api/checkout/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

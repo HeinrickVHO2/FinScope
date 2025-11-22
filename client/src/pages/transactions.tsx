@@ -33,6 +33,8 @@ import ExportPdfPremiumModal from "@/components/ExportPdfPremiumModal";
 import UpgradeModal from "@/components/UpgradeModal";
 import { useDashboardView } from "@/context/dashboard-view";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
+import { Link } from "wouter";
 
 type Scope = "PF" | "PJ" | "ALL";
 
@@ -245,7 +247,7 @@ export default function TransactionsPage() {
     }
 
     try {
-      const response = await fetch("/api/export/pro", {
+      const response = await apiFetch("/api/export/pro", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -561,6 +563,31 @@ export default function TransactionsPage() {
           </Dialog>
         </div>
       </div>
+      <Card className="border-dashed border-indigo-200 bg-indigo-50/40">
+        <CardContent className="flex flex-col gap-4 pt-6 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <Badge variant="secondary" className="bg-indigo-600/10 text-indigo-700">Novo</Badge>
+            <h2 className="text-xl font-semibold text-slate-900">Registre gastos pelo chat inteligente</h2>
+            <p className="text-sm text-slate-600 max-w-2xl">
+              Descreva suas movimentações no Assistente AI e deixe o FinScope criar transações e valores previstos automaticamente.
+              O fluxo manual continua disponível no botão “Nova Transação”.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Link href="/ai">
+              <Button className="bg-indigo-600 hover:bg-indigo-500 text-white">
+                Abrir AI Client
+                <Badge variant="secondary" className="ml-2 bg-emerald-600/10 text-emerald-700">
+                  Recomendado
+                </Badge>
+              </Button>
+            </Link>
+            <div className="text-xs text-muted-foreground text-center sm:text-left">
+              Prefere digitar? Use o formulário “Nova Transação” abaixo.
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       </div>
 
       {/* Filters */}

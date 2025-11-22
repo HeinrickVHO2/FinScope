@@ -4,7 +4,7 @@ import { TrendingUp } from "lucide-react";
 export function FinScopeFooter() {
   return (
     <footer className="border-t py-12 bg-muted/20">
-      <div className="container">
+      <div className="max-w-6xl mx-auto px-4">
         <div className="grid md:grid-cols-4 gap-8">
           <div className="space-y-4">
             <div className="flex items-center gap-2">

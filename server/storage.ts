@@ -13,6 +13,14 @@ import {
   type InsertInvestmentGoal,
   type InvestmentTransaction,
   type InsertInvestmentTransaction,
+  type FutureExpense,
+  type InsertFutureExpense,
+  type FutureTransaction,
+  type InsertFutureTransaction,
+  type RecurringTransaction,
+  type InsertRecurringTransaction,
+  type AiReportSetting,
+  type InsertAiReportSetting,
   PLAN_LIMITS
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -21,6 +29,17 @@ import bcrypt from "bcrypt";
 // Internal types with numeric amounts for calculations
 type StoredAccount = Omit<Account, 'initialBalance'> & { initialBalance: number };
 type StoredTransaction = Omit<Transaction, 'amount'> & { amount: number };
+type StoredFutureTransaction = Omit<FutureTransaction, 'amount' | 'expectedDate' | 'createdAt' | 'dueDate'> & {
+  amount: number;
+  expectedDate: Date;
+  isScheduled: boolean;
+  dueDate: Date | null;
+  createdAt: Date;
+};
+type StoredRecurringTransaction = Omit<RecurringTransaction, 'amount' | 'nextDate'> & {
+  amount: number;
+  nextDate: Date;
+};
 type AccountScope = "PF" | "PJ" | "ALL";
 
 const matchesScope = (accountType: string, scope: AccountScope) => {
@@ -48,7 +67,7 @@ export interface IStorage {
   getTransactionsByUserId(userId: string, scope?: AccountScope): Promise<Transaction[]>;
   getTransactionsByAccountId(accountId: string): Promise<Transaction[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
-  updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ" }): Promise<Transaction | undefined>;
+  updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ"; source?: "manual" | "ai" }): Promise<Transaction | undefined>;
   deleteTransaction(id: string): Promise<boolean>;
 
   // Rule operations
@@ -91,6 +110,16 @@ export interface IStorage {
     income: number;
     expenses: number;
   }>;
+  // Future expenses
+  getFutureExpenses(userId: string, scope?: AccountScope, status?: "pending" | "paid" | "overdue"): Promise<FutureExpense[]>;
+  createFutureExpense(expense: InsertFutureExpense): Promise<FutureExpense>;
+  updateFutureExpenseStatus(id: string, userId: string, status: "pending" | "paid" | "overdue"): Promise<FutureExpense | undefined>;
+  getFutureTransactions(userId: string, scope?: AccountScope, status?: "pending" | "paid" | "received"): Promise<FutureTransaction[]>;
+  createFutureTransaction(tx: InsertFutureTransaction): Promise<FutureTransaction>;
+  getRecurringTransactions(userId: string, scope?: AccountScope): Promise<RecurringTransaction[]>;
+  createRecurringTransaction(tx: InsertRecurringTransaction): Promise<RecurringTransaction>;
+  getAiReportSettings(userId: string): Promise<AiReportSetting | undefined>;
+  upsertAiReportSettings(userId: string, settings: InsertAiReportSetting): Promise<AiReportSetting>;
 }
 
 // MemStorage is deprecated - use SupabaseStorage instead
@@ -98,12 +127,20 @@ export class MemStorage {
   private users: Map<string, User>;
   private accounts: Map<string, StoredAccount>;
   private transactions: Map<string, StoredTransaction>;
+  private futureExpenses: Map<string, FutureExpense>;
+  private recurringTransactions: Map<string, StoredRecurringTransaction>;
+  private futureTransactions: Map<string, StoredFutureTransaction>;
+  private aiReportSettings: Map<string, AiReportSetting>;
   private rules: Map<string, Rule>;
 
   constructor() {
     this.users = new Map();
     this.accounts = new Map();
     this.transactions = new Map();
+    this.futureExpenses = new Map();
+    this.recurringTransactions = new Map();
+    this.futureTransactions = new Map();
+    this.aiReportSettings = new Map();
     this.rules = new Map();
   }
 
@@ -126,6 +163,24 @@ export class MemStorage {
     return {
       ...transaction,
       amount: transaction.amount.toFixed(2),
+    };
+  }
+
+  private toApiRecurringTransaction(record: RecurringTransaction & { amount: number; nextDate: Date }): RecurringTransaction {
+    return {
+      ...record,
+      amount: record.amount.toFixed(2),
+      nextDate: record.nextDate,
+    };
+  }
+
+  private toApiFutureTransaction(transaction: StoredFutureTransaction): FutureTransaction {
+    return {
+      ...transaction,
+      amount: transaction.amount.toFixed(2),
+      expectedDate: transaction.expectedDate,
+      dueDate: transaction.dueDate ?? null,
+      createdAt: transaction.createdAt,
     };
   }
 
@@ -294,6 +349,7 @@ export class MemStorage {
       date: insertTransaction.date,
       accountType: insertTransaction.accountType ?? "PF",
       autoRuleApplied,
+      source: insertTransaction.source ?? "manual",
       createdAt: new Date(),
     };
 
@@ -301,7 +357,7 @@ export class MemStorage {
     return this.toApiTransaction(transaction);
   }
 
-  async updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ" }): Promise<Transaction | undefined> {
+  async updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ"; source?: "manual" | "ai" }): Promise<Transaction | undefined> {
     const transaction = this.transactions.get(id);
     if (!transaction) return undefined;
 
@@ -429,6 +485,129 @@ export class MemStorage {
       income: Number(income.toFixed(2)),
       expenses: Number(expenses.toFixed(2)),
     };
+  }
+
+  async getFutureExpenses(userId: string, scope: AccountScope = "ALL", status?: "pending" | "paid" | "overdue") {
+    return Array.from(this.futureExpenses.values()).filter((expense) => {
+      if (expense.userId !== userId) return false;
+      if (scope !== "ALL" && (expense.accountType || "PF").toUpperCase() !== scope) {
+        return false;
+      }
+      if (status && expense.status !== status) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  async createFutureExpense(expense: InsertFutureExpense): Promise<FutureExpense> {
+    const id = randomUUID();
+    const record: FutureExpense = {
+      id,
+      userId: expense.userId,
+      accountType: expense.accountType,
+      title: expense.title,
+      category: expense.category,
+      amount: expense.amount.toString(),
+      dueDate: expense.dueDate,
+      isRecurring: Boolean(expense.isRecurring),
+      recurrenceType: expense.recurrenceType ?? null,
+      status: expense.status || "pending",
+      createdAt: new Date(),
+    };
+    this.futureExpenses.set(id, record);
+    return record;
+  }
+
+  async updateFutureExpenseStatus(id: string, userId: string, status: "pending" | "paid" | "overdue") {
+    const existing = this.futureExpenses.get(id);
+    if (!existing || existing.userId !== userId) {
+      return undefined;
+    }
+    const updated: FutureExpense = { ...existing, status };
+    this.futureExpenses.set(id, updated);
+    return updated;
+  }
+
+  async getFutureTransactions(userId: string, scope: AccountScope = "ALL", status?: "pending" | "paid" | "received") {
+    return Array.from(this.futureTransactions.values())
+      .filter((tx) => {
+        if (tx.userId !== userId) return false;
+        if (scope !== "ALL" && (tx.accountType || "PF").toUpperCase() !== scope) return false;
+        if (status && tx.status !== status) return false;
+        return true;
+      })
+      .sort((a, b) => b.expectedDate.getTime() - a.expectedDate.getTime())
+      .map((tx) => this.toApiFutureTransaction(tx));
+  }
+
+  async createFutureTransaction(tx: InsertFutureTransaction): Promise<FutureTransaction> {
+    const id = randomUUID();
+    const record: StoredFutureTransaction = {
+      id,
+      userId: tx.userId,
+      type: tx.type,
+      description: tx.description,
+      amount: tx.amount,
+      expectedDate: tx.expectedDate,
+      accountType: tx.accountType ?? "PF",
+      status: tx.status || "pending",
+      isScheduled: Boolean(tx.isScheduled),
+      dueDate: tx.dueDate ?? tx.expectedDate,
+      createdAt: new Date(),
+    };
+    this.futureTransactions.set(id, record);
+    return this.toApiFutureTransaction(record);
+  }
+
+  async getRecurringTransactions(userId: string, scope: AccountScope = "ALL") {
+    return Array.from(this.recurringTransactions.values())
+      .filter((item) => {
+        if (item.userId !== userId) return false;
+        if (scope !== "ALL" && (item.accountType || "PF").toUpperCase() !== scope) {
+          return false;
+        }
+        return true;
+      })
+      .map((item) => this.toApiRecurringTransaction(item));
+  }
+
+  async createRecurringTransaction(tx: InsertRecurringTransaction): Promise<RecurringTransaction> {
+    const id = randomUUID();
+    const record: StoredRecurringTransaction = {
+      id,
+      userId: tx.userId,
+      type: tx.type,
+      description: tx.description,
+      amount: tx.amount,
+      frequency: tx.frequency,
+      nextDate: tx.nextDate,
+      accountType: tx.accountType ?? "PF",
+      createdAt: new Date(),
+    };
+    this.recurringTransactions.set(id, record);
+    return this.toApiRecurringTransaction(record);
+  }
+
+  async getAiReportSettings(userId: string): Promise<AiReportSetting | undefined> {
+    return this.aiReportSettings.get(userId);
+  }
+
+  async upsertAiReportSettings(userId: string, settings: InsertAiReportSetting): Promise<AiReportSetting> {
+    const existing = this.aiReportSettings.get(userId) || {
+      userId,
+      focusEconomy: false,
+      focusDebt: false,
+      focusInvestments: false,
+      updatedAt: new Date(),
+    };
+    const updated = {
+      ...existing,
+      ...settings,
+      updatedAt: new Date(),
+    };
+    this.aiReportSettings.set(userId, updated);
+    return updated;
   }
 }
 

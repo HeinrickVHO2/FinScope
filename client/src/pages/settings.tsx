@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BillingCheckoutSection } from "@/components/BillingCheckoutSection";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { CheckoutPlanId } from "@/constants/checkout-plans";
+import { apiFetch } from "@/lib/api";
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -131,7 +132,7 @@ export default function SettingsPage() {
       const field = confirmField;
       setConfirmField(null);
       setIsUpdatingProfile(true);
-      const response = await fetch("/api/user/profile", {
+      const response = await apiFetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

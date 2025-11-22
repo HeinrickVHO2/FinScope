@@ -11,6 +11,7 @@ import { loginSchema, type LoginData } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { apiFetch } from "@/lib/api";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -29,7 +30,7 @@ export default function LoginPage() {
   async function onSubmit(data: LoginData) {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await apiFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

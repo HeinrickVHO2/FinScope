@@ -13,13 +13,79 @@ import {
   type InsertInvestmentGoal,
   type InvestmentTransaction,
   type InsertInvestmentTransaction,
+  type FutureExpense,
+  type InsertFutureExpense,
+  type FutureTransaction,
+  type InsertFutureTransaction,
+  type RecurringTransaction,
+  type InsertRecurringTransaction,
+  type AiReportSetting,
+  type InsertAiReportSetting,
   PLAN_LIMITS
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { supabase } from "./supabase";
 import type { IStorage } from "./storage";
 
+type AccountScope = "PF" | "PJ" | "ALL";
+
 export class SupabaseStorage implements IStorage {
+  private mapFutureExpenseRow(row: any): FutureExpense {
+    return {
+      id: row.id,
+      userId: row.user_id,
+      accountType: row.account_type,
+      title: row.title,
+      category: row.category,
+      amount: row.amount?.toString() ?? "0",
+      dueDate: row.due_date ? new Date(row.due_date) : new Date(),
+      isRecurring: Boolean(row.is_recurring),
+      recurrenceType: row.recurrence_type,
+      status: row.status,
+      createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+    };
+  }
+
+  private mapFutureTransactionRow(row: any): FutureTransaction {
+    return {
+      id: row.id,
+      userId: row.user_id,
+      type: row.type,
+      description: row.description,
+      amount: row.amount?.toString() ?? "0",
+      expectedDate: row.expected_date ? new Date(row.expected_date) : new Date(),
+      accountType: row.account_type ?? "PF",
+      status: row.status ?? "pending",
+      isScheduled: Boolean(row.is_scheduled),
+      dueDate: row.due_date ? new Date(row.due_date) : row.expected_date ? new Date(row.expected_date) : null,
+      createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+    };
+  }
+
+  private mapRecurringTransactionRow(row: any): RecurringTransaction {
+    return {
+      id: row.id,
+      userId: row.user_id,
+      type: row.type,
+      description: row.description,
+      amount: row.amount?.toString() ?? "0",
+      frequency: row.frequency,
+      nextDate: row.next_date ? new Date(row.next_date) : new Date(),
+      accountType: row.account_type ?? "PF",
+      createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+    };
+  }
+
+  private mapAiReportSettingRow(row: any): AiReportSetting {
+    if (!row) return undefined as any;
+    return {
+      userId: row.user_id,
+      focusEconomy: Boolean(row.focus_economy),
+      focusDebt: Boolean(row.focus_debt),
+      focusInvestments: Boolean(row.focus_investments),
+      updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(),
+    };
+  }
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     const { data, error } = await supabase
@@ -326,6 +392,7 @@ export class SupabaseStorage implements IStorage {
       date: new Date(row.date),
       accountType: row.account_type ?? "PF",
       autoRuleApplied: row.auto_rule_applied,
+      source: row.source ?? "manual",
       createdAt: new Date(row.created_at),
     }));
   }
@@ -350,6 +417,7 @@ export class SupabaseStorage implements IStorage {
       date: new Date(row.date),
       accountType: row.account_type ?? "PF",
       autoRuleApplied: row.auto_rule_applied,
+      source: row.source ?? "manual",
       createdAt: new Date(row.created_at),
     }));
   }
@@ -384,6 +452,7 @@ export class SupabaseStorage implements IStorage {
         date: insertTransaction.date.toISOString(),
         account_type: insertTransaction.accountType ?? "PF",
         auto_rule_applied: autoRuleApplied,
+        source: insertTransaction.source ?? "manual",
       })
       .select()
       .single();
@@ -403,11 +472,12 @@ export class SupabaseStorage implements IStorage {
       date: new Date(data.date),
       accountType: data.account_type ?? "PF",
       autoRuleApplied: data.auto_rule_applied,
+      source: data.source ?? "manual",
       createdAt: new Date(data.created_at),
     };
   }
 
-  async updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ" }): Promise<Transaction | undefined> {
+  async updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ"; source?: "manual" | "ai" }): Promise<Transaction | undefined> {
     const updateData: any = {};
     if (updates.description !== undefined) updateData.description = updates.description;
     if (updates.type !== undefined) updateData.type = updates.type;
@@ -416,6 +486,9 @@ export class SupabaseStorage implements IStorage {
     if (updates.date !== undefined) updateData.date = updates.date.toISOString();
     if (updates.accountType !== undefined) {
       updateData.account_type = updates.accountType;
+    }
+    if (updates.source !== undefined) {
+      updateData.source = updates.source;
     }
 
     const { data, error } = await supabase
@@ -437,6 +510,8 @@ export class SupabaseStorage implements IStorage {
       category: data.category,
       date: new Date(data.date),
       autoRuleApplied: data.auto_rule_applied,
+      accountType: data.account_type ?? "PF",
+      source: data.source ?? "manual",
       createdAt: new Date(data.created_at),
     };
   }
@@ -927,5 +1002,177 @@ export class SupabaseStorage implements IStorage {
       income: Number(income.toFixed(2)),
       expenses: Number(expenses.toFixed(2)),
     };
+  }
+
+  async getFutureExpenses(userId: string, scope: AccountScope = "ALL", status?: "pending" | "paid" | "overdue"): Promise<FutureExpense[]> {
+    let query = supabase
+      .from("future_expenses")
+      .select("*")
+      .eq("user_id", userId)
+      .order("due_date", { ascending: true });
+
+    if (scope && scope !== "ALL") {
+      query = query.eq("account_type", scope);
+    }
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) return [];
+    return data.map((row) => this.mapFutureExpenseRow(row));
+  }
+
+  async createFutureExpense(expense: InsertFutureExpense): Promise<FutureExpense> {
+    const { data, error } = await supabase
+      .from("future_expenses")
+      .insert({
+        user_id: expense.userId,
+        account_type: expense.accountType,
+        title: expense.title,
+        category: expense.category,
+        amount: expense.amount,
+        due_date: expense.dueDate.toISOString(),
+        is_recurring: expense.isRecurring ?? false,
+        recurrence_type: expense.recurrenceType ?? null,
+        status: expense.status || "pending",
+      })
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new Error(error?.message || "Erro ao cadastrar conta a pagar");
+    }
+
+    return this.mapFutureExpenseRow(data);
+  }
+
+  async updateFutureExpenseStatus(id: string, userId: string, status: "pending" | "paid" | "overdue") {
+    const { data, error } = await supabase
+      .from("future_expenses")
+      .update({ status })
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    if (error || !data) return undefined;
+    return this.mapFutureExpenseRow(data);
+  }
+
+  async getFutureTransactions(userId: string, scope: AccountScope = "ALL", status?: "pending" | "paid" | "received"): Promise<FutureTransaction[]> {
+    let query = supabase
+      .from("future_transactions")
+      .select("*")
+      .eq("user_id", userId)
+      .order("expected_date", { ascending: true });
+
+    if (scope && scope !== "ALL") {
+      query = query.eq("account_type", scope);
+    }
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) return [];
+    return data.map((row) => this.mapFutureTransactionRow(row));
+  }
+
+  async createFutureTransaction(tx: InsertFutureTransaction): Promise<FutureTransaction> {
+    const { data, error } = await supabase
+      .from("future_transactions")
+      .insert({
+        user_id: tx.userId,
+        type: tx.type,
+        description: tx.description,
+        amount: tx.amount,
+        expected_date: tx.expectedDate.toISOString(),
+        account_type: tx.accountType ?? "PF",
+        status: tx.status || "pending",
+        is_scheduled: Boolean(tx.isScheduled),
+        due_date: (tx.dueDate ?? tx.expectedDate).toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new Error(error?.message || "Erro ao cadastrar valor previsto");
+    }
+
+    return this.mapFutureTransactionRow(data);
+  }
+
+  async getRecurringTransactions(userId: string, scope: AccountScope = "ALL"): Promise<RecurringTransaction[]> {
+    let query = supabase
+      .from("recurring_transactions")
+      .select("*")
+      .eq("user_id", userId)
+      .order("next_date", { ascending: true });
+
+    if (scope && scope !== "ALL") {
+      query = query.eq("account_type", scope);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) return [];
+    return data.map((row) => this.mapRecurringTransactionRow(row));
+  }
+
+  async createRecurringTransaction(tx: InsertRecurringTransaction): Promise<RecurringTransaction> {
+    const { data, error } = await supabase
+      .from("recurring_transactions")
+      .insert({
+        user_id: tx.userId,
+        type: tx.type,
+        description: tx.description,
+        amount: tx.amount,
+        frequency: tx.frequency,
+        next_date: tx.nextDate.toISOString(),
+        account_type: tx.accountType ?? "PF",
+      })
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new Error(error?.message || "Erro ao cadastrar recorrência");
+    }
+
+    return this.mapRecurringTransactionRow(data);
+  }
+
+  async getAiReportSettings(userId: string): Promise<AiReportSetting | undefined> {
+    const { data, error } = await supabase
+      .from("ai_report_settings")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !data) return undefined;
+    return this.mapAiReportSettingRow(data);
+  }
+
+  async upsertAiReportSettings(userId: string, settings: InsertAiReportSetting): Promise<AiReportSetting> {
+    const payload = {
+      focus_economy: settings.focusEconomy ?? false,
+      focus_debt: settings.focusDebt ?? false,
+      focus_investments: settings.focusInvestments ?? false,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from("ai_report_settings")
+      .upsert({
+        user_id: userId,
+        ...payload,
+      })
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new Error(error?.message || "Erro ao salvar preferências de relatório");
+    }
+
+    return this.mapAiReportSettingRow(data);
   }
 }

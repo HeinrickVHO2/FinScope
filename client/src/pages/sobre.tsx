@@ -1,7 +1,7 @@
 import { FinScopeHeader } from "@/components/site/FinScopeHeader";
 import { FinScopeFooter } from "@/components/site/FinScopeFooter";
 import { motion } from "framer-motion";
-import { Shield, TrendingUp, Users } from "lucide-react";
+import { Shield, TrendingUp, Users, CalendarClock, BarChart3 } from "lucide-react";
 
 export default function SobrePage() {
   return (
@@ -13,7 +13,7 @@ export default function SobrePage() {
           <div className="absolute -top-24 right-10 h-72 w-72 bg-primary/25 blur-3xl rounded-full opacity-40" />
         </div>
 
-        <section className="container py-24 max-w-5xl mx-auto space-y-20">
+        <section className="max-w-5xl mx-auto px-4 py-24 space-y-20">
 
           <motion.div
             initial={{ opacity: 0, y: 14 }}
@@ -51,6 +51,20 @@ export default function SobrePage() {
               <h3 className="font-semibold text-lg">Segurança Primeiro</h3>
               <p className="text-slate-600 text-sm">
                 Construído com princípios de AppSec e proteção de dados desde o design.
+              </p>
+            </div>
+            <div className="text-center space-y-3">
+              <CalendarClock className="h-10 w-10 text-primary mx-auto" />
+              <h3 className="font-semibold text-lg">Planejamento real</h3>
+              <p className="text-slate-600 text-sm">
+                O FinScope nasceu para acabar com a planilha improvisada de contas futuras e mostrar cenários com semanas de antecedência.
+              </p>
+            </div>
+            <div className="text-center space-y-3">
+              <BarChart3 className="h-10 w-10 text-primary mx-auto" />
+              <h3 className="font-semibold text-lg">Visão de longo prazo</h3>
+              <p className="text-slate-600 text-sm">
+                Saldo previsto, relatórios automáticos e recomendações de economia incorporados ao produto.
               </p>
             </div>
           </div>
