@@ -280,7 +280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     createdAt: row?.created_at || row?.createdAt || new Date().toISOString(),
   });
 
-  const convertExpenseToFuture = (expense: FutureExpense): FutureTransaction => ({
+  const convertExpenseToFuture = (expense: any): FutureTransaction => ({
     id: `expense-${expense.id}`,
     userId: expense.userId,
     type: "expense",
@@ -451,7 +451,9 @@ Descrição: ${description}${scheduledNote}`;
       const rawIndex = match.index;
       const tokens = normalized.slice(0, rawIndex).trim().split(/\s+/);
       const prevWord = tokens[tokens.length - 1] || "";
-      if (prevWord.replace(/[^\p{L}]/gu, "").startsWith("dia")) {
+      // eslint-disable-next-line @typescript-eslint/no-control-regex
+      const prevWordClean = prevWord.replace(/[^\p{L}]/gu, "");
+      if (prevWordClean.startsWith("dia")) {
         continue;
       }
       const raw = match[1].replace(/\./g, "").replace(",", ".");
@@ -1165,7 +1167,7 @@ type AiInterpretationResult =
       }
       return data
         .map((row) => ({
-          role: row.role === "assistant" ? "assistant" : "user",
+          role: (row.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
           content: row.content || "",
         }))
         .reverse();
@@ -1223,7 +1225,7 @@ type AiInterpretationResult =
         };
       }
 
-      const completion = await response.json();
+      const completion = (await response.json()) as any;
       const rawContent = completion?.choices?.[0]?.message?.content?.trim();
       if (!rawContent) {
         return {
@@ -1431,7 +1433,7 @@ type AiInterpretationResult =
         storage.getCategoryBreakdown(req.session.userId, scope),
       ]);
 
-      const insights = includeInsights ? buildPremiumInsights(transactions) : [];
+      const insights = includeInsights ? buildPremiumInsights(transactions as any) : [];
       const chartImage = includeCharts ? buildChartImage(categories) : null;
       const [forecast, aiInsights] = await Promise.all([
         computeCashflowForecast(req.session.userId, scope),
@@ -1453,7 +1455,7 @@ type AiInterpretationResult =
 
       const protocolTimeout = Number(process.env.PUPPETEER_PROTOCOL_TIMEOUT || "90000");
       const browser = await puppeteer.launch({
-        headless: "new",
+        headless: true,
         executablePath: puppeteerExecutable ?? undefined,
         protocolTimeout,
         args: [
@@ -2046,12 +2048,8 @@ type AiInterpretationResult =
         })
         .map((tx) => {
           const category = (tx as any)?.category || "Outros";
-          const amountValue =
-            typeof tx.amount === "number"
-              ? tx.amount.toFixed(2)
-              : typeof tx.amount === "string"
-              ? tx.amount
-              : Number(tx.amount || 0).toFixed(2);
+          const amountNum = typeof tx.amount === "number" ? tx.amount : Number(tx.amount || 0);
+          const amountValue = amountNum.toFixed(2);
           return {
             id: `scheduled-${tx.id}`,
             userId: tx.userId,
@@ -2412,7 +2410,7 @@ INSTRUÇÕES:
             }),
           });
           if (response.ok) {
-            const completion = await response.json();
+            const completion = (await response.json()) as any;
             assistantText = completion?.choices?.[0]?.message?.content?.trim() || "Desculpa, não consegui responder agora.";
             if (isDevMode) console.log(`[AI QUESTION] Respondido: "${assistantText}"`);
             return await sendAssistantResponse();
@@ -2721,8 +2719,14 @@ INSTRUÇÕES:
 
   app.get("/api/ai/report/settings", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
     try {
-      const settings =
-        (await storage.getAiReportSettings(req.session.userId)) || (await storage.upsertAiReportSettings(req.session.userId, {}));
+      const existingSettings = await storage.getAiReportSettings(req.session.userId);
+      const settings = existingSettings || 
+        (await storage.upsertAiReportSettings(req.session.userId, {
+          userId: req.session.userId,
+          focusEconomy: false,
+          focusDebt: false,
+          focusInvestments: false,
+        }));
       res.json({
         focusEconomy: Boolean(settings.focusEconomy),
         focusDebt: Boolean(settings.focusDebt),
@@ -2736,8 +2740,11 @@ INSTRUÇÕES:
 
   app.put("/api/ai/report/settings", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
     try {
-      const payload = insertAiReportSettingSchema.partial().parse(req.body || {});
-      const updated = await storage.upsertAiReportSettings(req.session.userId, payload);
+      const payload = insertAiReportSettingSchema.partial().parse({
+        userId: req.session.userId,
+        ...(req.body || {}),
+      } as any);
+      const updated = await storage.upsertAiReportSettings(req.session.userId, payload as any);
       res.json({
         focusEconomy: Boolean(updated.focusEconomy),
         focusDebt: Boolean(updated.focusDebt),
@@ -2783,9 +2790,9 @@ INSTRUÇÕES:
     try {
       const data = insertRuleSchema.parse({
         ...req.body,
-        userId: req.session.userId,
-      });
-      const rule = await storage.createRule(data);
+        userID: req.session.userId,
+      } as any);
+      const rule = await storage.createRule(data as any);
       res.json(rule);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -3973,7 +3980,7 @@ function escapeHtml(value: string) {
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-  async function calculateAiProjections(userId: string, scope: AccountScope) {
+  async function calculateAiProjections(userId: string, scope: "PF" | "PJ" | "ALL") {
     const metrics = await storage.getDashboardMetrics(userId, scope);
     const futureTransactions = await storage.getFutureTransactions(userId, scope, "pending");
     const recurring = await storage.getRecurringTransactions(userId, scope);
@@ -4006,7 +4013,7 @@ function escapeHtml(value: string) {
     };
   }
 
-  async function computeCashflowForecast(userId: string, scope: AccountScope) {
+  async function computeCashflowForecast(userId: string, scope: "PF" | "PJ" | "ALL") {
     const metrics = await storage.getDashboardMetrics(userId, scope);
     const transactions = await storage.getTransactionsByUserId(userId, scope);
     const futureExpenses = await storage.getFutureExpenses(userId, scope, "pending");
