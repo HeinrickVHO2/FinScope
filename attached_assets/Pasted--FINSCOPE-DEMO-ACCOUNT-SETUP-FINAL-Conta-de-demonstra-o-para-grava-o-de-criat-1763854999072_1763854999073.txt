@@ -1,0 +1,279 @@
+-- ===== FINSCOPE - DEMO ACCOUNT SETUP (FINAL) =====
+-- Conta de demonstração para gravação de criativos
+-- UUIDs geradas automaticamente + tipos corretos
+
+-- 1. Criar usuário Premium
+INSERT INTO users (
+  email,
+  password,
+  full_name,
+  plan,
+  billing_status,
+  trial_start,
+  trial_end
+) VALUES (
+  'demo.usuario@finscope.com.br',
+  '$2b$10$eORUmS8sfFbQLZtt3hb66ex/7jrgv4EBJgEb2U.FZYm5ZmoQSneHG',
+  'Marina Silva',
+  'premium',
+  'active',
+  NOW(),
+  NOW() + INTERVAL '30 days'
+);
+
+-- 2. Criar contas (PF e PJ)
+INSERT INTO accounts (
+  user_id,
+  name,
+  type,
+  initial_balance
+)
+SELECT
+  id,
+  'Conta Pessoal - Marina',
+  'pf',
+  15840.50::numeric
+FROM users WHERE email = 'demo.usuario@finscope.com.br'
+UNION ALL
+SELECT
+  id,
+  'Studio de Design',
+  'pj',
+  32400.75::numeric
+FROM users WHERE email = 'demo.usuario@finscope.com.br';
+
+-- 3. Criar investimentos diversificados
+INSERT INTO investments (
+  user_id,
+  name,
+  type,
+  current_amount
+)
+SELECT
+  id,
+  'Fundo de Emergência',
+  'reserva_emergencia',
+  '5000.00'
+FROM users WHERE email = 'demo.usuario@finscope.com.br'
+UNION ALL
+SELECT
+  id,
+  'CDB Bradesco 105% CDI',
+  'cdb',
+  '10000.00'
+FROM users WHERE email = 'demo.usuario@finscope.com.br'
+UNION ALL
+SELECT
+  id,
+  'Tesouro Selic 2025',
+  'renda_fixa',
+  '8500.00'
+FROM users WHERE email = 'demo.usuario@finscope.com.br'
+UNION ALL
+SELECT
+  id,
+  'Carteira de Ações - Tech',
+  'renda_variavel',
+  '25000.00'
+FROM users WHERE email = 'demo.usuario@finscope.com.br';
+
+-- 4. Criar metas de investimentos
+INSERT INTO investment_goals (
+  user_id,
+  investment_id,
+  target_amount
+)
+SELECT
+  u.id,
+  i.id,
+  CASE 
+    WHEN i.name = 'Fundo de Emergência' THEN '10000.00'
+    WHEN i.name = 'CDB Bradesco 105% CDI' THEN '20000.00'
+    WHEN i.name = 'Carteira de Ações - Tech' THEN '50000.00'
+    ELSE '0.00'
+  END
+FROM users u
+CROSS JOIN investments i
+WHERE u.email = 'demo.usuario@finscope.com.br'
+  AND i.user_id = u.id
+  AND i.name IN ('Fundo de Emergência', 'CDB Bradesco 105% CDI', 'Carteira de Ações - Tech');
+
+-- 5. Criar contas a pagar (future_expenses)
+INSERT INTO future_expenses (
+  user_id,
+  title,
+  category,
+  amount,
+  due_date,
+  account_type,
+  status,
+  is_recurring
+)
+SELECT
+  u.id,
+  'Aluguel - Apartamento',
+  'Habitação',
+  '2800.00',
+  NOW() + INTERVAL '5 days',
+  'pf',
+  'pending',
+  true
+FROM users u WHERE u.email = 'demo.usuario@finscope.com.br'
+UNION ALL
+SELECT
+  u.id,
+  'Internet Empresarial',
+  'Internet',
+  '350.00',
+  NOW() + INTERVAL '8 days',
+  'pj',
+  'pending',
+  true
+FROM users u WHERE u.email = 'demo.usuario@finscope.com.br'
+UNION ALL
+SELECT
+  u.id,
+  'Conta Energia Elétrica',
+  'Utilidades',
+  '450.00',
+  NOW() + INTERVAL '12 days',
+  'pf',
+  'pending',
+  true
+FROM users u WHERE u.email = 'demo.usuario@finscope.com.br'
+UNION ALL
+SELECT
+  u.id,
+  'Adobe Creative Cloud',
+  'Software',
+  '85.90',
+  NOW() + INTERVAL '15 days',
+  'pj',
+  'pending',
+  true
+FROM users u WHERE u.email = 'demo.usuario@finscope.com.br'
+UNION ALL
+SELECT
+  u.id,
+  'DAS - Contribuição Social',
+  'Impostos',
+  '585.00',
+  NOW() + INTERVAL '20 days',
+  'pj',
+  'pending',
+  false
+FROM users u WHERE u.email = 'demo.usuario@finscope.com.br';
+
+-- 6. Criar transações (últimos 2 meses)
+INSERT INTO transactions (
+  user_id,
+  account_id,
+  description,
+  type,
+  amount,
+  category,
+  date,
+  account_type,
+  source
+)
+SELECT
+  u.id,
+  a.id,
+  'Salário - Contrato CLT',
+  'entrada',
+  '6500.00',
+  'Salário',
+  NOW() - INTERVAL '25 days',
+  'pf',
+  'manual'
+FROM users u
+CROSS JOIN accounts a
+WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pf' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Projeto de Design - Cliente', 'entrada', '1800.00', 'Freelance', NOW() - INTERVAL '20 days', 'pf', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pf' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Supermercado Carrefour', 'saida', '285.50', 'Alimentação', NOW() - INTERVAL '22 days', 'pf', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pf' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Mensalidade Academia Smart Fit', 'saida', '120.00', 'Saúde', NOW() - INTERVAL '18 days', 'pf', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pf' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Uber - Deslocamento', 'saida', '45.80', 'Transporte', NOW() - INTERVAL '15 days', 'pf', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pf' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Netflix Premium', 'saida', '44.90', 'Entretenimento', NOW() - INTERVAL '10 days', 'pf', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pf' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Farmácia Drogasil - Remédios', 'saida', '125.30', 'Saúde', NOW() - INTERVAL '8 days', 'pf', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pf' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Faturamento - Projeto Identidade Visual', 'entrada', '4500.00', 'Faturamento / Receitas', NOW() - INTERVAL '23 days', 'pj', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pj' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Faturamento - Website Institucional', 'entrada', '8200.00', 'Faturamento / Receitas', NOW() - INTERVAL '16 days', 'pj', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pj' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Hospedagem Web - Hostgator', 'saida', '79.90', 'Software', NOW() - INTERVAL '21 days', 'pj', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pj' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Taxa Bancária - Manutenção Conta', 'saida', '35.00', 'Taxas', NOW() - INTERVAL '19 days', 'pj', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pj' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Stock Photos - Unsplash Premium', 'saida', '99.00', 'Fornecedores', NOW() - INTERVAL '14 days', 'pj', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pj' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'IRPF - Arredondamento', 'saida', '450.00', 'Impostos', NOW() - INTERVAL '12 days', 'pj', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pj' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Almoço - Restaurante Italia', 'saida', '89.50', 'Alimentação', NOW() - INTERVAL '5 days', 'pf', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pf' AND a.user_id = u.id
+UNION ALL
+SELECT u.id, a.id, 'Livro - Cashflow Quadrante', 'saida', '67.80', 'Educação', NOW() - INTERVAL '3 days', 'pf', 'manual'
+FROM users u CROSS JOIN accounts a WHERE u.email = 'demo.usuario@finscope.com.br' AND a.type = 'pf' AND a.user_id = u.id;
+
+-- 7. Criar transações futuras agendadas
+INSERT INTO future_transactions (
+  user_id,
+  type,
+  description,
+  amount,
+  expected_date,
+  account_type,
+  status,
+  is_scheduled,
+  due_date
+)
+SELECT
+  u.id,
+  'income',
+  'Salário Dezembro - CLT',
+  '6500.00',
+  NOW() + INTERVAL '35 days',
+  'pf',
+  'pending',
+  true,
+  NOW() + INTERVAL '35 days'
+FROM users u WHERE u.email = 'demo.usuario@finscope.com.br'
+UNION ALL
+SELECT u.id, 'income', '13º Salário', '6500.00', NOW() + INTERVAL '40 days', 'pf', 'pending', true, NOW() + INTERVAL '40 days'
+FROM users u WHERE u.email = 'demo.usuario@finscope.com.br'
+UNION ALL
+SELECT u.id, 'income', 'Faturamento - App Mobile', '12000.00', NOW() + INTERVAL '25 days', 'pj', 'pending', true, NOW() + INTERVAL '25 days'
+FROM users u WHERE u.email = 'demo.usuario@finscope.com.br';
+
+-- ===== VERIFICAÇÃO FINAL =====
+SELECT 'DADOS CRIADOS COM SUCESSO!' AS resultado;
+SELECT 'Usuários' as tipo, COUNT(*) as qtd FROM users WHERE email = 'demo.usuario@finscope.com.br'
+UNION ALL
+SELECT 'Contas', COUNT(*) FROM accounts WHERE user_id = (SELECT id FROM users WHERE email = 'demo.usuario@finscope.com.br')
+UNION ALL
+SELECT 'Investimentos', COUNT(*) FROM investments WHERE user_id = (SELECT id FROM users WHERE email = 'demo.usuario@finscope.com.br')
+UNION ALL
+SELECT 'Metas', COUNT(*) FROM investment_goals WHERE user_id = (SELECT id FROM users WHERE email = 'demo.usuario@finscope.com.br')
+UNION ALL
+SELECT 'Contas a Pagar', COUNT(*) FROM future_expenses WHERE user_id = (SELECT id FROM users WHERE email = 'demo.usuario@finscope.com.br')
+UNION ALL
+SELECT 'Transações', COUNT(*) FROM transactions WHERE user_id = (SELECT id FROM users WHERE email = 'demo.usuario@finscope.com.br')
+UNION ALL
+SELECT 'Transações Futuras', COUNT(*) FROM future_transactions WHERE user_id = (SELECT id FROM users WHERE email = 'demo.usuario@finscope.com.br');
