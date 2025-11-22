@@ -917,6 +917,25 @@ type AiInterpretationResult =
     return resetKeywords.some((keyword) => normalized.includes(keyword));
   };
 
+  const detectFinanceQuestion = (content: string): boolean => {
+    const normalized = content.toLowerCase().trim();
+    // Se termina com "?" ou começou como pergunta, é pergunta
+    if (normalized.endsWith("?")) return true;
+    
+    // Padrões que indicam pergunta (não transação)
+    const questionPatterns = [
+      /^(quanto|total|qual|como|me mostre|mostre)/i,
+      /\?(.*)?/i,
+      /dica|conselho|ajuda|sugestão|recomendação/i,
+      /resumo|análise|relatório/i,
+      /total de/i,
+      /quanto.*gasto|quanto.*recebi|quanto.*tenho/i,
+      /me diga/i,
+    ];
+    
+    return questionPatterns.some((pattern) => pattern.test(normalized));
+  };
+
   const describeCandidate = (candidate: CandidateTransaction) => {
     const reference = candidate.dueDate || candidate.date;
     const date = reference ? new Date(reference) : new Date();
@@ -2317,10 +2336,58 @@ type AiInterpretationResult =
         return await sendAssistantResponse();
       }
 
+      // DETECTAR SE É PERGUNTA GERAL (não transação)
+      const isGeneralQuestion = detectFinanceQuestion(content) && state.step === "idle";
+      
       const [recentConversation, financialContext] = await Promise.all([
         fetchRecentConversation(user.id, 6),
         buildFinancialContext(user.id, "ALL"),
       ]);
+
+      // SE É PERGUNTA GERAL, RESPONDER COM CONTEXTO
+      if (isGeneralQuestion) {
+        const questionPrompt = `
+O usuário fez uma pergunta sobre suas finanças. Use o contexto para responder de forma útil e personalizada.
+
+Pergunta do usuário: "${content}"
+
+${financialContext?.asPrompt || "Sem histórico financeiro para consultar."}
+
+INSTRUÇÕES:
+- Responda em português brasileiro, de forma amigável
+- Seja direto e útil
+- Se tiver dados, use números reais
+- Ofereça dicas práticas baseadas no contexto
+- Não repita o contexto, apenas use para informar a resposta
+- Máximo 3 sentenças
+`;
+        try {
+          const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [{ role: "user", content: questionPrompt }],
+              temperature: 0.7,
+              max_tokens: 200,
+            }),
+          });
+          if (response.ok) {
+            const completion = await response.json();
+            assistantText = completion?.choices?.[0]?.message?.content?.trim() || "Desculpa, não consegui responder agora.";
+            if (isDevMode) console.log(`[AI QUESTION] Respondido: "${assistantText}"`);
+            return await sendAssistantResponse();
+          }
+        } catch (error) {
+          console.error("[AI QUESTION] erro ao responder pergunta:", error);
+          assistantText = "Deixa eu pensar... Use meu painel de análise para mais detalhes sobre suas finanças.";
+          return await sendAssistantResponse();
+        }
+      }
+
       const interpretation = await interpretTransactionFromMessage(
         content,
         recentConversation,
@@ -2407,8 +2474,53 @@ type AiInterpretationResult =
         assistantText = "Como você quer descrever essa movimentação?";
       }
 
-      // Registrar pending action se estiver na etapa de confirmação (mas não sobrescrever mensagem!)
-      if (state.step === "confirming_transaction" && hasAllConversationData(state.memory)) {
+      // EXECUTAR IMEDIATAMENTE se temos todos os dados e IA respondeu com mensagem conversacional
+      if (state.step === "confirming_transaction" && hasAllConversationData(state.memory) && assistantText && interpretation.conversationalMessage) {
+        const candidate = buildCandidateFromState(state);
+        if (candidate) {
+          try {
+            if (recurringFrequency) {
+              const action: PendingAction = {
+                kind: "recurring",
+                candidate,
+                frequency: recurringFrequency,
+                immediateReceipt,
+              };
+              const result = await executePendingAction(action, user);
+              createdTransaction = result.transaction ?? null;
+              createdFutureTransaction = result.futureTransaction ?? null;
+              createdRecurringTransaction = result.recurringTransaction ?? null;
+              assistantText = result.assistantText;
+              if (isDevMode) console.log(`[AI AUTO-EXECUTE] Recurring: ${result.assistantText}`);
+            } else if (futureIntent) {
+              const action: PendingAction = {
+                kind: "future",
+                candidate,
+                intent: candidate.type,
+              };
+              const result = await executePendingAction(action, user);
+              createdFutureTransaction = result.futureTransaction ?? null;
+              assistantText = result.assistantText;
+              if (isDevMode) console.log(`[AI AUTO-EXECUTE] Future: ${result.assistantText}`);
+            } else {
+              const action: PendingAction = {
+                kind: "transaction",
+                candidate,
+              };
+              const result = await executePendingAction(action, user);
+              createdTransaction = result.transaction ?? null;
+              assistantText = result.assistantText || assistantText;
+              if (isDevMode) console.log(`[AI AUTO-EXECUTE] Transaction: ${assistantText}`);
+            }
+          } catch (error) {
+            console.error("[AI AUTO-EXECUTE] erro ao executar transação:", error);
+            assistantText = assistantText || "Tive um problema ao salvar, mas registrei sua mensagem. Tente novamente em instantes.";
+          }
+        }
+        resetConversationState(user.id);
+      } 
+      // Fallback: registrar pending action se não conseguimos executar imediatamente
+      else if (state.step === "confirming_transaction" && hasAllConversationData(state.memory)) {
         const candidate = buildCandidateFromState(state);
         if (candidate) {
           if (recurringFrequency) {
@@ -2418,7 +2530,6 @@ type AiInterpretationResult =
               frequency: recurringFrequency,
               immediateReceipt,
             });
-            // Só sobrescrever se não houver mensagem da IA
             if (!assistantText) {
               assistantText = buildPendingSummary(pendingActions.get(user.id)!);
             }
@@ -2428,7 +2539,6 @@ type AiInterpretationResult =
               candidate.dueDate = candidate.dueDate || candidate.date;
             }
             registerPendingActionForCandidate(user.id, candidate, candidate.type);
-            // Só sobrescrever se não houver mensagem da IA
             if (!assistantText) {
               assistantText = formatConfirmationMessage(state.memory);
             }

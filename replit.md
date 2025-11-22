@@ -2,17 +2,17 @@
 
 ## Recent Changes (November 22, 2025)
 
-**AI Financial Assistant Complete Refactoring - PRODUCTION READY ✅**
-- ✅ **Consolidated all prompts** into single `ai/conversationalPrompt.ts` with clear structure (system prompt + user prompt with context)
-- ✅ **Redesigned state management**: conversations auto-reset after success/failure, new conversations start in idle state, no stale data
-- ✅ **Refactored confirmation logic**: AI generates humanized conversational messages, backend only validates/executes JSON actions
-- ✅ **Fixed response priority**: (1) AI conversational message, (2) AI clarification, (3) hardcoded fallbacks only when AI fails
-- ✅ **Fixed date handling**: system prompt includes current date (2025-11-22) so AI uses correct dates instead of 1970-01-01
-- ✅ **Preserved conversationalMessage field**: `interpretTransactionFromMessage()` now returns AI-generated messages to frontend
-- ✅ **Enhanced personality**: Brazilian financial consultant (friendly, direct, never robotic), context-aware, automatic intent detection
-- ✅ **Security maintained**: `sanitizeUserInput()` detects 15+ injection patterns, resets state on dangerous input, logs security events
-- ✅ **E2E tests passing**: humanized messages appear correctly, dates accurate, transactions created successfully, recurring detection works
-- ⚠️ **MONITORING REQUIRED**: Track real-world conversational quality and adjust system prompt based on user feedback
+**AI Financial Assistant - NOW EXECUTING REAL ACTIONS ✅**
+- ✅ **Transactions created IMMEDIATELY in Supabase**: AI no longer just responds, it creates transactions in real-time
+- ✅ **Auto-execute transactions**: When AI interprets all data (amount, type, date, category), backend calls `executePendingAction()` immediately
+- ✅ **Conversational messages preserved**: AI generates humanized responses ("Anotado! Registrei um gasto de R$ 200...")
+- ✅ **Agent now answers general questions**: Detects finance questions (vs transactions) and responds with financial context
+- ✅ **Context-aware responses**: Builds financial context from recent transactions, goals, future bills to answer "How much did I spend?" etc.
+- ✅ **Fixed date handling**: System prompt includes current date (2025-11-22) so AI uses correct dates
+- ✅ **Enhanced personality**: Brazilian financial consultant, friendly, direct, never robotic
+- ✅ **Security maintained**: `sanitizeUserInput()` detects 15+ injection patterns, resets state on dangerous input
+- ✅ **E2E tests passing**: Transactions created, questions answered with context, state managed correctly
+- ✅ **Frontend UX improved**: Animated loader ("FinScope AI está digitando..."), visual confirmation when transaction saves
 
 **PDF Export Fix for Production - READY FOR TESTING ✅**
 - ✅ Added Chromium system dependency via Nix packages (resolves `libglib-2.0.so.0` error)
