@@ -723,6 +723,7 @@ Descrição: ${description}${scheduledNote}`;
 
 type AiInterpretationSuccess = {
   status: "success";
+  conversationalMessage?: string; // Mensagem humanizada da IA
   transaction: {
     type: "income" | "expense";
     description: string;
@@ -739,7 +740,8 @@ type AiInterpretationResult =
   | AiInterpretationSuccess
   | {
       status: "clarify";
-      message: string;
+      conversationalMessage?: string; // Mensagem humanizada da IA
+      message?: string; // Fallback para compatibilidade
     };
 
   const sanitizeAiJson = (raw: string) => {
@@ -1210,7 +1212,9 @@ type AiInterpretationResult =
         };
       }
 
+      console.log("[AI DEBUG] Raw response from OpenAI:", rawContent);
       const jsonPayload = sanitizeAiJson(rawContent);
+      console.log("[AI DEBUG] Sanitized JSON:", jsonPayload);
 
       let parsed: any;
       try {
@@ -1333,6 +1337,7 @@ type AiInterpretationResult =
 
       return {
         status: "success",
+        conversationalMessage: parsed.conversationalMessage, // Preservar mensagem da IA
         transaction: {
           type: normalizedType,
           description,
@@ -2380,7 +2385,17 @@ type AiInterpretationResult =
         return await sendAssistantResponse();
       }
 
-      if (state.step === "collecting_amount" && !state.memory.amount) {
+      // PRIORIDADE 1: Usar a mensagem conversacional da IA se disponível
+      if (interpretation.conversationalMessage) {
+        assistantText = interpretation.conversationalMessage;
+        if (isDevMode) console.log(`[AI CONVERSATIONAL] Usando mensagem da IA: "${assistantText}"`);
+      } 
+      // PRIORIDADE 2: Usar mensagem de clarificação da IA (fallback para compatibilidade)
+      else if (interpretation.status === "clarify" && interpretation.message) {
+        assistantText = interpretation.message;
+      }
+      // PRIORIDADE 3: Lógica hardcoded como último recurso (quando IA falha)
+      else if (state.step === "collecting_amount" && !state.memory.amount) {
         assistantText = "Qual é o valor dessa movimentação? (ex.: 250 ou 1.200,50)";
       } else if (state.step === "collecting_type" && !state.memory.type) {
         assistantText = "É um pagamento (saída) ou um recebimento (entrada)?";
@@ -2392,6 +2407,7 @@ type AiInterpretationResult =
         assistantText = "Como você quer descrever essa movimentação?";
       }
 
+      // Registrar pending action se estiver na etapa de confirmação (mas não sobrescrever mensagem!)
       if (state.step === "confirming_transaction" && hasAllConversationData(state.memory)) {
         const candidate = buildCandidateFromState(state);
         if (candidate) {
@@ -2402,23 +2418,26 @@ type AiInterpretationResult =
               frequency: recurringFrequency,
               immediateReceipt,
             });
-            assistantText = buildPendingSummary(pendingActions.get(user.id)!);
+            // Só sobrescrever se não houver mensagem da IA
+            if (!assistantText) {
+              assistantText = buildPendingSummary(pendingActions.get(user.id)!);
+            }
           } else {
             if (futureIntent && !candidate.isScheduled) {
               candidate.isScheduled = true;
               candidate.dueDate = candidate.dueDate || candidate.date;
             }
             registerPendingActionForCandidate(user.id, candidate, candidate.type);
-            assistantText = formatConfirmationMessage(state.memory);
+            // Só sobrescrever se não houver mensagem da IA
+            if (!assistantText) {
+              assistantText = formatConfirmationMessage(state.memory);
+            }
           }
-        } else {
+        } else if (!assistantText) {
           assistantText = "Preciso de mais detalhes antes de salvar.";
         }
       } else if (!assistantText) {
-        assistantText =
-          interpretation.status === "clarify"
-            ? interpretation.message
-            : "Estou quase lá! Vamos seguir a ordem: valor → tipo → data → descrição.";
+        assistantText = "Estou quase lá! Vamos seguir a ordem: valor → tipo → data → descrição.";
       }
 
       logConversationState(user.id, "after");
