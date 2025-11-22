@@ -2478,11 +2478,42 @@ INSTRUÇÕES:
       if (interpretation.status === "success") {
         fillMemoryFromInterpretation(state, interpretation);
         
-        // Processar ações estruturadas (future_bill, goal)
+        // Processar ações estruturadas (transaction, future_bill, goal)
         const actions = (interpretation as any)?.actions || [];
         if (isDevMode) console.log(`[AI DEBUG] Processing ${actions.length} actions`);
         for (const action of actions) {
-          if (action.type === "future_bill" && action.data) {
+          if (action.type === "transaction" && action.data) {
+            if (isDevMode) console.log("[AI DEBUG] Creating transaction:", JSON.stringify(action.data));
+            try {
+              const accounts = await storage.getAccountsByUserId(user.id);
+              const accountType = action.data.account_type || action.data.accountType || "PF";
+              const targetAccount = accounts.find((acc) => acc.type?.toLowerCase() === accountType.toLowerCase());
+              
+              if (!targetAccount) {
+                console.error("[AI ACTION] Conta não encontrada para tipo:", accountType);
+                continue;
+              }
+
+              const transaction = await storage.createTransaction({
+                userId: user.id,
+                accountId: targetAccount.id,
+                description: action.data.title || action.data.description || "Transação",
+                type: (action.data.type === "income" || action.data.type === "entrada") ? "entrada" : "saida",
+                amount: action.data.amount || 0,
+                category: action.data.category || "Outros",
+                date: action.data.date ? new Date(action.data.date) : new Date(),
+                accountType: accountType,
+                source: "ai",
+              });
+              if (isDevMode) console.log("[AI ACTION] Transaction criada:", transaction);
+              createdTransaction = transaction;
+              createdActions.push({ type: "transaction", data: transaction });
+            } catch (err) {
+              console.error("[AI ACTION] ERRO ao criar transaction:", err);
+              if ((err as any)?.message) console.error("[AI ACTION] Error message:", (err as any).message);
+              if ((err as any)?.details) console.error("[AI ACTION] Error details:", (err as any).details);
+            }
+          } else if (action.type === "future_bill" && action.data) {
             if (isDevMode) console.log("[AI DEBUG] Creating future_bill:", JSON.stringify(action.data));
             try {
               const { data: futureBill } = await supabase
@@ -2493,7 +2524,7 @@ INSTRUÇÕES:
                   category: action.data.category || "Outros",
                   amount: String(action.data.amount || 0),
                   due_date: action.data.dueDate,
-                  account_type: action.data.account_type || "PF",
+                  account_type: action.data.account_type || action.data.accountType || "PF",
                   status: "pending",
                   is_recurring: false,
                 })
