@@ -1838,7 +1838,11 @@ type AiInterpretationResult =
     try {
       await ensureDefaultAccounts(req.session.userId, req.currentUser.plan);
       const accounts = await storage.getAccountsByUserId(req.session.userId);
-      res.json(accounts);
+      // Filtrar contas PJ para usuários não-premium
+      const filtered = req.currentUser?.plan === "premium"
+        ? accounts
+        : accounts.filter((account) => account.type !== "pj");
+      res.json(filtered);
     } catch (error) {
       res.status(500).json({ error: "Erro ao garantir contas padrão" });
     }
@@ -2490,8 +2494,17 @@ INSTRUÇÕES:
           if (action.type === "transaction" && action.data) {
             if (isDevMode) console.log("[AI DEBUG] Creating transaction:", JSON.stringify(action.data));
             try {
-              const accounts = await storage.getAccountsByUserId(user.id);
               const accountType = action.data.account_type || action.data.accountType || "PF";
+              
+              // Validar se usuário tem acesso a contas PJ (Premium only)
+              if (accountType === "PJ" && user.plan !== "premium") {
+                console.error("[AI ACTION] Usuário Pro tentou criar transação em conta PJ");
+                assistantText = "Transações em contas empresariais (PJ) estão disponíveis apenas no plano Premium. Faça upgrade para acessar esse recurso.";
+                resetConversationState(user.id);
+                return await sendAssistantResponse();
+              }
+              
+              const accounts = await storage.getAccountsByUserId(user.id);
               const targetAccount = accounts.find((acc) => acc.type?.toLowerCase() === accountType.toLowerCase());
               
               if (!targetAccount) {
@@ -2528,6 +2541,16 @@ INSTRUÇÕES:
           } else if (action.type === "future_bill" && action.data) {
             if (isDevMode) console.log("[AI DEBUG] Creating future_bill:", JSON.stringify(action.data));
             try {
+              const accountType = action.data.account_type || action.data.accountType || "PF";
+              
+              // Validar se usuário tem acesso a contas PJ (Premium only)
+              if (accountType === "PJ" && user.plan !== "premium") {
+                console.error("[AI ACTION] Usuário Pro tentou criar future bill em conta PJ");
+                assistantText = "Contas futuras em contas empresariais (PJ) estão disponíveis apenas no plano Premium. Faça upgrade para acessar esse recurso.";
+                resetConversationState(user.id);
+                return await sendAssistantResponse();
+              }
+              
               // Suporte para múltiplos formatos de data: dueDate, due_date, date
               const dueDate = action.data.dueDate || action.data.due_date || action.data.date;
               
@@ -2546,7 +2569,7 @@ INSTRUÇÕES:
                   category: action.data.category || "Outros",
                   amount: String(action.data.amount || 0),
                   due_date: dueDate,
-                  account_type: action.data.account_type || action.data.accountType || "PF",
+                  account_type: accountType,
                   status: "pending",
                   is_recurring: false,
                 })
@@ -3112,6 +3135,8 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
   // Get investments summary
   app.get("/api/dashboard/investments", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
+      // Investments não têm scope (PF/PJ) no esquema, mas devem estar visíveis apenas para usuário autenticado
+      // Não há validação de PJ aqui pois investments são globais, não associados a contas PF/PJ específicas
       const summary = await storage.getInvestmentsSummary(req.session.userId);
       res.json(summary);
     } catch (error) {

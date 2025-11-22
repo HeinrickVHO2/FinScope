@@ -25,6 +25,11 @@ Preferred communication style: Simple, everyday language.
 **Authentication & Authorization:** Session-based authentication with HTTP-only cookies, bcrypt for password hashing, role-based access via plan tiers, trial tracking.
 **Data Layer:** Supabase PostgreSQL, `IStorage` interface with `SupabaseStorage` implementation, Drizzle ORM for type-safe models, numeric decimals as strings for precision, Row Level Security (RLS).
 **Business Logic:** Plan limit enforcement, AI-driven categorization and action processing (transactions, future bills, investment goals), dashboard metrics aggregation.
+**Access Control & PJ Restrictions:** Comprehensive PJ validation across all entry points (API endpoints, AI chat, storage layer). Pro users cannot create/view PJ accounts or resources (transactions, future bills) - Premium only. Validation enforced at:
+  - API level (POST/GET endpoints)
+  - AI action processing (transactions, future_bills)
+  - Account filtering (GET /api/accounts returns PF-only for Pro users)
+  - All DELETE operations check plan tier
 
 ### Data Storage Solutions
 
