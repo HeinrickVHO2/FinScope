@@ -43,6 +43,7 @@ import { randomUUID } from "crypto";
 import fetch from "node-fetch";
 import { buildFinancialContext } from "../ai/buildFinancialContext";
 import { sanitizeUserInput, generateSafeRejectionMessage } from "../ai/sanitizeInput";
+import { buildConversationalPrompt } from "../ai/conversationalPrompt";
 
 
 // Extend Express session type
@@ -717,38 +718,8 @@ Descrição: ${description}${scheduledNote}`;
     recurringTransaction?: RecurringTransaction | null;
   };
 
-  const AI_SYSTEM_PROMPT = `
-Você é o FinScope AI, um agente financeiro do FinScope. Sua responsabilidade é entender comandos em português simples como "Gastei 50 reais no mercado hoje", "Recebi 3.500 de salário", "todo mês pago Netflix" e devolvê-los em um JSON estruturado para que o FinScope consiga lançar transações, compromissos futuros e recorrências.
-
-Sempre aja como especialista do FinScope: confirme a intenção, escolha o tipo certo (entrada/saída) e ajude a manter o histórico correto.
-
-Seu objetivo é interpretar se existe uma transação e responder APENAS com JSON válido (sem texto adicional).
-
-Formato obrigatório:
-{
-  "status": "success" | "clarify",
-  "message": "texto explicativo quando status = clarify",
-  "transaction": {
-    "type": "income" | "expense" | "scheduled",
-    "description": "texto curto em minúsculas",
-    "amount": 50.5,
-    "date": "2025-01-20",
-    "account_type": "PF" | "PJ",
-    "category": "categoria permitida"
-  }
-}
-
-Regras:
-- Determine o tipo com cuidado: entradas (income) representam dinheiro recebido ("recebi", "salário", "caiu"), saídas (expense) são gastos ("paguei", "gastei", "transferi para pagar"). Use "scheduled" somente para compromissos futuros confirmados (ex.: "vou pagar", "conta do mês que vem") e sempre peça data futura.
-- Se não houver informação suficiente (valor ou data), retorne status "clarify" com uma mensagem pedindo detalhes.
-- Sempre use datas no formato ISO YYYY-MM-DD. Se não houver data, use a data de hoje. Para \"scheduled\" você deve exigir data futura antes de confirmar.
-- account_type: escolha "PJ" apenas se o texto mencionar termos de empresa (CNPJ, clientes PJ, faturamento da empresa, notas fiscais, MEI). Caso contrário, use "PF".
-- Categorias devem ser APENAS das listas abaixo, respeitando o contexto PF/PJ. Exemplos: Streaming é PF, Impostos e Software são PJ, Mercado é PF.
-${AI_CATEGORY_TEXT}
-- Use descrições curtas (ex.: "mercado", "salário").
-- Quando identificar assinaturas ou valores como salário/aluguel/streaming citados como recorrentes do tipo "todo mês", mantenha a categoria coerente e responda normalmente (o sistema aplica recorrência fora desta resposta).
-- amount deve ser número em reais (sem símbolo). Use valor absoluto.
-`;
+  // O prompt conversacional é construído dinamicamente com contexto do usuário
+  // Ver ai/conversationalPrompt.ts
 
 type AiInterpretationSuccess = {
   status: "success";
@@ -1186,7 +1157,8 @@ type AiInterpretationResult =
   const interpretTransactionFromMessage = async (
     content: string,
     conversation: ConversationMessage[],
-    contextPrompt?: string
+    userId: string,
+    userFinancialContext?: string
   ): Promise<AiInterpretationResult> => {
     if (!OPENAI_API_KEY) {
       return {
@@ -1196,6 +1168,9 @@ type AiInterpretationResult =
     }
 
     try {
+      // Construir prompt conversacional com contexto financeiro do usuário
+      const conversationalPrompt = buildConversationalPrompt(AI_CATEGORY_TEXT, userFinancialContext);
+
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -1204,11 +1179,10 @@ type AiInterpretationResult =
         },
         body: JSON.stringify({
           model: OPENAI_MODEL,
-          temperature: 0.2,
+          temperature: 0.3,
           response_format: { type: "json_object" },
           messages: [
-            { role: "system", content: AI_SYSTEM_PROMPT },
-            ...(contextPrompt ? [{ role: "user" as const, content: contextPrompt }] : []),
+            { role: "system", content: conversationalPrompt },
             ...conversation.map((message) => ({
               role: message.role,
               content: message.content,
@@ -2345,6 +2319,7 @@ type AiInterpretationResult =
       const interpretation = await interpretTransactionFromMessage(
         content,
         recentConversation,
+        user.id,
         financialContext?.asPrompt
       );
       if (!state.memory.type) {
