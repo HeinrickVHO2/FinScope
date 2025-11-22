@@ -1873,7 +1873,10 @@ type AiInterpretationResult =
       };
 
       if (validatedData.type === "pj" && req.currentUser?.plan !== "premium") {
-        return res.status(403).json({ error: "Contas PJ disponíveis apenas no plano Premium" });
+        return res.status(403).json({ 
+          error: "Contas PJ disponíveis apenas no plano Premium",
+          message: "Para cadastrar contas empresariais (PJ), você precisa fazer upgrade para o plano Premium. Clique no botão 'Fazer Upgrade' para ativar todos os recursos empresariais."
+        });
       }
 
       const account = await storage.createAccount(dataWithUserId);
@@ -2573,9 +2576,12 @@ INSTRUÇÕES:
               const depositAmount = action.data.deposit_amount || 0;
               const targetAmount = action.data.target_value || 0;
               const investmentTitle = action.data.title || "Meta de Investimento";
+              const investmentType = action.data.investment_type || "reserva_emergencia"; // Nova: tipo de investimento
               
               // Se há depósito, usar esse valor como current_amount. Senão, usar target como initial
               const currentAmount = depositAmount > 0 ? depositAmount : targetAmount;
+              
+              if (isDevMode) console.log("[AI DEBUG] Investment type detected:", investmentType);
               
               // 1. Criar investment
               const { data: investment, error: investmentError } = await supabase
@@ -2583,7 +2589,7 @@ INSTRUÇÕES:
                 .insert({
                   user_id: user.id,
                   name: investmentTitle,
-                  type: "reserva_emergencia",
+                  type: investmentType,
                   current_amount: String(currentAmount),
                 })
                 .select()
