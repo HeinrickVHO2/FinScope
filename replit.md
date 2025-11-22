@@ -2,6 +2,18 @@
 
 ## Recent Changes (November 22, 2025)
 
+**IA: Detecção de Contas Futuras - Parcialmente Implementado ⚠️**
+- ✅ **Infraestrutura completa**: Backend preparado para processar `actions[]` da IA
+- ✅ **Tipo `AiInterpretationSuccess`**: Inclui campo `actions[]` com suporte a transaction/future_bill/goal
+- ✅ **Pipeline de processamento**: Detecta quando IA retorna `actions[]` e executa automaticamente
+- ✅ **Prompt atualizado**: Instruções claras sobre detecção de "preciso pagar" + data futura = future_bill
+- ✅ **Temperature aumentada**: 0.3 → 0.7 para IA ser mais proativa
+- ✅ **Correções TypeScript**: 13 erros LSP corrigidos (tipos, regex flags, etc.)
+- ⚠️ **Limitação GPT-4o-mini**: Modelo não segue consistemente instruções para gerar `actions[]`
+- ⚠️ **JSON Schema strict**: Tentativa com schema rígido falhou devido a estrutura variável do campo `data`
+- 📌 **Status**: Sistema PRONTO para processar future_bills, aguardando IA cooperar ou upgrade para GPT-4o
+- 📌 **Rota correta**: `/api/future-expenses` (backend já cria registros quando IA retorna actions)
+
 **AI Agent Now Controls Entire Platform ✅**
 - ✅ **Botões de Insight funcionando**: "Foco em economia", "Foco em dívidas", "Foco em investimentos" alternam entre True/False
 - ✅ **Foco persistido**: Salvo em localStorage (frontend) e db (backend via `/api/ai/insight-focus`)

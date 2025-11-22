@@ -726,6 +726,10 @@ Descrição: ${description}${scheduledNote}`;
 type AiInterpretationSuccess = {
   status: "success";
   conversationalMessage?: string; // Mensagem humanizada da IA
+  actions?: Array<{
+    type: "transaction" | "future_bill" | "goal";
+    data: any;
+  }>; // Ações estruturadas retornadas pela IA
   transaction: {
     type: "income" | "expense";
     description: string;
@@ -1203,8 +1207,8 @@ type AiInterpretationResult =
         },
         body: JSON.stringify({
           model: OPENAI_MODEL,
-          temperature: 0.3,
-          response_format: { type: "json_object" },
+          temperature: 0.7, // Aumentado para IA ser mais proativa
+          response_format: { type: "json_object" }, // Voltando para json_object simples
           messages: [
             { role: "system", content: conversationalPrompt },
             ...conversation.map((message) => ({
@@ -1246,6 +1250,24 @@ type AiInterpretationResult =
         return {
           status: "clarify",
           message: "Preciso de mais detalhes (valor, descrição e data) para registrar essa movimentação.",
+        };
+      }
+
+      // NOVO: Se a IA retornou actions[], retornar imediatamente sem validar transaction
+      if (parsed.actions && Array.isArray(parsed.actions) && parsed.actions.length > 0) {
+        console.log("[AI DEBUG] IA retornou actions[] - pulando validação de transaction");
+        return {
+          status: "success",
+          conversationalMessage: parsed.conversationalMessage,
+          actions: parsed.actions,
+          transaction: {
+            type: "expense", // Placeholder - não será usado quando temos actions
+            description: "placeholder",
+            amount: 0,
+            date: new Date().toISOString(),
+            accountType: "PF",
+            category: "Outros",
+          },
         };
       }
 
@@ -1360,6 +1382,7 @@ type AiInterpretationResult =
       return {
         status: "success",
         conversationalMessage: parsed.conversationalMessage, // Preservar mensagem da IA
+        actions: parsed.actions, // CRÍTICO: Preservar ações estruturadas da IA
         transaction: {
           type: normalizedType,
           description,
@@ -2447,13 +2470,20 @@ INSTRUÇÕES:
 
       const snapshotBefore = JSON.stringify(state.memory);
 
+      if (isDevMode) {
+        console.log("[AI DEBUG] interpretation.status:", interpretation.status);
+        console.log("[AI DEBUG] interpretation.actions:", JSON.stringify((interpretation as any)?.actions));
+      }
+
       if (interpretation.status === "success") {
         fillMemoryFromInterpretation(state, interpretation);
         
         // Processar ações estruturadas (future_bill, goal)
         const actions = (interpretation as any)?.actions || [];
+        if (isDevMode) console.log(`[AI DEBUG] Processing ${actions.length} actions`);
         for (const action of actions) {
           if (action.type === "future_bill" && action.data) {
+            if (isDevMode) console.log("[AI DEBUG] Creating future_bill:", JSON.stringify(action.data));
             try {
               const { data: futureBill } = await supabase
                 .from("future_transactions")
@@ -2471,7 +2501,9 @@ INSTRUÇÕES:
               if (isDevMode) console.log("[AI ACTION] Future bill criada:", futureBill);
               createdActions.push({ type: "future_bill", data: futureBill });
             } catch (err) {
-              console.error("[AI ACTION] erro ao criar future bill:", err);
+              console.error("[AI ACTION] ERRO ao criar future bill:", err);
+              if ((err as any)?.message) console.error("[AI ACTION] Error message:", (err as any).message);
+              if ((err as any)?.details) console.error("[AI ACTION] Error details:", (err as any).details);
             }
           } else if (action.type === "goal" && action.data) {
             try {
