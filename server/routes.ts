@@ -2481,6 +2481,8 @@ INSTRUÇÕES:
         // Processar ações estruturadas (transaction, future_bill, goal)
         const actions = (interpretation as any)?.actions || [];
         if (isDevMode) console.log(`[AI DEBUG] Processing ${actions.length} actions`);
+        let actionsProcessed = false;
+        
         for (const action of actions) {
           if (action.type === "transaction" && action.data) {
             if (isDevMode) console.log("[AI DEBUG] Creating transaction:", JSON.stringify(action.data));
@@ -2508,6 +2510,7 @@ INSTRUÇÕES:
               if (isDevMode) console.log("[AI ACTION] Transaction criada:", transaction);
               createdTransaction = transaction;
               createdActions.push({ type: "transaction", data: transaction });
+              actionsProcessed = true;
             } catch (err) {
               console.error("[AI ACTION] ERRO ao criar transaction:", err);
               if ((err as any)?.message) console.error("[AI ACTION] Error message:", (err as any).message);
@@ -2532,6 +2535,7 @@ INSTRUÇÕES:
                 .single();
               if (isDevMode) console.log("[AI ACTION] Future bill criada:", futureBill);
               createdActions.push({ type: "future_bill", data: futureBill });
+              actionsProcessed = true;
             } catch (err) {
               console.error("[AI ACTION] ERRO ao criar future bill:", err);
               if ((err as any)?.message) console.error("[AI ACTION] Error message:", (err as any).message);
@@ -2553,10 +2557,19 @@ INSTRUÇÕES:
                 .single();
               if (isDevMode) console.log("[AI ACTION] Goal criada:", goal);
               createdActions.push({ type: "goal", data: goal });
+              actionsProcessed = true;
             } catch (err) {
               console.error("[AI ACTION] erro ao criar goal:", err);
             }
           }
+        }
+        
+        // Se processamos actions[] com sucesso, resetar estado e retornar
+        if (actionsProcessed) {
+          assistantText = interpretation.conversationalMessage || "Perfeito! Registrei isso para você.";
+          resetConversationState(user.id);
+          logConversationState(user.id, "actions-processed");
+          return await sendAssistantResponse();
         }
       }
 
