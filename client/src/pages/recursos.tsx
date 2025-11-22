@@ -1,39 +1,51 @@
 import { FinScopeHeader } from "@/components/site/FinScopeHeader";
 import { FinScopeFooter } from "@/components/site/FinScopeFooter";
 import { motion } from "framer-motion";
-import { BarChart3, Wallet, Shield, Zap, TrendingUp } from "lucide-react";
+import { BarChart3, Wallet, Shield, Zap, TrendingUp, CalendarClock, FileText } from "lucide-react";
 
 export default function RecursosPage() {
   const recursos = [
     {
       icon: BarChart3,
-      title: "Dashboard Inteligente",
+      title: "Dashboard com Previsões",
       description:
-        "Visualização completa das suas finanças com gráficos avançados e insights automáticos.",
+        "Saldo atual, histórico e projeções de caixa lado a lado para você decidir com antecedência.",
     },
     {
       icon: Wallet,
-      title: "Gestão de Contas",
+      title: "Contas PF e PJ integradas",
       description:
-        "Controle contas pessoais, contas empresariais e cartões em um só lugar.",
+        "Controle o que já gastou e planeje o que vai gastar em contas pessoais ou empresariais.",
     },
     {
-      icon: Shield,
-      title: "Segurança AppSec",
+      icon: CalendarClock,
+      title: "Planejamento de gastos futuros",
       description:
-        "Arquitetado com padrões de segurança e criptografia de nível corporativo.",
+        "Cadastre boletos, assinaturas e impostos, receba lembretes e veja o impacto no saldo previsto.",
     },
     {
       icon: Zap,
-      title: "Regras Automáticas",
+      title: "Automação e alertas",
       description:
-        "Categorização automática e inteligente para economizar horas do seu mês.",
+        "Regras inteligentes categorizam transações automaticamente e avisam sobre vencimentos.",
     },
     {
       icon: TrendingUp,
-      title: "Gestão Empresarial Completa",
+      title: "Previsão de saldo livre",
       description:
-        "Contas PJ com categoria MEI opcional, fluxo de caixa dedicado e relatórios profissionais.",
+        "Mostramos quanto dinheiro vai sobrar depois de pagar as contas e quanto é ideal reservar.",
+    },
+    {
+      icon: FileText,
+      title: "Relatórios e PDFs",
+      description:
+        "Exporte relatórios PRO e Premium com comparativo entre despesas reais e previstas.",
+    },
+    {
+      icon: Shield,
+      title: "Segurança plena",
+      description:
+        "Backups, criptografia e isolamento de dados para você confiar seus números ao FinScope.",
     },
   ];
 
@@ -41,7 +53,7 @@ export default function RecursosPage() {
     <div className="min-h-screen bg-white text-slate-900">
       <FinScopeHeader />
 
-      <main className="container py-24 max-w-6xl mx-auto space-y-16">
+      <main className="max-w-6xl mx-auto px-4 py-24 space-y-16">
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}

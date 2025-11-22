@@ -3,13 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { apiFetch } from "@/lib/api";
 
 export default function ForgotPasswordPage() {
   const { register, handleSubmit } = useForm();
   const { toast } = useToast();
 
   async function onSubmit(data: any) {
-    await fetch("/api/auth/forgot-password", {
+    await apiFetch("/api/auth/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),

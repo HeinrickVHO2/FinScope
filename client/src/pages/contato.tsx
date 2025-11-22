@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FinScopeHeader } from "@/components/site/FinScopeHeader";
 import { FinScopeFooter } from "@/components/site/FinScopeFooter";
 import { motion } from "framer-motion";
+import { apiFetch } from "@/lib/api";
 
 export default function ContatoPage() {
   const [name, setName] = useState("");
@@ -21,7 +22,7 @@ export default function ContatoPage() {
     setStatus("loading");
     setErrorMessage("");
     try {
-      const response = await fetch("/api/contact", {
+      const response = await apiFetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, message }),
@@ -46,7 +47,7 @@ export default function ContatoPage() {
     <div className="min-h-screen bg-white text-slate-900">
       <FinScopeHeader />
 
-      <main className="container py-24 max-w-4xl mx-auto space-y-16">
+      <main className="max-w-4xl mx-auto px-4 py-24 space-y-16">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -108,14 +109,16 @@ export default function ContatoPage() {
           </form>
 
           <div className="space-y-4 text-slate-700">
-            <p>
-              <strong>Email:</strong> contato@finscope.com.br
-            </p>
-            <p>
-              <strong>Tempo médio de resposta:</strong> 6 horas úteis
-            </p>
-            <p>
-              Estamos sempre trabalhando para melhorar sua experiência com o FinScope.
+            <div className="p-4 rounded-xl border bg-muted/40">
+              <p className="text-sm text-muted-foreground">Email</p>
+              <p className="font-semibold">contato@finscope.com.br</p>
+            </div>
+            <div className="p-4 rounded-xl border bg-muted/40">
+              <p className="text-sm text-muted-foreground">SLA de atendimento</p>
+              <p className="font-semibold">Até 6 horas úteis</p>
+            </div>
+            <p className="text-sm">
+              Tem sugestões para novos recursos de planejamento? Fale com a gente — o roadmap do FinScope é guiado pelos clientes.
             </p>
           </div>
         </div>

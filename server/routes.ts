@@ -15,6 +15,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { buildPremiumInsights } from "./insights";
 import { buildProTransactionsPdf } from "./pdf/proReport";
+import { generateAiFinancialReport } from "./aiReports";
+import { generateAiInsights } from "./aiInsights";
+import type { AiInsightResult } from "./aiInsights";
 import { 
   insertUserSchema, 
   loginSchema,
@@ -30,10 +33,15 @@ import {
   insertInvestmentGoalSchema,
   updateInvestmentGoalSchema,
   insertInvestmentTransactionSchema,
+  insertFutureExpenseSchema,
+  insertFutureTransactionSchema,
+  insertAiReportSettingSchema,
 } from "@shared/schema";
-import type { User } from "@shared/schema";
+import type { User, Transaction, FutureTransaction, RecurringTransaction } from "@shared/schema";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import fetch from "node-fetch";
+import { buildFinancialContext } from "../ai/buildFinancialContext";
 
 
 // Extend Express session type
@@ -147,15 +155,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return "ALL";
   };
 
+  const parseFutureExpenseStatus = (value: any): "pending" | "paid" | "overdue" | undefined => {
+    const normalized = String(value || "").toLowerCase();
+    if (normalized === "pending" || normalized === "paid" || normalized === "overdue") {
+      return normalized as "pending" | "paid" | "overdue";
+    }
+    return undefined;
+  };
+
+  const parseFutureTransactionStatus = (value: any): "pending" | "paid" | "received" | undefined => {
+    const normalized = String(value || "").toLowerCase();
+    if (normalized === "pending" || normalized === "paid" || normalized === "received") {
+      return normalized as "pending" | "paid" | "received";
+    }
+    return undefined;
+  };
+
   const normalizeAccountType = (value: any): "PF" | "PJ" => {
     return String(value || "PF").toUpperCase() === "PJ" ? "PJ" : "PF";
   };
+
+  const aiChatRequestSchema = z.object({
+    content: z.string().min(1, "Mensagem é obrigatória").max(2000, "Mensagem muito longa"),
+  });
 
   const scopeLabels: Record<AccountScope, string> = {
     PF: "Conta Pessoal",
     PJ: "Conta Empresarial",
     ALL: "Consolidado PF + PJ",
   };
+
+  const PF_EXPENSE_CATEGORIES = [
+    "Mercado",
+    "Streaming",
+    "Aluguel",
+    "Luz / Água",
+    "Transporte",
+    "Alimentação",
+    "Outros",
+  ];
+
+  const PF_INCOME_CATEGORIES = ["Salário", "Renda extra", "Transferências", "Reembolso", "Outros"];
+
+  const PJ_EXPENSE_CATEGORIES = [
+    "Impostos",
+    "Software",
+    "Fornecedores",
+    "Transporte",
+    "Alimentação",
+    "Outros",
+  ];
+
+  const PJ_INCOME_CATEGORIES = [
+    "Faturamento / Receitas",
+    "Serviços prestados",
+    "Produtos vendidos",
+    "Reembolsos empresariais",
+    "Outros",
+  ];
+
+  const AI_ALLOWED_CATEGORIES = {
+    PF: { income: PF_INCOME_CATEGORIES, expense: PF_EXPENSE_CATEGORIES },
+    PJ: { income: PJ_INCOME_CATEGORIES, expense: PJ_EXPENSE_CATEGORIES },
+  } as const;
+
+  const DEFAULT_CATEGORY = {
+    PF: { income: "Renda extra", expense: "Outros" },
+    PJ: { income: "Faturamento / Receitas", expense: "Outros" },
+  } as const;
+
+  const CATEGORY_HINTS: Array<{
+    scope: "PF" | "PJ";
+    type: "income" | "expense";
+    category: string;
+    keywords: string[];
+  }> = [
+    { scope: "PF", type: "expense", category: "Mercado", keywords: ["mercado", "supermerc", "hortifruti"] },
+    { scope: "PF", type: "expense", category: "Alimentação", keywords: ["restaurante", "lanch", "pizza", "comida"] },
+    { scope: "PF", type: "expense", category: "Aluguel", keywords: ["aluguel", "condomínio", "locação"] },
+    { scope: "PF", type: "expense", category: "Streaming", keywords: ["netflix", "spotify", "streaming", "prime video", "assinatura"] },
+    { scope: "PF", type: "expense", category: "Luz / Água", keywords: ["energia", "luz", "água", "copasa", "sabesp"] },
+    { scope: "PF", type: "expense", category: "Transporte", keywords: ["uber", "combust", "gasolina", "ônibus"] },
+    { scope: "PF", type: "income", category: "Salário", keywords: ["salario", "pagamento", "folha"] },
+    { scope: "PF", type: "income", category: "Reembolso", keywords: ["reembolso"] },
+    { scope: "PJ", type: "income", category: "Faturamento / Receitas", keywords: ["faturamento", "nfe", "nota", "cliente"] },
+    { scope: "PJ", type: "expense", category: "Impostos", keywords: ["das", "imposto", "taxa", "simples"] },
+    { scope: "PJ", type: "expense", category: "Software", keywords: ["licença", "software", "saas"] },
+    { scope: "PJ", type: "expense", category: "Fornecedores", keywords: ["fornecedor", "compra", "insumo"] },
+    { scope: "PJ", type: "expense", category: "Transporte", keywords: ["logistica", "frete", "transporte"] },
+    { scope: "PJ", type: "expense", category: "Alimentação", keywords: ["almoço equipe", "refeição", "coffee break"] },
+  ];
+
+  const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
   const formatPtDate = (date: Date) => {
     const day = String(date.getDate()).padStart(2, "0");
@@ -177,6 +269,1113 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return false;
     }
     return true;
+  };
+
+  const mapAiMessage = (row: any) => ({
+    id: row?.id,
+    role: row?.role,
+    content: row?.content,
+    createdAt: row?.created_at || row?.createdAt || new Date().toISOString(),
+  });
+
+  const convertExpenseToFuture = (expense: FutureExpense): FutureTransaction => ({
+    id: `expense-${expense.id}`,
+    userId: expense.userId,
+    type: "expense",
+    description: expense.title,
+    amount: expense.amount?.toString() ?? "0",
+    expectedDate: expense.dueDate,
+    accountType: expense.accountType || "PF",
+    status: expense.status || "pending",
+    createdAt: expense.createdAt,
+    isScheduled: true,
+    dueDate: expense.dueDate,
+  });
+
+  const computeFutureTotals = (items: FutureTransaction[]) => {
+    let totalToPay = 0;
+    let totalToReceive = 0;
+    items.forEach((item) => {
+      const amount = Number(item.amount) || 0;
+      if (item.type === "expense") {
+        if (item.status === "pending") {
+          totalToPay += amount;
+        }
+      } else if (item.type === "income") {
+        if (item.status === "pending") {
+          totalToReceive += amount;
+        }
+      }
+    });
+    return {
+      totalToPay: Number(totalToPay.toFixed(2)),
+      totalToReceive: Number(totalToReceive.toFixed(2)),
+      futureBalance: Number((totalToReceive - totalToPay).toFixed(2)),
+    };
+  };
+
+  const AI_CATEGORY_TEXT = [
+    `Categorias PF (despesas): ${PF_EXPENSE_CATEGORIES.join(", ")}`,
+    `Categorias PF (receitas): ${PF_INCOME_CATEGORIES.join(", ")}`,
+    `Categorias PJ (despesas): ${PJ_EXPENSE_CATEGORIES.join(", ")}`,
+    `Categorias PJ (receitas): ${PJ_INCOME_CATEGORIES.join(", ")}`,
+  ].join("\n");
+
+  type CandidateTransaction = {
+    type: "income" | "expense";
+    description: string;
+    amount: number;
+    date: string;
+    accountType: "PF" | "PJ";
+    category: string;
+    isScheduled?: boolean;
+    dueDate?: string;
+  };
+
+  type PendingAction =
+    | { kind: "transaction"; candidate: CandidateTransaction }
+    | { kind: "future"; candidate: CandidateTransaction; intent: "income" | "expense" }
+    | {
+        kind: "recurring";
+        candidate: CandidateTransaction;
+        frequency: "monthly" | "weekly";
+        immediateReceipt: boolean;
+      };
+
+  const pendingActions = new Map<string, PendingAction>();
+
+  type ConversationStep =
+    | "idle"
+    | "collecting_amount"
+    | "collecting_type"
+    | "collecting_date"
+    | "collecting_description"
+    | "confirming_transaction";
+
+  type ConversationMemory = {
+    amount?: number;
+    type?: "income" | "expense";
+    date?: string;
+    description?: string;
+    accountType?: "PF" | "PJ";
+    category?: string;
+    isScheduled?: boolean;
+    dueDate?: string;
+  };
+
+  type ConversationState = {
+    step: ConversationStep;
+    memory: ConversationMemory;
+  };
+
+  const conversationStates = new Map<string, ConversationState>();
+  const isDevMode = process.env.NODE_ENV !== "production";
+
+  const conversationStepOrder: ConversationStep[] = [
+    "idle",
+    "collecting_amount",
+    "collecting_type",
+    "collecting_date",
+    "collecting_description",
+    "confirming_transaction",
+  ];
+
+  const getConversationState = (userId: string): ConversationState => {
+    if (!conversationStates.has(userId)) {
+      conversationStates.set(userId, { step: "idle", memory: {} });
+    }
+    return conversationStates.get(userId)!;
+  };
+
+  const resetConversationState = (userId: string) => {
+    conversationStates.set(userId, { step: "idle", memory: {} });
+    pendingActions.delete(userId);
+  };
+
+  const logConversationState = (userId: string, label: string) => {
+    if (!isDevMode) return;
+    const snapshot = conversationStates.get(userId);
+    console.log(`[AI STATE][${userId}] ${label}:`, snapshot);
+  };
+
+  const stepIndex = (step: ConversationStep) => conversationStepOrder.indexOf(step);
+
+  const hasAllConversationData = (memory: ConversationMemory) =>
+    memory.amount !== undefined &&
+    memory.type !== undefined &&
+    memory.date !== undefined &&
+    memory.description &&
+    (memory.accountType === "PF" || memory.accountType === "PJ");
+
+  const determineNextStepFromMemory = (memory: ConversationMemory): ConversationStep => {
+    if (!memory.amount) return "collecting_amount";
+    if (!memory.type) return "collecting_type";
+    if (!memory.date) return "collecting_date";
+    if (!memory.description) return "collecting_description";
+    return "confirming_transaction";
+  };
+
+  const advanceConversationStep = (state: ConversationState) => {
+    const desired = determineNextStepFromMemory(state.memory);
+    const currentIdx = stepIndex(state.step);
+    const desiredIdx = stepIndex(desired);
+    if (desiredIdx > currentIdx || state.step === "idle") {
+      state.step = desired;
+    }
+  };
+
+  const mapTypeToHuman = (type: "income" | "expense") => (type === "income" ? "recebimento" : "pagamento");
+
+  const formatConfirmationMessage = (memory: ConversationMemory) => {
+    const amount = memory.amount ? formatCurrencyBRL(memory.amount) : "R$ 0,00";
+    const typeLabel = memory.type ? mapTypeToHuman(memory.type) : "pendente";
+    const dateLabel = memory.date ? formatPtDate(new Date(memory.date)) : "sem data";
+    const accountLabel = memory.accountType ? scopeLabels[memory.accountType] : scopeLabels.PF;
+    const description = memory.description || "-";
+    const scheduledNote = memory.isScheduled ? "\nAgendado: sim" : "";
+    return `Posso salvar assim?
+Valor: ${amount}
+Tipo: ${typeLabel}
+Data: ${dateLabel}
+Conta: ${accountLabel}
+Descrição: ${description}${scheduledNote}`;
+  };
+
+  const extractAmountFromText = (content: string): number | null => {
+    const normalized = content.toLowerCase().replace(/\s+/g, " ");
+    const regex = /(\d+(?:[.,]\d+)?)(?:\s*(milhão|milhao|milhões|milhoes|mil))?/gi;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(normalized))) {
+      const rawIndex = match.index;
+      const tokens = normalized.slice(0, rawIndex).trim().split(/\s+/);
+      const prevWord = tokens[tokens.length - 1] || "";
+      if (prevWord.replace(/[^\p{L}]/gu, "").startsWith("dia")) {
+        continue;
+      }
+      const raw = match[1].replace(/\./g, "").replace(",", ".");
+      let value = Number(raw);
+      if (!Number.isFinite(value)) continue;
+      const unit = match[2];
+      if (unit) {
+        if (unit.startsWith("milh")) value *= 1_000_000;
+        else value *= 1_000;
+      }
+      return Number(value.toFixed(2));
+    }
+    return null;
+  };
+
+  const parseDateFromText = (content: string): Date | null => {
+    const normalized = content.toLowerCase();
+    const now = new Date();
+    if (normalized.includes("amanhã") || normalized.includes("amanha")) {
+      return new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
+    }
+    if (normalized.includes("hoje")) {
+      return now;
+    }
+    if (normalized.includes("ontem")) {
+      return new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+    }
+    const dayMatch = normalized.match(/dia\s+(\d{1,2})/);
+    if (dayMatch) {
+      const day = Number(dayMatch[1]);
+      if (!Number.isFinite(day) || day < 1 || day > 31) return null;
+      let target = new Date(now.getFullYear(), now.getMonth(), day);
+      if (target.getTime() < now.getTime()) {
+        target = new Date(now.getFullYear(), now.getMonth() + 1, day);
+      }
+      return target;
+    }
+    const explicitMatch = normalized.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
+    if (explicitMatch) {
+      const day = Number(explicitMatch[1]);
+      const month = Number(explicitMatch[2]) - 1;
+      const year = explicitMatch[3] ? Number(explicitMatch[3].length === 2 ? "20" + explicitMatch[3] : explicitMatch[3]) : now.getFullYear();
+      const candidate = new Date(year, month, day);
+      if (Number.isNaN(candidate.getTime())) return null;
+      return candidate;
+    }
+    return null;
+  };
+
+  const detectTransactionTypeFromText = (content: string): "income" | "expense" | null => {
+    const normalized = content.toLowerCase();
+    const incomeKeywords = ["recebi", "receber", "ganhei", "caiu", "entrou", "pagaram", "depositaram", "entrada"];
+    const expenseKeywords = ["paguei", "pagar", "gastei", "despesa", "boleto", "saída", "saida", "transferi", "comprar", "conta"];
+    if (incomeKeywords.some((keyword) => normalized.includes(keyword))) return "income";
+    if (expenseKeywords.some((keyword) => normalized.includes(keyword))) return "expense";
+    return null;
+  };
+
+  const detectAccountTypeFromText = (content: string, userPlan: string): "PF" | "PJ" | null => {
+    const normalized = content.toLowerCase();
+    const pjKeywords = [
+      "empresa",
+      "empresarial",
+      "escritório",
+      "escritorio",
+      "consultório",
+      "consultorio",
+      "loja",
+      "cnpj",
+      "mei",
+      "nota fiscal",
+      "cliente pj",
+      "cliente",
+      "fornecedor",
+      "emitir nfe",
+      "mei/pj",
+      "sala comercial",
+      "venda",
+      "faturamento",
+      "contrato",
+      "prestação de serviço",
+      "serviço para empresa",
+    ];
+    const pfKeywords = ["pessoal", "pf", "casa", "família", "familia", "particular"];
+
+    if (userPlan !== "premium") return "PF";
+
+    const tokens = normalized.split(/\s+/);
+    if (tokens.includes("pj")) return "PJ";
+    if (tokens.includes("pf")) return "PF";
+
+    if (pjKeywords.some((keyword) => normalized.includes(keyword))) {
+      return "PJ";
+    }
+    if (pfKeywords.some((keyword) => normalized.includes(keyword))) {
+      return "PF";
+    }
+
+    return null;
+  };
+
+  const inferTypeFromHistory = (messages: ConversationMessage[]): "income" | "expense" | null => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i];
+      if (message.role !== "user") continue;
+      if (i === messages.length - 1) continue;
+      const type = detectTransactionTypeFromText(message.content);
+      if (type) {
+        return type;
+      }
+    }
+    return null;
+  };
+
+  const inferAccountTypeFromHistory = (
+    messages: ConversationMessage[],
+    userPlan: string
+  ): "PF" | "PJ" | null => {
+    if (userPlan !== "premium") {
+      return "PF";
+    }
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i];
+      if (message.role !== "user") continue;
+      if (i === messages.length - 1) continue;
+      const accountType = detectAccountTypeFromText(message.content, userPlan);
+      if (accountType) {
+        return accountType;
+      }
+    }
+    return null;
+  };
+
+  const isAffirmativeWord = (content: string) => {
+    const normalized = content.trim().toLowerCase();
+    return ["sim", "claro", "pode", "ok", "certo"].includes(normalized);
+  };
+
+  const ensureAccountTypeInMemory = (state: ConversationState, userPlan: string) => {
+    if (!state.memory.accountType) {
+      if (userPlan !== "premium") {
+        state.memory.accountType = "PF";
+      }
+    }
+  };
+
+  const fillMemoryFromInterpretation = (state: ConversationState, interpretation?: AiInterpretationSuccess) => {
+    if (!interpretation) return;
+    const tx = interpretation.transaction;
+    if (tx.amount && state.memory.amount === undefined) {
+      state.memory.amount = Number(tx.amount);
+    }
+    if (tx.type && !state.memory.type) {
+      state.memory.type = tx.type;
+    }
+    if (tx.date && !state.memory.date) {
+      state.memory.date = tx.date;
+      state.memory.dueDate = tx.date;
+    }
+    if (tx.description && !state.memory.description) {
+      state.memory.description = tx.description;
+    }
+    if (tx.accountType && !state.memory.accountType) {
+      state.memory.accountType = tx.accountType;
+    }
+    if (tx.category && !state.memory.category) {
+      state.memory.category = tx.category;
+    }
+    if (typeof tx.isScheduled === "boolean") {
+      if (tx.isScheduled) {
+        state.memory.isScheduled = true;
+      } else if (state.memory.isScheduled === undefined) {
+        state.memory.isScheduled = false;
+      }
+    }
+    if (tx.dueDate && !state.memory.dueDate) {
+      state.memory.dueDate = tx.dueDate;
+    }
+  };
+
+  const applyHeuristicsFromContent = (state: ConversationState, content: string, userPlan: string) => {
+    const amountFromText = extractAmountFromText(content);
+    if (!state.memory.amount && amountFromText !== null) {
+      state.memory.amount = amountFromText;
+    }
+    const typeFromText = detectTransactionTypeFromText(content);
+    if (!state.memory.type && typeFromText) {
+      state.memory.type = typeFromText;
+    }
+    const dateFromText = parseDateFromText(content);
+    if (!state.memory.date && dateFromText) {
+      state.memory.date = dateFromText.toISOString();
+      state.memory.dueDate = state.memory.date;
+    }
+    if (!state.memory.accountType) {
+      const detectedAccountType = detectAccountTypeFromText(content, userPlan);
+      if (detectedAccountType) {
+        state.memory.accountType = detectedAccountType;
+      }
+    }
+    if (!state.memory.accountType && userPlan === "premium" && state.memory.description) {
+      const desc = state.memory.description.toLowerCase();
+      const inferred = detectAccountTypeFromText(desc, userPlan);
+      if (inferred) {
+        state.memory.accountType = inferred;
+      }
+    }
+    const scheduled = detectScheduledKeyword(content);
+    if (scheduled) {
+      state.memory.isScheduled = true;
+      if (state.memory.date) {
+        state.memory.dueDate = state.memory.date;
+      }
+    }
+    if (!state.memory.description && state.step === "collecting_description") {
+      const trimmed = content.trim();
+      if (trimmed.length > 2 && !isAffirmativeWord(trimmed)) {
+        state.memory.description = trimmed;
+      }
+    }
+  };
+
+  const buildCandidateFromState = (state: ConversationState): CandidateTransaction | null => {
+    if (!hasAllConversationData(state.memory)) {
+      return null;
+    }
+    const type = state.memory.type || "expense";
+    const accountType = state.memory.accountType || "PF";
+    const description = state.memory.description || "";
+    const amount = state.memory.amount || 0;
+    const isoDate = state.memory.date!;
+    const category =
+      state.memory.category ||
+      pickCategory(state.memory.category, accountType, type, description);
+
+    return {
+      type,
+      description,
+      amount,
+      date: isoDate,
+      accountType,
+      category,
+      isScheduled: Boolean(state.memory.isScheduled),
+      dueDate: state.memory.dueDate || isoDate,
+    };
+  };
+
+  const registerPendingActionForCandidate = (
+    userId: string,
+    candidate: CandidateTransaction,
+    intentOverride?: "income" | "expense"
+  ) => {
+    if (candidate.isScheduled) {
+      pendingActions.set(userId, { kind: "future", candidate, intent: intentOverride || candidate.type });
+    } else {
+      pendingActions.set(userId, { kind: "transaction", candidate });
+    }
+  };
+
+  type PendingActionResult = {
+    assistantText: string;
+    transaction?: Transaction | null;
+    futureTransaction?: FutureTransaction | null;
+    recurringTransaction?: RecurringTransaction | null;
+  };
+
+  const AI_SYSTEM_PROMPT = `
+Você é o FinScope AI, um agente financeiro do FinScope. Sua responsabilidade é entender comandos em português simples como "Gastei 50 reais no mercado hoje", "Recebi 3.500 de salário", "todo mês pago Netflix" e devolvê-los em um JSON estruturado para que o FinScope consiga lançar transações, compromissos futuros e recorrências.
+
+Sempre aja como especialista do FinScope: confirme a intenção, escolha o tipo certo (entrada/saída) e ajude a manter o histórico correto.
+
+Seu objetivo é interpretar se existe uma transação e responder APENAS com JSON válido (sem texto adicional).
+
+Formato obrigatório:
+{
+  "status": "success" | "clarify",
+  "message": "texto explicativo quando status = clarify",
+  "transaction": {
+    "type": "income" | "expense" | "scheduled",
+    "description": "texto curto em minúsculas",
+    "amount": 50.5,
+    "date": "2025-01-20",
+    "account_type": "PF" | "PJ",
+    "category": "categoria permitida"
+  }
+}
+
+Regras:
+- Determine o tipo com cuidado: entradas (income) representam dinheiro recebido ("recebi", "salário", "caiu"), saídas (expense) são gastos ("paguei", "gastei", "transferi para pagar"). Use "scheduled" somente para compromissos futuros confirmados (ex.: "vou pagar", "conta do mês que vem") e sempre peça data futura.
+- Se não houver informação suficiente (valor ou data), retorne status "clarify" com uma mensagem pedindo detalhes.
+- Sempre use datas no formato ISO YYYY-MM-DD. Se não houver data, use a data de hoje. Para \"scheduled\" você deve exigir data futura antes de confirmar.
+- account_type: escolha "PJ" apenas se o texto mencionar termos de empresa (CNPJ, clientes PJ, faturamento da empresa, notas fiscais, MEI). Caso contrário, use "PF".
+- Categorias devem ser APENAS das listas abaixo, respeitando o contexto PF/PJ. Exemplos: Streaming é PF, Impostos e Software são PJ, Mercado é PF.
+${AI_CATEGORY_TEXT}
+- Use descrições curtas (ex.: "mercado", "salário").
+- Quando identificar assinaturas ou valores como salário/aluguel/streaming citados como recorrentes do tipo "todo mês", mantenha a categoria coerente e responda normalmente (o sistema aplica recorrência fora desta resposta).
+- amount deve ser número em reais (sem símbolo). Use valor absoluto.
+`;
+
+type AiInterpretationSuccess = {
+  status: "success";
+  transaction: {
+    type: "income" | "expense";
+    description: string;
+    amount: number;
+    date: string;
+    accountType: "PF" | "PJ";
+    category: string;
+    isScheduled?: boolean;
+    dueDate?: string;
+  };
+};
+
+type AiInterpretationResult =
+  | AiInterpretationSuccess
+  | {
+      status: "clarify";
+      message: string;
+    };
+
+  const sanitizeAiJson = (raw: string) => {
+    if (!raw) return "";
+    const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace === -1 || lastBrace === -1) {
+      return cleaned;
+    }
+    return cleaned.slice(firstBrace, lastBrace + 1);
+  };
+
+  const normalizeCategoryCandidate = (
+    candidate: string | undefined,
+    accountType: "PF" | "PJ",
+    txType: "income" | "expense"
+  ) => {
+    if (!candidate) return undefined;
+    const allowed = AI_ALLOWED_CATEGORIES[accountType][txType];
+    return allowed.find((cat) => cat.toLowerCase() === candidate.toLowerCase());
+  };
+
+  const inferCategoryFromDescription = (
+    description: string,
+    accountType: "PF" | "PJ",
+    txType: "income" | "expense"
+  ) => {
+    const normalized = description.toLowerCase();
+    const hint = CATEGORY_HINTS.find(
+      (item) =>
+        item.scope === accountType &&
+        item.type === txType &&
+        item.keywords.some((keyword) => normalized.includes(keyword))
+    );
+    return hint?.category;
+  };
+
+  const pickCategory = (
+    candidate: string | undefined,
+    accountType: "PF" | "PJ",
+    txType: "income" | "expense",
+    description: string
+  ) => {
+    const normalizedCandidate = normalizeCategoryCandidate(candidate, accountType, txType);
+    if (normalizedCandidate) return normalizedCandidate;
+    const hinted = inferCategoryFromDescription(description, accountType, txType);
+    if (hinted) return hinted;
+    return DEFAULT_CATEGORY[accountType][txType];
+  };
+
+  const detectFutureIntent = (content: string): "income" | "expense" | null => {
+    const normalized = content.toLowerCase();
+    const futureExpensePatterns = [
+      /vou\s+(ter\s+que\s+)?pagar/,
+      /tenho\s+que\s+pagar/,
+      /preciso\s+pagar/,
+      /vou\s+pagar/,
+      /vou\s+precisar\s+pagar/,
+    ];
+    const futureIncomePatterns = [
+      /vou\s+(receber|ganhar)/,
+      /tenho\s+que\s+receber/,
+      /devo\s+receber/,
+      /vou\s+emitir/,
+    ];
+    if (futureIncomePatterns.some((regex) => regex.test(normalized))) {
+      return "income";
+    }
+    if (futureExpensePatterns.some((regex) => regex.test(normalized))) {
+      return "expense";
+    }
+    return null;
+  };
+
+  const detectScheduledKeyword = (content: string): boolean => {
+    const normalized = content.toLowerCase();
+    const scheduledPatterns = [
+      /vou\s+ter\s+que\s+pagar/,
+      /conta\s+do\s+m[êe]s\s+que\s+vem/,
+      /conta\s+do\s+pr[oó]ximo\s+m[êe]s/,
+      /preciso\s+separar\s+dinheiro/,
+      /separar\s+dinheiro/,
+      /preciso\s+reservar/,
+      /vou\s+reservar/,
+    ];
+    return scheduledPatterns.some((regex) => regex.test(normalized));
+  };
+
+  const detectRecurringFrequency = (content: string): "monthly" | "weekly" | null => {
+    const normalized = content.toLowerCase();
+    const monthlyPatterns = [
+      /todo\s+m[êe]s/,
+      /toda\s+m[êe]s/,
+      /mensal/,
+      /mensalmente/,
+      /dia\s+\d+/,
+      /sal[aá]rio/,
+      /assinatura/,
+      /streaming/,
+      /netflix/,
+      /spotify/,
+      /mensalidade/,
+      /aluguel/,
+    ];
+    const weeklyPatterns = [
+      /toda\s+semana/,
+      /toda\s+seman[ao]/,
+      /semanal/,
+      /semanalmente/,
+      /toda\s+segunda/,
+      /toda\s+ter[cç]a/,
+      /toda\s+quarta/,
+      /toda\s+quinta/,
+      /toda\s+sexta/,
+    ];
+
+    if (weeklyPatterns.some((regex) => regex.test(normalized))) {
+      return "weekly";
+    }
+    if (monthlyPatterns.some((regex) => regex.test(normalized))) {
+      return "monthly";
+    }
+    return null;
+  };
+
+  const detectConfirmationIntent = (content: string): "confirm" | "cancel" | null => {
+    const cleaned = content
+      .toLowerCase()
+      .replace(/[!?.]/g, "")
+      .replace(/,/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!cleaned) return null;
+    const words = cleaned.split(" ");
+    if (words.length > 4) {
+      return null;
+    }
+    const confirmKeywords = ["sim", "confirmo", "pode salvar", "pode confirmar", "ok", "pode registrar", "confirma"];
+    const cancelKeywords = ["não", "nao", "cancela", "cancelar", "desconsidera", "descarta"];
+
+    const matchesKeyword = (value: string, keywords: string[]) =>
+      keywords.some((keyword) => value === keyword || value === `${keyword} sim` || value === `${keyword} por favor`);
+
+    if (matchesKeyword(cleaned, confirmKeywords)) {
+      return "confirm";
+    }
+    if (matchesKeyword(cleaned, cancelKeywords)) {
+      return "cancel";
+    }
+    return null;
+  };
+
+  const detectResetIntent = (content: string): boolean => {
+    const normalized = content
+      .toLowerCase()
+      .replace(/[!?.]/g, "")
+      .replace(/,+/g, "")
+      .trim();
+    if (!normalized) return false;
+    const resetKeywords = [
+      "reset",
+      "resetar",
+      "reinicia",
+      "reiniciar",
+      "começar do zero",
+      "começar de novo",
+      "vamos do zero",
+      "volta do zero",
+      "comece do 0",
+      "começa do zero",
+    ];
+    return resetKeywords.some((keyword) => normalized.includes(keyword));
+  };
+
+  const describeCandidate = (candidate: CandidateTransaction) => {
+    const reference = candidate.dueDate || candidate.date;
+    const date = reference ? new Date(reference) : new Date();
+    const scheduledTag = candidate.isScheduled ? " (planejado)" : "";
+    return `${candidate.type === "income" ? "Entrada" : "Saída"} de ${formatCurrencyBRL(candidate.amount)} em ${formatPtDate(
+      date
+    )} (${candidate.category}) na ${scopeLabels[candidate.accountType]}${scheduledTag}`;
+  };
+
+  const buildPendingSummary = (action: PendingAction) => {
+    const base = describeCandidate(action.candidate);
+    if (action.kind === "recurring") {
+      const label = action.frequency === "monthly" ? "mensal" : "semanal";
+      return `${base} marcada como recorrente ${label}. Confirma esta transação?`;
+    }
+    if (action.kind === "future") {
+      const verb = action.intent === "expense" ? "pagar" : "receber";
+      if (action.candidate.isScheduled) {
+        return `${base} programada para ${verb}. Confirma este compromisso futuro?`;
+      }
+      return `${base} para ${verb} no futuro. Confirma esta previsão?`;
+    }
+    return `${base}. Confirma esta transação?`;
+  };
+
+  async function executePendingAction(action: PendingAction, user: User): Promise<PendingActionResult> {
+    try {
+      if (action.kind === "future") {
+        let expectedDate = new Date(action.candidate.dueDate || action.candidate.date || Date.now());
+        if (Number.isNaN(expectedDate.getTime())) {
+          expectedDate = new Date();
+        }
+        const isScheduled = Boolean(action.candidate.isScheduled);
+        const record = await storage.createFutureTransaction({
+          userId: user.id,
+          type: action.intent,
+          description: action.candidate.description,
+          amount: action.candidate.amount,
+          expectedDate,
+          accountType: action.candidate.accountType,
+          status: "pending",
+          isScheduled,
+          dueDate: expectedDate,
+        });
+        const verb = action.intent === "expense" ? "precisa pagar" : "vai receber";
+        const scheduledNote = isScheduled ? " (planejado)" : "";
+        return {
+          assistantText: `Anotado! Registrei que você ${verb} ${formatCurrencyBRL(
+            action.candidate.amount
+          )} em ${formatPtDate(expectedDate)}${scheduledNote} na ${scopeLabels[action.candidate.accountType]}.`,
+          futureTransaction: record,
+        };
+      }
+
+      await ensureDefaultAccounts(user.id, user.plan);
+      const accounts = await storage.getAccountsByUserId(user.id);
+      const targetAccount = accounts.find(
+        (acc) => acc.type?.toLowerCase() === action.candidate.accountType.toLowerCase()
+      );
+
+      if (!targetAccount) {
+        return {
+          assistantText: "Não encontrei uma conta compatível para registrar isso agora. Tente novamente em alguns segundos.",
+        };
+      }
+
+      if (action.kind === "transaction") {
+        let transactionDate = new Date(action.candidate.date || Date.now());
+        if (Number.isNaN(transactionDate.getTime())) {
+          transactionDate = new Date();
+        }
+        const transaction = await storage.createTransaction({
+          userId: user.id,
+          accountId: targetAccount.id,
+          description: action.candidate.description,
+          type: action.candidate.type === "income" ? "entrada" : "saida",
+          amount: action.candidate.amount,
+          category: action.candidate.category,
+          date: transactionDate,
+          accountType: action.candidate.accountType,
+          source: "ai",
+        });
+        return {
+          assistantText: `Perfeito! Registrei ${action.candidate.description} em ${formatPtDate(transactionDate)}.`,
+          transaction,
+        };
+      }
+
+      if (action.kind === "recurring") {
+        let referenceDate = new Date(action.candidate.date || Date.now());
+        if (Number.isNaN(referenceDate.getTime())) {
+          referenceDate = new Date();
+        }
+        if (action.immediateReceipt) {
+          referenceDate = new Date();
+        }
+        const nextDate = computeNextOccurrence(referenceDate, action.frequency);
+        const recurringRecord = await storage.createRecurringTransaction({
+          userId: user.id,
+          type: action.candidate.type,
+          description: action.candidate.description,
+          amount: action.candidate.amount,
+          frequency: action.frequency,
+          nextDate,
+          accountType: action.candidate.accountType,
+        });
+
+        let futureRecord: FutureTransaction | null = null;
+        try {
+          futureRecord = await storage.createFutureTransaction({
+            userId: user.id,
+            type: action.candidate.type,
+            description: action.candidate.description,
+            amount: action.candidate.amount,
+            expectedDate: nextDate,
+            accountType: action.candidate.accountType,
+            status: "pending",
+            isScheduled: true,
+            dueDate: nextDate,
+          });
+        } catch (error) {
+          console.error("[AI CLIENT] erro ao criar previsão recorrente:", error);
+        }
+
+        let createdTransaction: Transaction | null = null;
+        const shouldInsertNow = action.immediateReceipt || referenceDate <= new Date();
+        if (shouldInsertNow) {
+          try {
+            createdTransaction = await storage.createTransaction({
+              userId: user.id,
+              accountId: targetAccount.id,
+              description: action.candidate.description,
+              type: action.candidate.type === "income" ? "entrada" : "saida",
+              amount: action.candidate.amount,
+              category: action.candidate.category,
+              date: referenceDate,
+              accountType: action.candidate.accountType,
+              source: "ai",
+            });
+          } catch (error) {
+            console.error("[AI CLIENT] erro ao registrar transação recorrente atual:", error);
+          }
+        }
+
+        const recurringLabel = action.frequency === "monthly" ? "mensal" : "semanal";
+        const immediateMsg = createdTransaction ? ", e já lancei o valor deste período" : "";
+        return {
+          assistantText: `Perfeito! Anotei ${action.candidate.description} como recorrência ${recurringLabel}${immediateMsg}.`,
+          transaction: createdTransaction,
+          futureTransaction: futureRecord,
+          recurringTransaction: recurringRecord,
+        };
+      }
+
+      return { assistantText: "Não consegui processar esta operação agora. Tente novamente em instantes." };
+    } catch (error) {
+      console.error("[AI CLIENT] erro ao confirmar ação pendente:", error);
+      return { assistantText: "Algo deu errado ao registrar. Pode tentar novamente em alguns segundos?" };
+    }
+  }
+  const resolveRelativeDateFromContent = (content: string): Date | null => {
+    const normalized = content.toLowerCase();
+    const now = new Date();
+    if (normalized.includes("hoje")) {
+      return now;
+    }
+    if (normalized.includes("ontem")) {
+      return new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    }
+    if (normalized.includes("semana passada")) {
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+    return null;
+  };
+
+  const detectImmediateReceipt = (content: string): boolean => {
+    const normalized = content.toLowerCase();
+    const keywords = [
+      "recebi",
+      "recebido",
+      "caiu",
+      "entrou",
+      "pix",
+      "pagaram",
+      "depositaram",
+      "me pagaram",
+      "ganhei",
+    ];
+    return keywords.some((keyword) => normalized.includes(keyword));
+  };
+
+  const computeNextOccurrence = (baseDate: Date, frequency: "monthly" | "weekly") => {
+    const reference = new Date(baseDate);
+    const now = new Date();
+    let nextDate = reference;
+    if (nextDate < now) {
+      nextDate = new Date(reference);
+      while (nextDate < now) {
+        if (frequency === "monthly") {
+          nextDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, nextDate.getDate());
+        } else {
+          nextDate = new Date(nextDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+        }
+      }
+    }
+    return nextDate;
+  };
+
+  type ConversationMessage = {
+    role: "user" | "assistant";
+    content: string;
+  };
+
+  const fetchRecentConversation = async (userId: string, limit = 6): Promise<ConversationMessage[]> => {
+    try {
+      const { data, error } = await supabase
+        .from("ai_messages")
+        .select("role, content")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error || !data) {
+        if (error) {
+          console.warn("[AI CLIENT] não foi possível carregar histórico para contexto:", error);
+        }
+        return [];
+      }
+      return data
+        .map((row) => ({
+          role: row.role === "assistant" ? "assistant" : "user",
+          content: row.content || "",
+        }))
+        .reverse();
+    } catch (error) {
+      console.warn("[AI CLIENT] falha ao buscar histórico de contexto:", error);
+      return [];
+    }
+  };
+
+  const interpretTransactionFromMessage = async (
+    content: string,
+    conversation: ConversationMessage[],
+    contextPrompt?: string
+  ): Promise<AiInterpretationResult> => {
+    if (!OPENAI_API_KEY) {
+      return {
+        status: "clarify",
+        message: "Para registrar automaticamente preciso da variável OPENAI_API_KEY configurada no servidor.",
+      };
+    }
+
+    try {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: OPENAI_MODEL,
+          temperature: 0.2,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: AI_SYSTEM_PROMPT },
+            ...(contextPrompt ? [{ role: "user" as const, content: contextPrompt }] : []),
+            ...conversation.map((message) => ({
+              role: message.role,
+              content: message.content,
+            })),
+            { role: "user", content },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[AI CLIENT] OpenAI response error:", errorText);
+        return {
+          status: "clarify",
+          message: "Não consegui falar com a IA agora. Pode tentar novamente em instantes?",
+        };
+      }
+
+      const completion = await response.json();
+      const rawContent = completion?.choices?.[0]?.message?.content?.trim();
+      if (!rawContent) {
+        return {
+          status: "clarify",
+          message: "Não consegui entender essa mensagem. Pode enviar com valor, tipo e data?",
+        };
+      }
+
+      const jsonPayload = sanitizeAiJson(rawContent);
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(jsonPayload);
+      } catch (error) {
+        console.warn("[AI CLIENT] não consegui converter resposta da IA em JSON:", jsonPayload);
+        return {
+          status: "clarify",
+          message: "Preciso de mais detalhes (valor, descrição e data) para registrar essa movimentação.",
+        };
+      }
+
+      if (parsed.status && String(parsed.status).toLowerCase() !== "success") {
+        return {
+          status: "clarify",
+          message:
+            parsed.message ||
+            "Ainda não entendi. Informe valor, descrição e se é gasto ou receita (PF ou PJ).",
+        };
+      }
+
+      const payload = parsed.transaction ?? parsed;
+      if (!payload) {
+        return {
+          status: "clarify",
+          message: "Não encontrei uma transação clara nessa mensagem. Pode repetir com mais detalhes?",
+        };
+      }
+
+      const typeText = String(payload.type || "").toLowerCase();
+      const scheduledKeyword = detectScheduledKeyword(content);
+      const inferredFutureIntent = detectFutureIntent(content);
+      let normalizedType: "income" | "expense" | undefined =
+        typeText === "income" ? "income" : typeText === "expense" ? "expense" : undefined;
+      let isScheduledCandidate = false;
+
+      if (typeText === "scheduled") {
+        isScheduledCandidate = true;
+      }
+
+      if (isScheduledCandidate) {
+        if (!normalizedType && inferredFutureIntent) {
+          normalizedType = inferredFutureIntent;
+        }
+        if (!normalizedType) {
+          return {
+            status: "clarify",
+            message: "Essa conta futura é um pagamento ou um recebimento?",
+          };
+        }
+      } else if (!normalizedType && scheduledKeyword && inferredFutureIntent) {
+        normalizedType = inferredFutureIntent;
+        isScheduledCandidate = true;
+      }
+
+      if (!normalizedType) {
+        return {
+          status: "clarify",
+          message: "É uma entrada ou saída? Conte se recebeu ou gastou dinheiro.",
+        };
+      }
+
+      const description = String(payload.description || "").trim();
+      if (!description) {
+        return {
+          status: "clarify",
+          message: "Preciso de uma descrição curta (ex.: mercado, salário, fornecedor).",
+        };
+      }
+
+      const amount = Number(payload.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return {
+          status: "clarify",
+          message: "Qual é o valor da movimentação?",
+        };
+      }
+
+      const accountType = String(payload.account_type || payload.accountType || "PF").toUpperCase() === "PJ" ? "PJ" : "PF";
+      const dateCandidate = payload.due_date || payload.dueDate || payload.date || payload.when;
+      let parsedDate: Date | null = null;
+      if (dateCandidate) {
+        const candidateDate = new Date(dateCandidate);
+        if (!Number.isNaN(candidateDate.getTime())) {
+          parsedDate = candidateDate;
+        }
+      }
+
+      if (!parsedDate && !isScheduledCandidate) {
+        const relative = resolveRelativeDateFromContent(content);
+        if (relative) {
+          parsedDate = relative;
+        }
+      }
+
+      if (!parsedDate) {
+        return {
+          status: "clarify",
+          message: isScheduledCandidate
+            ? "Qual é a data futura dessa movimentação?"
+            : "Qual é a data dessa movimentação?",
+        };
+      }
+
+      if (isScheduledCandidate && parsedDate.getTime() <= Date.now()) {
+          return {
+            status: "clarify",
+            message: "Para agendar preciso de uma data no futuro. Informe dia/mês/ano.",
+          };
+      }
+
+      const category = pickCategory(
+        payload.category ? String(payload.category) : undefined,
+        accountType,
+        normalizedType,
+        description
+      );
+
+      const isoDate = parsedDate.toISOString();
+
+      return {
+        status: "success",
+        transaction: {
+          type: normalizedType,
+          description,
+          amount: Math.abs(amount),
+          date: isoDate,
+          accountType,
+          category,
+          isScheduled: isScheduledCandidate,
+          dueDate: isScheduledCandidate ? isoDate : undefined,
+        },
+      };
+    } catch (error) {
+      console.error("[AI CLIENT] erro ao conversar com a OpenAI:", error);
+      return {
+        status: "clarify",
+        message: "A IA falhou desta vez. Reenvie a mensagem em alguns segundos, por favor.",
+      };
+    }
   };
 
   async function ensureDefaultAccounts(userId: string, plan: string) {
@@ -234,6 +1433,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const insights = includeInsights ? buildPremiumInsights(transactions) : [];
       const chartImage = includeCharts ? buildChartImage(categories) : null;
+      const [forecast, aiInsights] = await Promise.all([
+        computeCashflowForecast(req.session.userId, scope),
+        generateAiInsights(req.session.userId, scope),
+      ]);
       const html = buildReportHtml({
         user,
         type,
@@ -244,11 +1447,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         chartImage,
         includeCharts,
         insights,
+        forecast,
+        aiInsights,
       });
 
+      const protocolTimeout = Number(process.env.PUPPETEER_PROTOCOL_TIMEOUT || "90000");
       const browser = await puppeteer.launch({
         headless: "new",
         executablePath: puppeteerExecutable ?? undefined,
+        protocolTimeout,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
@@ -258,10 +1465,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "--single-process",
           "--no-zygote",
         ],
-        protocolTimeout: 60000, // 60 seconds timeout for DevTools protocol
         dumpio: process.env.NODE_ENV !== "production",
       });
       const page = await browser.newPage();
+      page.setDefaultNavigationTimeout(protocolTimeout);
+      page.setDefaultTimeout(protocolTimeout);
       await page.setContent(html, { waitUntil: "networkidle0" });
       const pdfBuffer = await page.pdf({
         format: "A4",
@@ -743,8 +1951,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         userId: req.session.userId,
         accountType: requestedAccountType,
+        source: "manual",
       });
-      const transaction = await storage.createTransaction({ ...data, accountId, accountType: requestedAccountType });
+      const transaction = await storage.createTransaction({ ...data, accountId, accountType: requestedAccountType, source: "manual" });
       res.json(transaction);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -806,6 +2015,504 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  // ===== FUTURE EXPENSES =====
+  app.get("/api/future-expenses", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const scope = parseAccountScope(req.query?.accountType);
+      const statusFilter = parseFutureExpenseStatus(req.query?.status);
+      if (!ensureScopeAccess(scope, req, res)) {
+        return;
+      }
+      const [expenses, scheduled] = await Promise.all([
+        storage.getFutureExpenses(req.session.userId, scope, statusFilter),
+        storage.getFutureTransactions(req.session.userId, scope),
+      ]);
+
+      const scheduledExpenses = scheduled
+        .filter((tx) => tx.isScheduled && tx.type === "expense")
+        .filter((tx) => {
+          if (!statusFilter) return true;
+          if (statusFilter === "paid") return tx.status === "paid";
+          if (statusFilter === "overdue") return tx.status === "overdue";
+          return tx.status === "pending";
+        })
+        .map((tx) => {
+          const category = (tx as any)?.category || "Outros";
+          const amountValue =
+            typeof tx.amount === "number"
+              ? tx.amount.toFixed(2)
+              : typeof tx.amount === "string"
+              ? tx.amount
+              : Number(tx.amount || 0).toFixed(2);
+          return {
+            id: `scheduled-${tx.id}`,
+            userId: tx.userId,
+            accountType: tx.accountType,
+            title: tx.description || "Despesa futura",
+            category,
+            amount: amountValue,
+            dueDate: tx.dueDate ? new Date(tx.dueDate) : new Date(tx.expectedDate),
+            isRecurring: false,
+            recurrenceType: null,
+            status: tx.status === "paid" ? "paid" : tx.status === "overdue" ? "overdue" : "pending",
+            createdAt: tx.createdAt ? new Date(tx.createdAt) : new Date(),
+          };
+        });
+
+      res.json([...expenses, ...scheduledExpenses]);
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  app.post("/api/future-expenses", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const payload = insertFutureExpenseSchema.parse(req.body);
+      if (!ensureScopeAccess(payload.accountType as AccountScope, req, res)) {
+        return;
+      }
+      const expense = await storage.createFutureExpense({
+        ...payload,
+        status: payload.status || "pending",
+        userId: req.session.userId,
+      });
+      res.status(201).json(expense);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  app.put("/api/future-expenses/:id/mark-paid", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const updated = await storage.updateFutureExpenseStatus(req.params.id, req.session.userId, "paid");
+      if (!updated) {
+        return res.status(404).json({ error: "Conta a pagar não encontrada" });
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  app.put("/api/future-expenses/:id/mark-overdue", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const updated = await storage.updateFutureExpenseStatus(req.params.id, req.session.userId, "overdue");
+      if (!updated) {
+        return res.status(404).json({ error: "Conta a pagar não encontrada" });
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  app.get("/api/future", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const scope = parseAccountScope(req.query?.type);
+      if (!ensureScopeAccess(scope, req, res)) {
+        return;
+      }
+      const statusFilter = parseFutureTransactionStatus(req.query?.status);
+      const [futureItems, expenseItems] = await Promise.all([
+        storage.getFutureTransactions(req.session.userId, scope, statusFilter),
+        storage.getFutureExpenses(req.session.userId, scope),
+      ]);
+
+      const expenseAsFuture = expenseItems
+        .filter((expense) => {
+          if (!statusFilter) return true;
+          if (statusFilter === "pending") return expense.status === "pending";
+          if (statusFilter === "paid") return expense.status === "paid";
+          if (statusFilter === "received") return expense.status === "paid";
+          if (statusFilter === "overdue") return expense.status === "overdue";
+          return false;
+        })
+        .map(convertExpenseToFuture);
+
+      const combined = [...futureItems, ...expenseAsFuture];
+      const totals = computeFutureTotals(combined);
+      res.json({ items: combined, totals });
+    } catch (error) {
+      console.error("[FUTURE TX] erro ao listar previsões:", error);
+      res.status(500).json({ error: "Erro ao buscar valores previstos" });
+    }
+  });
+
+  app.post("/api/future", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const parsed = insertFutureTransactionSchema.parse({
+        ...req.body,
+        accountType: normalizeAccountType(req.body?.accountType),
+        expectedDate: req.body?.expectedDate,
+      });
+      if (parsed.accountType === "PJ" && req.currentUser?.plan !== "premium") {
+        return res.status(403).json({ error: "Valores previstos PJ disponíveis apenas no plano Premium" });
+      }
+      const futureTx = await storage.createFutureTransaction({
+        ...parsed,
+        status: parsed.status || "pending",
+        userId: req.session.userId,
+        isScheduled: Boolean(parsed.isScheduled),
+        dueDate: parsed.dueDate ?? parsed.expectedDate,
+      });
+      res.status(201).json(futureTx);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      console.error("[FUTURE TX] erro ao cadastrar previsão:", error);
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  app.post("/api/ai/chat", requireAuth, requireActiveBilling, async (req: any, res) => {
+    const validation = aiChatRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      const message = validation.error.issues[0]?.message || "Mensagem inválida";
+      return res.status(400).json({ error: message });
+    }
+
+    const user = req.currentUser;
+    if (!user) {
+      return res.status(401).json({ error: "Sessão expirada" });
+    }
+
+    const content = validation.data.content.trim();
+    const state = getConversationState(user.id);
+    logConversationState(user.id, "before");
+
+    let assistantText = "";
+    let createdTransaction: Transaction | null = null;
+    let createdFutureTransaction: FutureTransaction | null = null;
+    let createdRecurringTransaction: RecurringTransaction | null = null;
+
+    const pendingAction = pendingActions.get(user.id);
+    const confirmationIntent = detectConfirmationIntent(content);
+
+    try {
+      const { data: userMessage, error: userMessageError } = await supabase
+        .from("ai_messages")
+        .insert({
+          user_id: user.id,
+          role: "user",
+          content,
+        })
+        .select()
+        .single();
+
+      if (userMessageError || !userMessage) {
+        console.error("[AI CLIENT] erro ao salvar mensagem do usuário:", userMessageError);
+        return res.status(500).json({ error: "Não foi possível registrar sua mensagem agora." });
+      }
+
+      const sendAssistantResponse = async () => {
+        const { data: assistantMessage, error: assistantMessageError } = await supabase
+          .from("ai_messages")
+          .insert({
+            user_id: user.id,
+            role: "assistant",
+            content: assistantText,
+          })
+          .select()
+          .single();
+
+        if (assistantMessageError || !assistantMessage) {
+          console.error("[AI CLIENT] erro ao salvar resposta:", assistantMessageError);
+          return res.status(500).json({ error: "Mensagem registrada, mas não foi possível gerar a resposta agora." });
+        }
+
+        return res.json({
+          success: true,
+          data: {
+            userMessage: mapAiMessage(userMessage),
+            assistantMessage: mapAiMessage(assistantMessage),
+            transaction: createdTransaction,
+            futureTransaction: createdFutureTransaction,
+            recurringTransaction: createdRecurringTransaction,
+          },
+        });
+      };
+
+      if (detectResetIntent(content)) {
+        resetConversationState(user.id);
+        assistantText = "Sem problemas, vamos começar do zero. Qual é o valor dessa movimentação?";
+        logConversationState(user.id, "reset-intent");
+        return await sendAssistantResponse();
+      }
+
+      if (!pendingAction && confirmationIntent === "cancel") {
+        resetConversationState(user.id);
+        assistantText = "Tudo bem, limpei as informações. Vamos começar de novo: qual é o valor?";
+        logConversationState(user.id, "reset/cancel");
+        return await sendAssistantResponse();
+      }
+
+      if (pendingAction && confirmationIntent) {
+        if (confirmationIntent === "confirm") {
+          const result = await executePendingAction(pendingAction, user);
+          assistantText = result.assistantText;
+          createdTransaction = result.transaction ?? null;
+          createdFutureTransaction = result.futureTransaction ?? null;
+          createdRecurringTransaction = result.recurringTransaction ?? null;
+        } else {
+          assistantText = "Sem problemas, descartei essa movimentação. Quando quiser, me envie outra.";
+        }
+        pendingActions.delete(user.id);
+        resetConversationState(user.id);
+        logConversationState(user.id, "after confirmation");
+        return await sendAssistantResponse();
+      }
+
+      if (state.step === "confirming_transaction" && pendingAction && !confirmationIntent) {
+        assistantText = 'Só preciso de um "sim" para salvar ou "cancelar" para descartar.';
+        return await sendAssistantResponse();
+      }
+
+      const [recentConversation, financialContext] = await Promise.all([
+        fetchRecentConversation(user.id, 6),
+        buildFinancialContext(user.id, "ALL"),
+      ]);
+      const interpretation = await interpretTransactionFromMessage(
+        content,
+        recentConversation,
+        financialContext?.asPrompt
+      );
+      if (!state.memory.type) {
+        const historyType = inferTypeFromHistory(recentConversation);
+        if (historyType) {
+          state.memory.type = historyType;
+        }
+      }
+      if (!state.memory.accountType) {
+        const historyAccount = inferAccountTypeFromHistory(recentConversation, user.plan);
+        if (historyAccount) {
+          state.memory.accountType = historyAccount;
+        }
+      }
+      const futureIntent = detectFutureIntent(content);
+      const recurringFrequency = detectRecurringFrequency(content);
+      const immediateReceipt = detectImmediateReceipt(content);
+
+      const snapshotBefore = JSON.stringify(state.memory);
+
+      if (interpretation.status === "success") {
+        fillMemoryFromInterpretation(state, interpretation);
+      }
+
+      applyHeuristicsFromContent(state, content, user.plan);
+
+      if (state.memory.isScheduled && state.memory.date) {
+        const plannedDate = new Date(state.memory.date);
+        if (plannedDate.getTime() > Date.now()) {
+          state.memory.dueDate = state.memory.date;
+        } else {
+          state.memory.date = undefined;
+          state.memory.dueDate = undefined;
+        }
+      }
+      if (futureIntent && !state.memory.isScheduled) {
+        state.memory.isScheduled = true;
+        state.memory.type = state.memory.type || futureIntent;
+        if (state.memory.date) {
+          state.memory.dueDate = state.memory.date;
+        }
+      }
+
+      if (isDevMode && snapshotBefore === JSON.stringify(state.memory)) {
+        console.log(`[AI STATE][${user.id}] Nenhum novo dado extraído de: "${content}"`);
+      }
+
+      ensureAccountTypeInMemory(state, user.plan);
+      advanceConversationStep(state);
+      if (user.plan === "premium" && !state.memory.accountType) {
+        state.step = "collecting_type";
+      }
+
+      if (state.memory.accountType === "PJ" && user.plan !== "premium") {
+        assistantText =
+          "Transações empresariais exigem o Plano Premium. Vamos continuar na conta pessoal por enquanto.";
+        resetConversationState(user.id);
+        return await sendAssistantResponse();
+      }
+
+      if (state.step === "collecting_amount" && !state.memory.amount) {
+        assistantText = "Qual é o valor dessa movimentação? (ex.: 250 ou 1.200,50)";
+      } else if (state.step === "collecting_type" && !state.memory.type) {
+        assistantText = "É um pagamento (saída) ou um recebimento (entrada)?";
+      } else if (state.step === "collecting_type" && state.memory.type && user.plan === "premium" && !state.memory.accountType) {
+        assistantText = "Essa movimentação deve sair da conta pessoal (PF) ou da conta empresarial (PJ)?";
+      } else if (state.step === "collecting_date" && !state.memory.date) {
+        assistantText = 'Qual é a data? Informe dia/mês/ano ou diga "amanhã"/"dia 10".';
+      } else if (state.step === "collecting_description" && !state.memory.description) {
+        assistantText = "Como você quer descrever essa movimentação?";
+      }
+
+      if (state.step === "confirming_transaction" && hasAllConversationData(state.memory)) {
+        const candidate = buildCandidateFromState(state);
+        if (candidate) {
+          if (recurringFrequency) {
+            pendingActions.set(user.id, {
+              kind: "recurring",
+              candidate,
+              frequency: recurringFrequency,
+              immediateReceipt,
+            });
+            assistantText = buildPendingSummary(pendingActions.get(user.id)!);
+          } else {
+            if (futureIntent && !candidate.isScheduled) {
+              candidate.isScheduled = true;
+              candidate.dueDate = candidate.dueDate || candidate.date;
+            }
+            registerPendingActionForCandidate(user.id, candidate, candidate.type);
+            assistantText = formatConfirmationMessage(state.memory);
+          }
+        } else {
+          assistantText = "Preciso de mais detalhes antes de salvar.";
+        }
+      } else if (!assistantText) {
+        assistantText =
+          interpretation.status === "clarify"
+            ? interpretation.message
+            : "Estou quase lá! Vamos seguir a ordem: valor → tipo → data → descrição.";
+      }
+
+      logConversationState(user.id, "after");
+      return await sendAssistantResponse();
+    } catch (error) {
+      console.error("[AI CLIENT] erro inesperado:", error);
+      return res.status(500).json({ error: "Erro ao processar mensagem" });
+    }
+  });
+
+  app.get("/api/ai/chat", requireAuth, requireActiveBilling, async (req: any, res) => {
+    const user = req.currentUser;
+    if (!user) {
+      return res.status(401).json({ error: "Sessão expirada" });
+    }
+    const limit = Number(req.query?.limit) || 100;
+    try {
+      const { data, error } = await supabase
+        .from("ai_messages")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true })
+        .limit(limit);
+
+      if (error) {
+        console.error("[AI CLIENT] erro ao buscar histórico:", error);
+        return res.status(500).json({ error: "Erro ao buscar histórico" });
+      }
+
+      const messages = (data || []).map((row) => mapAiMessage(row));
+      res.json({ messages });
+    } catch (error) {
+      console.error("[AI CLIENT] erro inesperado ao listar histórico:", error);
+      res.status(500).json({ error: "Erro ao buscar histórico" });
+    }
+  });
+
+  app.post("/api/ai/report", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
+    try {
+      const { period } = req.body || {};
+      if (!period || typeof period !== "string" || !/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({ error: "Período inválido. Use o formato YYYY-MM." });
+      }
+
+      const [yearStr, monthStr] = period.split("-");
+      const year = Number(yearStr);
+      const month = Number(monthStr);
+      if (Number.isNaN(year) || Number.isNaN(month) || month < 1 || month > 12) {
+        return res.status(400).json({ error: "Período inválido. Use o formato YYYY-MM." });
+      }
+
+      const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+      const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+
+      const preferences = await storage.getAiReportSettings(req.session.userId);
+
+      const insights = await generateAiFinancialReport(
+        req.session.userId,
+        {
+          start,
+          end,
+          label: period,
+        },
+        preferences ?? undefined
+      );
+
+      return res.json({
+        insights: insights.insights,
+        tips: insights.savingsTips,
+        warnings: insights.alerts,
+        projections: insights.rawSummary,
+      });
+    } catch (error) {
+      console.error("[AI REPORT] erro ao gerar relatório:", error);
+      res.status(500).json({ error: "Não foi possível gerar o relatório AI agora." });
+    }
+  });
+
+  app.post("/api/ai/insights", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
+    try {
+      const scope = parseAccountScope(req.body?.type ?? req.query?.type);
+      const insights = await generateAiInsights(req.session.userId, scope);
+      res.json(insights);
+    } catch (error) {
+      console.error("[AI INSIGHTS] erro ao gerar insights:", error);
+      res.status(500).json({ error: "Não foi possível gerar insights agora." });
+    }
+  });
+
+  app.get("/api/ai/report/settings", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
+    try {
+      const settings =
+        (await storage.getAiReportSettings(req.session.userId)) || (await storage.upsertAiReportSettings(req.session.userId, {}));
+      res.json({
+        focusEconomy: Boolean(settings.focusEconomy),
+        focusDebt: Boolean(settings.focusDebt),
+        focusInvestments: Boolean(settings.focusInvestments),
+      });
+    } catch (error) {
+      console.error("[AI REPORT] erro ao buscar preferências:", error);
+      res.status(500).json({ error: "Não foi possível carregar preferências agora." });
+    }
+  });
+
+  app.put("/api/ai/report/settings", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
+    try {
+      const payload = insertAiReportSettingSchema.partial().parse(req.body || {});
+      const updated = await storage.upsertAiReportSettings(req.session.userId, payload);
+      res.json({
+        focusEconomy: Boolean(updated.focusEconomy),
+        focusDebt: Boolean(updated.focusDebt),
+        focusInvestments: Boolean(updated.focusInvestments),
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      console.error("[AI REPORT] erro ao salvar preferências:", error);
+      res.status(500).json({ error: "Não foi possível atualizar preferências agora." });
+    }
+  });
+
+  app.get("/api/cashflow/forecast", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const scope = parseAccountScope(req.query?.type);
+      if (!ensureScopeAccess(scope, req, res)) {
+        return;
+      }
+      const forecast = await computeCashflowForecast(req.session.userId, scope);
+      res.json(forecast);
+    } catch (error) {
+      console.error("[FORECAST] erro ao calcular previsão:", error);
+      res.status(500).json({ error: "Não foi possível calcular a previsão de caixa." });
     }
   });
 
@@ -1252,6 +2959,15 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
       const orderedTransactions = [...transactions].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
+      const realExpensesTotal = orderedTransactions
+        .filter((tx) => tx.type === "saida")
+        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+      const futureExpenses = await storage.getFutureExpenses(user.id, scope, "pending");
+      const futureExpensesTotal = futureExpenses.reduce(
+        (sum, expense) => sum + Number(expense.amount || 0),
+        0
+      );
+      const expensesDifference = futureExpensesTotal - realExpensesTotal;
 
       const printableTransactions = orderedTransactions.map((transaction) => {
         const txDate = new Date(transaction.date);
@@ -1286,12 +3002,25 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
         }
       }
 
+      const projections = await calculateAiProjections(user.id, scope);
+
       const pdfBuffer = buildProTransactionsPdf({
         userName: user.fullName || user.email,
         scopeLabel: scopeLabels[scope],
         periodLabel,
         generatedAt: new Date(),
         transactions: printableTransactions,
+        stats: {
+          realExpenses: formatCurrencyBRL(realExpensesTotal),
+          futureExpenses: formatCurrencyBRL(futureExpensesTotal),
+          difference:
+            (expensesDifference >= 0 ? "+" : "") + formatCurrencyBRL(expensesDifference),
+        },
+        projections: {
+          expectedEndBalance: formatCurrencyBRL(projections.expectedEndBalance),
+          safeSpendingMargin: formatCurrencyBRL(projections.safeSpendingMargin),
+          negativeRisk: `${projections.negativeRisk}%`,
+        },
       });
 
       res.setHeader("Content-Type", "application/pdf");
@@ -1647,6 +3376,8 @@ function buildReportHtml({
   chartImage,
   includeCharts,
   insights,
+  forecast,
+  aiInsights,
 }: {
   user: User;
   type: string;
@@ -1657,6 +3388,16 @@ function buildReportHtml({
   chartImage: string | null;
   includeCharts: boolean;
   insights: string[];
+  forecast?: {
+    currentBalance: number;
+    expectedIncome: number;
+    previousIncome: number;
+    incomeDelta: number;
+    futureExpensesTotal: number;
+    forecastBalance: number;
+    freeCash: number;
+  };
+  aiInsights?: AiInsightResult;
 }) {
   const summaryRows = transactions.slice(0, 6).map((tx) => {
     const date = new Date(tx.date || tx.createdAt || Date.now());
@@ -1697,6 +3438,33 @@ function buildReportHtml({
       <p class="kpi-value">${kpi.value}</p>
     </div>`
   ).join("");
+
+  const forecastBlocks = forecast
+    ? `
+    <section class="forecast-grid">
+      <div class="forecast-card">
+        <p class="kpi-label">Saldo previsto</p>
+        <p class="kpi-value">${formatCurrency(forecast.forecastBalance)}</p>
+        <p class="muted">Saldo atual ${formatCurrency(forecast.currentBalance)} + receitas previstas ${formatCurrency(forecast.expectedIncome)} - gastos futuros ${formatCurrency(forecast.futureExpensesTotal)}</p>
+      </div>
+      <div class="forecast-card">
+        <p class="kpi-label">Gastos já previstos</p>
+        <p class="kpi-value text-negative">${formatCurrency(forecast.futureExpensesTotal)}</p>
+        <p class="muted">Contas registradas como pendentes</p>
+      </div>
+      <div class="forecast-card">
+        <p class="kpi-label">Dinheiro livre esperado</p>
+        <p class="kpi-value text-positive">${formatCurrency(forecast.freeCash)}</p>
+        <p class="muted">Comparativo vs. mês anterior: ${forecast.incomeDelta >= 0 ? "+" : "-"}${formatCurrency(Math.abs(forecast.incomeDelta))}</p>
+      </div>
+      <div class="forecast-card highlight">
+        <p class="kpi-label">Economia recomendada</p>
+        <p class="kpi-value">${formatCurrency(Math.max(0, forecast.freeCash * 0.3))}</p>
+        <p class="muted">Reserve 30% do dinheiro livre para construir gordura financeira.</p>
+      </div>
+    </section>
+  `
+    : "";
 
   const insightsList = `
     <div class="card insights-card">
@@ -1758,6 +3526,56 @@ function buildReportHtml({
     </div>
   `;
 
+  const aiInsightsBlock = aiInsights
+    ? `
+    <section class="two-column">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <p class="subtitle">Resumo da IA</p>
+            <h3>Contexto personalizado</h3>
+          </div>
+          <span class="badge">FinScope AI</span>
+        </div>
+        <p class="muted" style="white-space:pre-line;">${escapeHtml(aiInsights.summaryText)}</p>
+        <div class="forecast-grid" style="grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 12px; margin-top:16px;">
+          <div class="forecast-card">
+            <p class="kpi-label">Gastos previstos</p>
+            <p class="kpi-value">${formatCurrency(aiInsights.predictions.nextMonthExpenses || 0)}</p>
+          </div>
+          <div class="forecast-card">
+            <p class="kpi-label">Economia estimada</p>
+            <p class="kpi-value">${formatCurrency(aiInsights.predictions.nextMonthSavings || 0)}</p>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <p class="subtitle">Alertas & Dicas</p>
+            <h3>Foco para o próximo mês</h3>
+          </div>
+        </div>
+        ${
+          aiInsights.alerts.length
+            ? `<ul class="insights-list">${aiInsights.alerts
+                .map((item) => `<li>${escapeHtml(item)}</li>`)
+                .join("")}</ul>`
+            : `<p class="muted italic">Sem alertas críticos no momento.</p>`
+        }
+        <hr style="margin:18px 0; border:none; border-top:1px solid #e2e8f0;" />
+        ${
+          aiInsights.tips.length
+            ? `<ul class="insights-list">${aiInsights.tips
+                .map((item) => `<li>${escapeHtml(item)}</li>`)
+                .join("")}</ul>`
+            : `<p class="muted italic">Nenhuma recomendação extra desta vez.</p>`
+        }
+      </div>
+    </section>
+  `
+    : "";
+
   const generatedAt = new Date().toLocaleString("pt-BR", {
     dateStyle: "long",
     timeStyle: "short",
@@ -1783,6 +3601,9 @@ function buildReportHtml({
       .kpi-card { border: 1px solid #e2e8f0; border-radius: 24px; padding: 20px; background: #f8fafc; box-shadow: 0 10px 40px rgba(15,23,42,0.08); }
       .kpi-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.15em; color: #64748b; }
       .kpi-value { margin-top: 10px; font-size: 30px; font-weight: 600; color: #0f172a; }
+      .forecast-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px; }
+      .forecast-card { border: 1px solid #e2e8f0; border-radius: 24px; padding: 20px; background: #f8fafc; box-shadow: 0 16px 40px rgba(15,23,42,0.08); min-height: 150px; }
+      .forecast-card.highlight { background: #ecfdf5; border-color: #a7f3d0; }
       .two-column { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; margin-bottom: 40px; }
       .card { border: 1px solid #e2e8f0; border-radius: 24px; padding: 24px; box-shadow: 0 20px 60px rgba(15,23,42,0.08); background: #fff; min-height: 100%; }
       .card-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
@@ -1836,6 +3657,7 @@ function buildReportHtml({
       <section class="kpi-grid">
         ${kpiBlocks}
       </section>
+      ${forecastBlocks}
 
       <section class="two-column">
         ${chartBlock}
@@ -1843,6 +3665,7 @@ function buildReportHtml({
       </section>
 
       <section>${insightsList}</section>
+      ${aiInsightsBlock}
 
       <section class="card summary-section">
         <div class="card-header">
@@ -1900,3 +3723,85 @@ function escapeHtml(value: string) {
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+  async function calculateAiProjections(userId: string, scope: AccountScope) {
+    const metrics = await storage.getDashboardMetrics(userId, scope);
+    const futureTransactions = await storage.getFutureTransactions(userId, scope, "pending");
+    const recurring = await storage.getRecurringTransactions(userId, scope);
+
+    const sumByType = (items: { type?: string; amount?: string | number }[], type: "income" | "expense") =>
+      items
+        .filter((item) => (item.type || "").toLowerCase() === type)
+        .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    const projectedIncome =
+      sumByType(futureTransactions, "income") + sumByType(recurring, "income");
+    const projectedExpenses =
+      sumByType(futureTransactions, "expense") + sumByType(recurring, "expense");
+
+    const expectedEndBalance = metrics.totalBalance + projectedIncome - projectedExpenses;
+    const availableCash = metrics.totalBalance + projectedIncome;
+    const deficit = projectedExpenses - availableCash;
+    const negativeRisk =
+      projectedExpenses <= 0
+        ? 0
+        : Math.min(100, Math.max(0, (deficit / projectedExpenses) * 100));
+    const safeSpendingMargin = Math.max(0, availableCash - projectedExpenses);
+
+    return {
+      expectedEndBalance: Number(expectedEndBalance.toFixed(2)),
+      negativeRisk: Number(negativeRisk.toFixed(0)),
+      safeSpendingMargin: Number(safeSpendingMargin.toFixed(2)),
+      projectedIncome: Number(projectedIncome.toFixed(2)),
+      projectedExpenses: Number(projectedExpenses.toFixed(2)),
+    };
+  }
+
+  async function computeCashflowForecast(userId: string, scope: AccountScope) {
+    const metrics = await storage.getDashboardMetrics(userId, scope);
+    const transactions = await storage.getTransactionsByUserId(userId, scope);
+    const futureExpenses = await storage.getFutureExpenses(userId, scope, "pending");
+    const recurring = await storage.getRecurringTransactions(userId, scope);
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const sumIncome = (start: Date, end?: Date) =>
+      transactions
+        .filter((tx) => {
+          const txDate = new Date(tx.date);
+          if (tx.type !== "entrada") return false;
+          if (txDate < start) return false;
+          if (end && txDate >= end) return false;
+          return true;
+        })
+        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+
+    const expectedIncome = sumIncome(startOfMonth);
+    const previousIncome = sumIncome(startOfPrevMonth, startOfMonth);
+    const recurringIncome = recurring
+      .filter((item) => item.type === "income")
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const recurringExpenses = recurring
+      .filter((item) => item.type === "expense")
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const futureExpensesTotal =
+      futureExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0) + recurringExpenses;
+    const totalExpectedIncome = expectedIncome + recurringIncome;
+    const forecastBalance = metrics.totalBalance + totalExpectedIncome - futureExpensesTotal;
+    const freeCash = totalExpectedIncome - futureExpensesTotal;
+    const incomeDelta = totalExpectedIncome - previousIncome;
+
+    const projections = await calculateAiProjections(userId, scope);
+
+    return {
+      currentBalance: Number(metrics.totalBalance.toFixed(2)),
+      expectedIncome: Number(totalExpectedIncome.toFixed(2)),
+      previousIncome: Number(previousIncome.toFixed(2)),
+      incomeDelta: Number(incomeDelta.toFixed(2)),
+      futureExpensesTotal: Number(futureExpensesTotal.toFixed(2)),
+      forecastBalance: Number(forecastBalance.toFixed(2)),
+      freeCash: Number(freeCash.toFixed(2)),
+      projections,
+    };
+  }

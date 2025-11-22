@@ -5,15 +5,19 @@ import { motion } from "framer-motion";
 export default function BlogPage() {
   const posts = [
     {
-      title: "Como organizar suas finanças em 2025",
-      excerpt: "Um guia prático para começar o ano com controle financeiro total.",
-      date: "10 Jan 2025",
+      title: "Planejamento de gastos futuros na prática",
+      excerpt: "Como usar o FinScope para cadastrar boletos e prever o saldo de cada semana.",
+      date: "05 Fev 2025",
     },
     {
-      title: "PF vs PJ: separação financeira sem dor de cabeça",
-      excerpt:
-        "Como separar vida pessoal e negócio sem bagunçar seu fluxo de caixa.",
-      date: "02 Jan 2025",
+      title: "Relatórios PRO x Premium: qual escolher?",
+      excerpt: "Diferenças entre o PDF simples e o premium com previsões avançadas.",
+      date: "30 Jan 2025",
+    },
+    {
+      title: "Economia recomendada: por que guardar parte do dinheiro livre?",
+      excerpt: "Cálculo automático de reserva baseado na previsão de caixa.",
+      date: "22 Jan 2025",
     },
   ];
 
@@ -21,7 +25,7 @@ export default function BlogPage() {
     <div className="min-h-screen bg-white text-slate-900">
       <FinScopeHeader />
 
-      <main className="container py-24 max-w-5xl mx-auto">
+      <main className="max-w-5xl mx-auto px-4 py-24">
         <h1 className="text-center text-4xl font-poppins font-bold mb-12">
           Blog FinScope
         </h1>

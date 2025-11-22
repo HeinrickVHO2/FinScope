@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CHECKOUT_PLAN_OPTIONS, type CheckoutPlanId } from "@/constants/checkout-plans";
 import { Check, Clock3, ArrowLeft, Loader2, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiFetch } from "@/lib/api";
 
 interface BillingCheckoutSectionProps {
   intent: "signup" | "upgrade";
@@ -104,7 +105,7 @@ export function BillingCheckoutSection({
     setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/checkout/create", {
+      const response = await apiFetch("/api/checkout/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -135,7 +136,7 @@ export function BillingCheckoutSection({
   async function verifyPayment(manual = true) {
     try {
       if (manual) setIsVerifying(true);
-      const response = await fetch("/api/auth/me", { credentials: "include" });
+      const response = await apiFetch("/api/auth/me", { credentials: "include" });
       if (!response.ok) return;
       const user = await response.json();
       const ready = user?.billingStatus === "active";

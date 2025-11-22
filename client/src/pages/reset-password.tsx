@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { FormAlert } from "@/components/ui/FormAlert";
+import { apiFetch } from "@/lib/api";
 
 export default function ResetPasswordPage() {
   const [, navigate] = useLocation();
@@ -23,7 +24,7 @@ export default function ResetPasswordPage() {
       }
 
       try {
-        const res = await fetch(`/api/auth/reset-password/validate?token=${token}`);
+        const res = await apiFetch(`/api/auth/reset-password/validate?token=${token}`);
         const data = await res.json();
 
         if (res.ok && data.valid) {
@@ -55,7 +56,7 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    const res = await fetch("/api/auth/reset-password", {
+    const res = await apiFetch("/api/auth/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, password, confirmPassword: confirm }),

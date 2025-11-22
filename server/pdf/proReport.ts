@@ -16,6 +16,16 @@ interface BuildProPdfOptions {
   scopeLabel: string;
   periodLabel: string;
   generatedAt?: Date;
+  stats?: {
+    realExpenses: string;
+    futureExpenses: string;
+    difference: string;
+  };
+  projections?: {
+    expectedEndBalance: string;
+    safeSpendingMargin: string;
+    negativeRisk: string;
+  };
 }
 
 interface PageContext extends BuildProPdfOptions {
@@ -84,18 +94,54 @@ const buildPageContent = (ctx: PageContext) => {
   const commands: string[] = [];
   const footerY = 70;
   const headerY = 790;
-  const tableHeaderY = 700;
+  const summaryItems: { label: string; value: string }[] = [];
+  if (ctx.pageNumber === 1) {
+    if (ctx.stats) {
+      summaryItems.push(
+        { label: "Despesas reais", value: ctx.stats.realExpenses },
+        { label: "Despesas previstas", value: ctx.stats.futureExpenses },
+        { label: "Diferença", value: ctx.stats.difference }
+      );
+    }
+    if (ctx.projections) {
+      summaryItems.push(
+        { label: "Saldo previsto", value: ctx.projections.expectedEndBalance },
+        { label: "Margem segura", value: ctx.projections.safeSpendingMargin },
+        { label: "Risco negativo", value: ctx.projections.negativeRisk }
+      );
+    }
+  }
+  const hasSummary = summaryItems.length > 0;
+  const summaryRows = Math.ceil(summaryItems.length / 3);
+  const summaryHeight = summaryRows * 60;
+  const tableHeaderBase = 700;
+  const tableHeaderY = hasSummary ? tableHeaderBase - (summaryRows - 1) * 40 - 60 : tableHeaderBase;
 
   commands.push(`BT /F2 22 Tf 50 ${headerY} Td (FinScope) Tj ET`);
   commands.push(`BT /F1 12 Tf 50 ${headerY - 20} Td (${escapePdfText("Relatorio de Transacoes")}) Tj ET`);
   commands.push(`BT /F1 10 Tf 50 ${headerY - 36} Td (${escapePdfText(`Conta: ${ctx.scopeLabel}`)}) Tj ET`);
   commands.push(`BT /F1 10 Tf 50 ${headerY - 52} Td (${escapePdfText(`Periodo: ${ctx.periodLabel}`)}) Tj ET`);
   if (ctx.userName) {
-    commands.push(`BT /F1 10 Tf 50 ${headerY - 68} Td (${escapePdfText(`Usuario: ${ctx.userName}`)}) Tj ET`);
+  commands.push(`BT /F1 10 Tf 50 ${headerY - 68} Td (${escapePdfText(`Usuario: ${ctx.userName}`)}) Tj ET`);
   }
   commands.push(
     `BT /F1 10 Tf 350 ${headerY - 52} Td (${escapePdfText(`Gerado em: ${formatDateTime(ctx.generatedAt || new Date())}`)}) Tj ET`
   );
+
+  if (hasSummary) {
+    const summaryY = headerY - 140;
+    const rectangleHeight = summaryHeight || 70;
+    commands.push(`0.96 g 50 ${summaryY} 495 ${rectangleHeight} re f`);
+    commands.push("0 g");
+    summaryItems.forEach((item, index) => {
+      const column = index % 3;
+      const row = Math.floor(index / 3);
+      const rowTop = summaryY + rectangleHeight - row * 60;
+      const currentX = 60 + column * 160;
+      commands.push(`BT /F1 9 Tf ${currentX} ${rowTop - 10} Td (${escapePdfText(item.label)}) Tj ET`);
+      commands.push(`BT /F2 12 Tf ${currentX} ${rowTop - 28} Td (${escapePdfText(item.value)}) Tj ET`);
+    });
+  }
 
   commands.push(`0.92 g 50 ${tableHeaderY} 495 22 re f`);
   commands.push(`0 g 1 w 50 ${tableHeaderY} 495 22 re S`);
