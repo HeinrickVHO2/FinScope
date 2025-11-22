@@ -2,17 +2,20 @@
 
 ## Recent Changes (November 22, 2025)
 
-**AI Financial Assistant - NOW EXECUTING REAL ACTIONS ✅**
-- ✅ **Transactions created IMMEDIATELY in Supabase**: AI no longer just responds, it creates transactions in real-time
-- ✅ **Auto-execute transactions**: When AI interprets all data (amount, type, date, category), backend calls `executePendingAction()` immediately
-- ✅ **Conversational messages preserved**: AI generates humanized responses ("Anotado! Registrei um gasto de R$ 200...")
-- ✅ **Agent now answers general questions**: Detects finance questions (vs transactions) and responds with financial context
-- ✅ **Context-aware responses**: Builds financial context from recent transactions, goals, future bills to answer "How much did I spend?" etc.
-- ✅ **Fixed date handling**: System prompt includes current date (2025-11-22) so AI uses correct dates
-- ✅ **Enhanced personality**: Brazilian financial consultant, friendly, direct, never robotic
-- ✅ **Security maintained**: `sanitizeUserInput()` detects 15+ injection patterns, resets state on dangerous input
-- ✅ **E2E tests passing**: Transactions created, questions answered with context, state managed correctly
-- ✅ **Frontend UX improved**: Animated loader ("FinScope AI está digitando..."), visual confirmation when transaction saves
+**AI Agent Now Controls Entire Platform ✅**
+- ✅ **Botões de Insight funcionando**: "Foco em economia", "Foco em dívidas", "Foco em investimentos" alternam entre True/False
+- ✅ **Foco persistido**: Salvo em localStorage (frontend) e db (backend via `/api/ai/insight-focus`)
+- ✅ **IA prioriza insights**: Quando foco ativado, prompt da IA prioriza análises na área selecionada
+- ✅ **Transações criadas IMEDIATAMENTE**: Supabase - sem confirmar, apenas registra
+- ✅ **Contas futuras criadas via IA**: IA pode criar "future_transactions" com dueDate
+- ✅ **Metas financeiras criadas via IA**: IA pode criar "investment_goals" com target_value
+- ✅ **Ações estruturadas retornadas**: Backend retorna `actions[]` com type (transaction/future_bill/goal)
+- ✅ **JSON nunca mostrado**: Ações processadas silenciosamente pelo frontend, apenas mensagem exibida
+- ✅ **Contexto financeiro automático**: IA usa histórico de transações, contas futuras, metas para respostas
+- ✅ **Perguntas gerais com contexto**: "Quanto gastei?" → Resposta personalizada com dados reais
+- ✅ **Dicas contextualizadas**: "Você gastou R$ 420 em mercado. Se reduzir 10%, sobra R$ 42 para investir"
+- ✅ **Sincronia automática**: Ações disparam evento `ai-action-completed` para atualizar abas
+- ✅ **Security mantida**: `sanitizeUserInput()` em funcionamento, input injection bloqueado
 
 **PDF Export Fix for Production - READY FOR TESTING ✅**
 - ✅ Added Chromium system dependency via Nix packages (resolves `libglib-2.0.so.0` error)

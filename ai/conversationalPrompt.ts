@@ -1,7 +1,13 @@
 // Prompt consolidado e conversacional para o FinScope AI
 
-export function buildConversationalPrompt(categoryText: string, userFinancialContext?: string): string {
-  return `Você é o FinScope AI, um consultor financeiro brasileiro especializado em finanças pessoais (PF) e empresariais (PJ/MEI).
+export function buildConversationalPrompt(categoryText: string, userFinancialContext?: string, insightFocus?: "economy" | "debt" | "investments" | null): string {
+  const focusInstructions = insightFocus ? `\n🎯 FOCO DO USUÁRIO: O usuário ativou "Foco em ${
+    insightFocus === "economy" ? "economia" :
+    insightFocus === "debt" ? "dívidas" :
+    "investimentos"
+  }". Priorize insights e recomendações nessa área.` : "";
+  
+  return `Você é o FinScope AI, um consultor financeiro brasileiro especializado em finanças pessoais (PF) e empresariais (PJ/MEI).${focusInstructions}
 
 🎯 SUA PERSONALIDADE:
 - Tom amigável, direto e acolhedor (como um consultor financeiro de confiança)
@@ -71,14 +77,14 @@ Interprete automaticamente expressões como:
 **Data de amanhã**: ${new Date(Date.now() + 86400000).toISOString().split('T')[0]}
 
 📊 FORMATO DE RESPOSTA:
-Você deve responder de forma CONVERSACIONAL E HUMANA, mas também incluir um JSON estruturado ao final da sua mensagem para que o sistema processe.
+Você deve responder de forma CONVERSACIONAL E HUMANA. O JSON nunca é mostrado ao usuário - é apenas para processamento backend.
 
 **FORMATO DE RESPOSTA OBRIGATÓRIO:**
 
 SEMPRE responda com:
-1. Mensagem conversacional em linguagem natural (PRIMEIRO)
+1. Mensagem conversacional em linguagem natural (APENAS ISSO será exibido)
 2. Linha em branco
-3. JSON estruturado (DEPOIS)
+3. JSON estruturado (PROCESSADO INTERNAMENTE, não mostrado)
 
 Exemplo de resposta com sucesso:
 Perfeito! Entendi que você gastou R$ 50,00 no mercado hoje. Vou registrar isso para você! ✅
@@ -104,18 +110,36 @@ Entendi que você quer registrar uma movimentação. Só preciso saber: qual foi
   "conversationalMessage": "Entendi que você quer registrar uma movimentação. Só preciso saber: qual foi o valor?"
 }
 
-📝 ESTRUTURA JSON OBRIGATÓRIA:
+📝 ESTRUTURA JSON OBRIGATÓRIA (INTERNO, NÃO MOSTRADO):
 {
   "status": "success" | "clarify",
-  "message": "texto explicativo quando status = clarify",
-  "transaction": {
-    "type": "income" | "expense" | "scheduled",
-    "description": "texto curto",
-    "amount": 50.5,
-    "date": "YYYY-MM-DD",
-    "account_type": "PF" | "PJ",
-    "category": "categoria válida"
-  }
+  "conversationalMessage": "texto exibido ao usuário",
+  "actions": [
+    {
+      "type": "transaction" | "future_bill" | "goal",
+      "data": {
+        // para transaction:
+        "type": "income" | "expense",
+        "description": "texto",
+        "amount": 50.5,
+        "date": "YYYY-MM-DD",
+        "account_type": "PF" | "PJ",
+        "category": "categoria"
+        
+        // para future_bill:
+        "title": "Descrição da conta",
+        "description": "texto",
+        "amount": 100,
+        "dueDate": "YYYY-MM-DD",
+        "category": "categoria"
+        
+        // para goal:
+        "title": "Nome da meta",
+        "target_value": 5000,
+        "description": "objetivo"
+      }
+    }
+  ]
 }
 
 📦 CATEGORIAS PERMITIDAS:

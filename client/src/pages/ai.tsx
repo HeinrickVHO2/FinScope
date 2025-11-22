@@ -21,8 +21,25 @@ export default function AIClientPage() {
   const [isSending, setIsSending] = useState(false);
   const [pendingBotId, setPendingBotId] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [insightFocus, setInsightFocus] = useState<"economy" | "debt" | "investments" | null>(() => {
+    const saved = localStorage.getItem("ai_insight_focus");
+    return (saved as any) || null;
+  });
   const { toast } = useToast();
   const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
+
+  // Persistir foco de insight
+  useEffect(() => {
+    if (insightFocus) {
+      localStorage.setItem("ai_insight_focus", insightFocus);
+      apiFetch("/api/ai/insight-focus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ focus: insightFocus }),
+        credentials: "include",
+      }).catch((e) => console.error("Erro ao salvar foco:", e));
+    }
+  }, [insightFocus]);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -101,7 +118,10 @@ export default function AIClientPage() {
       const response = await apiFetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: tempUserMessage.content }),
+        body: JSON.stringify({ 
+          content: tempUserMessage.content,
+          insightFocus: insightFocus,
+        }),
         credentials: "include",
       });
 
@@ -126,6 +146,22 @@ export default function AIClientPage() {
             return message;
           })
         );
+
+        // Processar ações silenciosamente (sem mostrar JSON)
+        const actions = data?.data?.actions || [];
+        if (actions.length > 0) {
+          for (const action of actions) {
+            if (action.type === "transaction" && action.data) {
+              console.log("[AI Action] Transação criada:", action.data);
+            } else if (action.type === "future_bill" && action.data) {
+              console.log("[AI Action] Conta futura criada:", action.data);
+            } else if (action.type === "goal" && action.data) {
+              console.log("[AI Action] Meta criada:", action.data);
+            }
+          }
+          // Invalidar cache para sincronizar abas
+          window.dispatchEvent(new CustomEvent("ai-action-completed", { detail: { actions } }));
+        }
       }
     } catch (error) {
       setMessages((prev) =>
@@ -158,11 +194,40 @@ export default function AIClientPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold font-poppins">Assistente Inteligente</h1>
-        <p className="text-muted-foreground mt-2 max-w-2xl">
-          Fale comigo sobre suas transações, e vou registrá-las automaticamente. Gasto no mercado? Meta de investimento? Conta futura? Eu cuido! 🤖
-        </p>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-3xl font-bold font-poppins">Assistente Inteligente</h1>
+          <p className="text-muted-foreground mt-2 max-w-2xl">
+            Fale comigo sobre suas transações, e vou registrá-las automaticamente. Gasto no mercado? Meta de investimento? Conta futura? Eu cuido!
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={insightFocus === "economy" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setInsightFocus(insightFocus === "economy" ? null : "economy")}
+            data-testid="button-focus-economy"
+          >
+            Foco em economia
+          </Button>
+          <Button
+            variant={insightFocus === "debt" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setInsightFocus(insightFocus === "debt" ? null : "debt")}
+            data-testid="button-focus-debt"
+          >
+            Foco em dívidas
+          </Button>
+          <Button
+            variant={insightFocus === "investments" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setInsightFocus(insightFocus === "investments" ? null : "investments")}
+            data-testid="button-focus-investments"
+          >
+            Foco em investimentos
+          </Button>
+        </div>
       </div>
 
       <Card className="flex flex-col h-[70vh] overflow-hidden border-primary/10 shadow-sm">

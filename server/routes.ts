@@ -1179,7 +1179,8 @@ type AiInterpretationResult =
     content: string,
     conversation: ConversationMessage[],
     userId: string,
-    userFinancialContext?: string
+    userFinancialContext?: string,
+    insightFocus?: "economy" | "debt" | "investments" | null
   ): Promise<AiInterpretationResult> => {
     if (!OPENAI_API_KEY) {
       return {
@@ -1190,7 +1191,7 @@ type AiInterpretationResult =
 
     try {
       // Construir prompt conversacional com contexto financeiro do usuário
-      const conversationalPrompt = buildConversationalPrompt(AI_CATEGORY_TEXT, userFinancialContext);
+      const conversationalPrompt = buildConversationalPrompt(AI_CATEGORY_TEXT, userFinancialContext, insightFocus);
 
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -2175,6 +2176,38 @@ type AiInterpretationResult =
     }
   });
 
+  // Salvar foco de insight do usuário
+  app.post("/api/ai/insight-focus", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const { focus } = req.body as { focus?: "economy" | "debt" | "investments" | null };
+      if (!focus) {
+        return res.status(400).json({ error: "Foco inválido" });
+      }
+
+      const { data, error } = await supabase
+        .from("ai_report_settings")
+        .upsert({
+          user_id: req.session.userId,
+          focus_economy: focus === "economy",
+          focus_debt: focus === "debt",
+          focus_investments: focus === "investments",
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id" })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("[AI INSIGHT] erro ao salvar foco:", error);
+        return res.status(500).json({ error: "Não foi possível salvar o foco" });
+      }
+
+      return res.json({ success: true, data });
+    } catch (error) {
+      console.error("[AI INSIGHT] erro inesperado:", error);
+      res.status(500).json({ error: "Erro ao processar foco" });
+    }
+  });
+
   app.post("/api/ai/chat", requireAuth, requireActiveBilling, async (req: any, res) => {
     const validation = aiChatRequestSchema.safeParse(req.body);
     if (!validation.success) {
@@ -2188,6 +2221,7 @@ type AiInterpretationResult =
     }
 
     const rawContent = validation.data.content.trim();
+    const insightFocus = (req.body.insightFocus as any) || null;
     
     // Sanitize input to prevent prompt injection
     const { clean, isDangerous, reason } = sanitizeUserInput(rawContent);
@@ -2253,6 +2287,7 @@ type AiInterpretationResult =
     let createdTransaction: Transaction | null = null;
     let createdFutureTransaction: FutureTransaction | null = null;
     let createdRecurringTransaction: RecurringTransaction | null = null;
+    let createdActions: Array<{ type: string; data: any }> = [];
 
     const pendingAction = pendingActions.get(user.id);
     const confirmationIntent = detectConfirmationIntent(content);
@@ -2297,6 +2332,7 @@ type AiInterpretationResult =
             transaction: createdTransaction,
             futureTransaction: createdFutureTransaction,
             recurringTransaction: createdRecurringTransaction,
+            actions: createdActions,
           },
         });
       };
@@ -2392,7 +2428,8 @@ INSTRUÇÕES:
         content,
         recentConversation,
         user.id,
-        financialContext?.asPrompt
+        financialContext?.asPrompt,
+        insightFocus
       );
       if (!state.memory.type) {
         const historyType = inferTypeFromHistory(recentConversation);
@@ -2414,6 +2451,51 @@ INSTRUÇÕES:
 
       if (interpretation.status === "success") {
         fillMemoryFromInterpretation(state, interpretation);
+        
+        // Processar ações estruturadas (future_bill, goal)
+        const actions = (interpretation as any)?.actions || [];
+        for (const action of actions) {
+          if (action.type === "future_bill" && action.data) {
+            try {
+              const { data: futureBill } = await supabase
+                .from("future_transactions")
+                .insert({
+                  user_id: user.id,
+                  type: action.data.type || "expense",
+                  description: action.data.title || action.data.description,
+                  amount: String(action.data.amount || 0),
+                  expected_date: action.data.dueDate,
+                  account_type: action.data.account_type || "PF",
+                  status: "pending",
+                })
+                .select()
+                .single();
+              if (isDevMode) console.log("[AI ACTION] Future bill criada:", futureBill);
+              createdActions.push({ type: "future_bill", data: futureBill });
+            } catch (err) {
+              console.error("[AI ACTION] erro ao criar future bill:", err);
+            }
+          } else if (action.type === "goal" && action.data) {
+            try {
+              const { data: goal } = await supabase
+                .from("investment_goals")
+                .insert({
+                  user_id: user.id,
+                  title: action.data.title || "Meta",
+                  description: action.data.description,
+                  target_value: String(action.data.target_value || 0),
+                  current_amount: "0",
+                  target_date: new Date().toISOString(),
+                })
+                .select()
+                .single();
+              if (isDevMode) console.log("[AI ACTION] Goal criada:", goal);
+              createdActions.push({ type: "goal", data: goal });
+            } catch (err) {
+              console.error("[AI ACTION] erro ao criar goal:", err);
+            }
+          }
+        }
       }
 
       applyHeuristicsFromContent(state, content, user.plan);
