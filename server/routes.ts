@@ -2486,15 +2486,16 @@ INSTRUÇÕES:
             if (isDevMode) console.log("[AI DEBUG] Creating future_bill:", JSON.stringify(action.data));
             try {
               const { data: futureBill } = await supabase
-                .from("future_transactions")
+                .from("future_expenses")
                 .insert({
                   user_id: user.id,
-                  type: action.data.type || "expense",
-                  description: action.data.title || action.data.description,
+                  title: action.data.title || action.data.description || "Despesa",
+                  category: action.data.category || "Outros",
                   amount: String(action.data.amount || 0),
-                  expected_date: action.data.dueDate,
+                  due_date: action.data.dueDate,
                   account_type: action.data.account_type || "PF",
                   status: "pending",
+                  is_recurring: false,
                 })
                 .select()
                 .single();

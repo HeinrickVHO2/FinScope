@@ -2,7 +2,7 @@
 
 ## Recent Changes (November 22, 2025)
 
-**IA: Detecção de Contas Futuras - FUNCIONANDO COM GPT-4o ✅**
+**IA: Detecção de Contas Futuras - 100% FUNCIONAL ✅**
 - ✅ **Infraestrutura completa**: Backend preparado para processar `actions[]` da IA
 - ✅ **Tipo `AiInterpretationSuccess`**: Inclui campo `actions[]` com suporte a transaction/future_bill/goal
 - ✅ **Pipeline de processamento**: Detecta quando IA retorna `actions[]` e executa automaticamente
@@ -12,8 +12,12 @@
 - ✅ **Correções TypeScript**: 13 erros LSP corrigidos (tipos, regex flags, etc.)
 - ✅ **Prompt corrigido**: Removida linha 178 que causava conflito (type: "scheduled" → type: "future_bill")
 - ✅ **Regras críticas enfatizadas**: "preciso pagar" + data futura = actions[{type: "future_bill"}] sem perguntar tipo
-- 📌 **Status**: Sistema 100% FUNCIONAL com GPT-4o - cria future_bills automaticamente
-- 📌 **Rota**: `/api/future-expenses` (backend cria registros quando IA retorna actions[])
+- ✅ **Tabela corrigida**: future_transactions → future_expenses (campos title, category, due_date corretos)
+- ✅ **Mapeamento de campos**: title, category, amount, dueDate → persistidos corretamente no Supabase
+- ✅ **Dados reais salvos**: "Seguro do carro R$ 450 dia 15/12" cria registro exato (não mais "placeholder")
+- 📌 **Status**: Sistema 100% FUNCIONAL - E2E tests passando - dados persistidos corretamente
+- 📌 **Rota**: `/api/future-expenses` (GET/POST) - lista e cria contas futuras
+- 📌 **Próximos passos** (futuro): Detectar recorrência automática, melhorar parsing de datas relativas
 
 **AI Agent Now Controls Entire Platform ✅**
 - ✅ **Botões de Insight funcionando**: "Foco em economia", "Foco em dívidas", "Foco em investimentos" alternam entre True/False
