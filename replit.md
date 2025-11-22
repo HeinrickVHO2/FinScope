@@ -10,6 +10,8 @@
 - ✅ Updated system prompt: Brazilian financial consultant personality (friendly, direct, never robotic), context-aware responses, automatic intent detection
 - ✅ Reinforced guardrails: mandatory rules prevent prompt injection, loop detection stops repetitive questions, automatic transaction/goal creation
 - ✅ Architect-approved security implementation: proper error handling, audit logging, and state management for dangerous inputs
+- ✅ Improved regex patterns: flexible matching for variations like "ignore todas as instruções anteriores" (catches up to 30 chars between trigger words)
+- ✅ E2E tests passing: safe messages processed normally, dangerous inputs rejected politely, conversation continues after rejection
 - ⚠️ **MONITORING REQUIRED**: Track logs post-deployment to tune dangerous-pattern detection based on real-world traffic
 
 **PDF Export Fix for Production - READY FOR TESTING ✅**
