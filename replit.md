@@ -5,21 +5,23 @@
 **IA: Sistema Unificado de Actions[] - PRODUÇÃO ✅**
 - ✅ **Transações imediatas via IA**: System actions[{type: "transaction"}] funcional para PF/PJ
 - ✅ **Dados reais em transações**: Corrigido bug de "placeholder" - agora usa description/amount da IA
+- ✅ **Investimentos criados pela IA**: "Quero 500 para renda fixa" → Cria investment + investment_transaction (deposit)
+- ✅ **Pipeline de investimentos**: Saca da conta PF e adiciona ao investimento (igual ao fluxo manual)
 - ✅ **Pipeline único**: Todas ações (transaction/future_bill/goal) processadas via actions[]
 - ✅ **Early return**: Sistema antigo não executa quando actions[] são processadas (evita duplicação)
 - ✅ **Tratamento de erro completo**: 
   - Transaction: Mensagem clara quando conta PF/PJ não existe + fallback em erros Supabase
   - Future_bill: Valida dueDate obrigatório + múltiplos formatos (dueDate/due_date/date) + erro handling
-  - Goal: Tratamento de erro Supabase completo
+  - Goal: Cria investment + investment_transaction com tratamento de erro completo
 - ✅ **Validação conversationalMessage**: Fallback quando IA retorna "placeholder" ou mensagem vazia
-- ✅ **Logs de debug**: Rastreamento completo do fluxo de processamento (OpenAI → actions[] → DB)
-- ✅ **E2E tests automatizados passando** (via run_test):
-  - Test 1: Transaction PF "Gastei 87 reais em livros técnicos" → Criada com dados reais (-R$ 87,00)
-  - Test 2: Future_bill "Internet de 199 reais dia 25/12" → Persistida (title: "Pagamento da Internet", amount: 199, due: 25/12/2025)
-  - Test 3: conversationalMessage "Comprei café por 5 reais" → "Perfeito! Registrei um gasto de R$ 5,00 em café para hoje. ☕" (SEM placeholder)
-  - Test 4: UI composer re-habilita após cada mensagem
-- 📌 **Comportamento**: "Gastei 120 em frutas" → transaction criada IMEDIATAMENTE com description: "frutas", amount: 120
-- 📌 **Arquitetura**: routes.ts linhas 2489-2620 (processamento actions[] + validação + fallbacks + error handling)
+- ✅ **Logs de debug**: Rastreamento completo do fluxo (OpenAI → actions[] → DB)
+- ✅ **Testes funcionais**:
+  - Transaction PF: "Gastei 87 reais" → criada corretamente (-R$ 87,00)
+  - Future_bill: "Internet 199 dia 25/12" → persistida com dados reais
+  - Investment Goal: "Juntar 500 para renda fixa" → investment criado + investment_transaction (deposit)
+  - conversationalMessage: Sem placeholder, com fallback quando necessário
+- 📌 **Comportamento investimentos**: "Quero 500 para emergência" → Cria investment + saca 500 da PF
+- 📌 **Arquitetura**: routes.ts linhas 2489-2640 (processamento actions[] + validação + fallbacks)
 
 **IA: Detecção de Contas Futuras - 100% FUNCIONAL ✅**
 - ✅ **Infraestrutura completa**: Backend preparado para processar `actions[]` da IA

@@ -2567,31 +2567,63 @@ INSTRUÇÕES:
               return await sendAssistantResponse();
             }
           } else if (action.type === "goal" && action.data) {
-            if (isDevMode) console.log("[AI DEBUG] Creating goal:", JSON.stringify(action.data));
+            if (isDevMode) console.log("[AI DEBUG] Creating goal/investment:", JSON.stringify(action.data));
             try {
-              // O banco já tem current_amount com default value
-              // investment_id é requerido, usar um UUID dummy
-              const { data: goal, error } = await supabase
-                .from("investment_goals")
+              const targetAmount = action.data.target_value || 0;
+              const investmentTitle = action.data.title || "Meta de Investimento";
+              
+              // 1. Criar investment (será a reserva/meta em si)
+              const { data: investment, error: investmentError } = await supabase
+                .from("investments")
                 .insert({
                   user_id: user.id,
-                  investment_id: user.id, // Usar user_id como placeholder (schema requer NOT NULL)
-                  target_amount: String(action.data.target_value || 0),
-                  target_date: new Date().toISOString(),
+                  name: investmentTitle,
+                  type: "reserva_emergencia",
+                  current_amount: String(targetAmount),
                 })
                 .select()
                 .single();
 
-              if (error) {
-                console.error("[AI ACTION] Supabase error ao criar goal:", error);
-                throw error;
+              if (investmentError) {
+                console.error("[AI ACTION] Supabase error ao criar investment:", investmentError);
+                throw investmentError;
               }
 
-              if (isDevMode) console.log("[AI ACTION] Goal criada:", goal);
-              createdActions.push({ type: "goal", data: goal });
+              if (isDevMode) console.log("[AI ACTION] Investment criado:", investment);
+
+              // 2. Se houver valor, criar investment transaction (deposit)
+              if (targetAmount > 0 && investment) {
+                const accounts = await storage.getAccountsByUserId(user.id);
+                const pfAccount = accounts.find((a) => a.type?.toLowerCase() === "pf");
+                
+                if (pfAccount) {
+                  const { data: invTx, error: txError } = await supabase
+                    .from("investment_transactions")
+                    .insert({
+                      user_id: user.id,
+                      investment_id: investment.id,
+                      source_account_id: pfAccount.id,
+                      amount: String(targetAmount),
+                      type: "deposit",
+                      date: new Date().toISOString(),
+                      note: `Depósito inicial para ${investmentTitle}`,
+                    })
+                    .select()
+                    .single();
+
+                  if (txError) {
+                    console.error("[AI ACTION] Supabase error ao criar investment transaction:", txError);
+                    // Não fazer throw - investimento foi criado, só a transação falhou
+                  } else {
+                    if (isDevMode) console.log("[AI ACTION] Investment transaction criada:", invTx);
+                  }
+                }
+              }
+
+              createdActions.push({ type: "goal", data: investment });
               actionsProcessed = true;
             } catch (err) {
-              console.error("[AI ACTION] ERRO ao criar goal:", err);
+              console.error("[AI ACTION] ERRO ao criar goal/investment:", err);
               if ((err as any)?.message) console.error("[AI ACTION] Error message:", (err as any).message);
               if ((err as any)?.details) console.error("[AI ACTION] Error details:", (err as any).details);
               assistantText = "Tive um problema ao registrar essa meta. Pode tentar novamente em alguns segundos?";
