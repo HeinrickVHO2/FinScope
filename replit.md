@@ -7,12 +7,19 @@
 - ✅ **Dados reais em transações**: Corrigido bug de "placeholder" - agora usa description/amount da IA
 - ✅ **Pipeline único**: Todas ações (transaction/future_bill/goal) processadas via actions[]
 - ✅ **Early return**: Sistema antigo não executa quando actions[] são processadas (evita duplicação)
-- ✅ **Tratamento de erro**: Mensagem clara quando conta PF/PJ não existe
+- ✅ **Tratamento de erro completo**: 
+  - Transaction: Mensagem clara quando conta PF/PJ não existe + fallback em erros Supabase
+  - Future_bill: Valida dueDate obrigatório + múltiplos formatos (dueDate/due_date/date) + erro handling
+  - Goal: Tratamento de erro Supabase completo
 - ✅ **Validação conversationalMessage**: Fallback quando IA retorna "placeholder" ou mensagem vazia
 - ✅ **Logs de debug**: Rastreamento completo do fluxo de processamento (OpenAI → actions[] → DB)
-- ✅ **E2E tests passando**: Transações PF/PJ com dados reais sem placeholder
+- ✅ **E2E tests automatizados passando** (via run_test):
+  - Test 1: Transaction PF "Gastei 87 reais em livros técnicos" → Criada com dados reais (-R$ 87,00)
+  - Test 2: Future_bill "Internet de 199 reais dia 25/12" → Persistida (title: "Pagamento da Internet", amount: 199, due: 25/12/2025)
+  - Test 3: conversationalMessage "Comprei café por 5 reais" → "Perfeito! Registrei um gasto de R$ 5,00 em café para hoje. ☕" (SEM placeholder)
+  - Test 4: UI composer re-habilita após cada mensagem
 - 📌 **Comportamento**: "Gastei 120 em frutas" → transaction criada IMEDIATAMENTE com description: "frutas", amount: 120
-- 📌 **Arquitetura**: routes.ts linhas 2484-2598 (processamento actions[] + validação + fallbacks)
+- 📌 **Arquitetura**: routes.ts linhas 2489-2620 (processamento actions[] + validação + fallbacks + error handling)
 
 **IA: Detecção de Contas Futuras - 100% FUNCIONAL ✅**
 - ✅ **Infraestrutura completa**: Backend preparado para processar `actions[]` da IA
