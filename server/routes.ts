@@ -2493,7 +2493,10 @@ INSTRUÇÕES:
               
               if (!targetAccount) {
                 console.error("[AI ACTION] Conta não encontrada para tipo:", accountType);
-                continue;
+                const accountLabel = accountType === "PJ" ? "empresarial (PJ)" : "pessoal (PF)";
+                assistantText = `Não encontrei uma conta ${accountLabel} configurada. ${accountType === "PJ" ? "Verifique se você tem o plano Premium para usar contas empresariais." : "Configure uma conta pessoal nas configurações."}`;
+                resetConversationState(user.id);
+                return await sendAssistantResponse();
               }
 
               const transaction = await storage.createTransaction({
@@ -2515,6 +2518,9 @@ INSTRUÇÕES:
               console.error("[AI ACTION] ERRO ao criar transaction:", err);
               if ((err as any)?.message) console.error("[AI ACTION] Error message:", (err as any).message);
               if ((err as any)?.details) console.error("[AI ACTION] Error details:", (err as any).details);
+              assistantText = "Tive um problema ao registrar essa transação. Pode tentar novamente em alguns segundos?";
+              resetConversationState(user.id);
+              return await sendAssistantResponse();
             }
           } else if (action.type === "future_bill" && action.data) {
             if (isDevMode) console.log("[AI DEBUG] Creating future_bill:", JSON.stringify(action.data));
@@ -2566,7 +2572,24 @@ INSTRUÇÕES:
         
         // Se processamos actions[] com sucesso, resetar estado e retornar
         if (actionsProcessed) {
-          assistantText = interpretation.conversationalMessage || "Perfeito! Registrei isso para você.";
+          // Validar e sanitizar a mensagem conversacional da IA
+          let message = interpretation.conversationalMessage || "";
+          message = message.trim();
+          
+          // Se mensagem vazia ou contém "placeholder", usar fallback
+          if (!message || message.toLowerCase().includes("placeholder")) {
+            if (createdTransaction) {
+              const typeLabel = createdTransaction.type === "entrada" ? "receita" : "gasto";
+              message = `Perfeito! Registrei um ${typeLabel} de R$ ${parseFloat(createdTransaction.amount).toFixed(2)} para você.`;
+            } else if (createdActions.length > 0) {
+              message = "Perfeito! Registrei isso para você.";
+            } else {
+              message = "Entendi! Como posso ajudar mais?";
+            }
+          }
+          
+          assistantText = message;
+          console.log("[AI ACTIONS] Processou actions[], retornando mensagem:", assistantText);
           resetConversationState(user.id);
           logConversationState(user.id, "actions-processed");
           return await sendAssistantResponse();
@@ -2612,7 +2635,7 @@ INSTRUÇÕES:
       // PRIORIDADE 1: Usar a mensagem conversacional da IA se disponível
       if (interpretation.conversationalMessage) {
         assistantText = interpretation.conversationalMessage;
-        if (isDevMode) console.log(`[AI CONVERSATIONAL] Usando mensagem da IA: "${assistantText}"`);
+        console.log(`[AI CONVERSATIONAL] Usando mensagem da IA: "${assistantText}"`);
       } 
       // PRIORIDADE 2: Usar mensagem de clarificação da IA (fallback para compatibilidade)
       else if (interpretation.status === "clarify" && interpretation.message) {
