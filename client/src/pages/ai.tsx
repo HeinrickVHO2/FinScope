@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { MessageCircle, Sparkles } from "lucide-react";
+import { MessageCircle, Sparkles, Check } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 type ChatMessage = {
@@ -89,7 +89,7 @@ export default function AIClientPage() {
       const tempBotMessage: ChatMessage = {
         id: `temp-bot-${Date.now()}`,
         role: "assistant",
-        content: "Processando...",
+        content: "FinScope AI está digitando...",
         createdAt: new Date().toISOString(),
         status: "pending",
       };
@@ -161,8 +161,7 @@ export default function AIClientPage() {
       <div>
         <h1 className="text-3xl font-bold font-poppins">Assistente Inteligente</h1>
         <p className="text-muted-foreground mt-2 max-w-2xl">
-          Registre gastos, receitas e contas futuras conversando em linguagem natural. Estamos guardando seus comandos
-          para que o FinScope AI consiga criar transações automaticamente nas próximas versões.
+          Fale comigo sobre suas transações, e vou registrá-las automaticamente. Gasto no mercado? Meta de investimento? Conta futura? Eu cuido! 🤖
         </p>
       </div>
 
@@ -208,12 +207,26 @@ export default function AIClientPage() {
                     {message.status === "pending" && (
                       <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
                         <MessageCircle className="h-3 w-3 animate-pulse" />
-                        enviando
+                        digitando
                       </span>
                     )}
                     {message.status === "error" && <span className="text-[10px] text-rose-500">erro</span>}
+                    {message.status === "sent" && message.role === "assistant" && (
+                      <span className="flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400">
+                        <Check className="h-3 w-3" />
+                        registrado
+                      </span>
+                    )}
                   </div>
-                  <p className="whitespace-pre-line leading-relaxed">{message.content}</p>
+                  {message.status === "pending" && message.role === "assistant" ? (
+                    <div className="flex items-center gap-1">
+                      <span className="animate-bounce inline-block h-2 w-2 rounded-full bg-muted-foreground" style={{ animationDelay: "0ms" }}></span>
+                      <span className="animate-bounce inline-block h-2 w-2 rounded-full bg-muted-foreground" style={{ animationDelay: "150ms" }}></span>
+                      <span className="animate-bounce inline-block h-2 w-2 rounded-full bg-muted-foreground" style={{ animationDelay: "300ms" }}></span>
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-line leading-relaxed">{message.content}</p>
+                  )}
                   {message.status === "error" && (
                     <button
                       type="button"
