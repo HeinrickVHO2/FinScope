@@ -2525,20 +2525,36 @@ INSTRUÇÕES:
           } else if (action.type === "future_bill" && action.data) {
             if (isDevMode) console.log("[AI DEBUG] Creating future_bill:", JSON.stringify(action.data));
             try {
-              const { data: futureBill } = await supabase
+              // Suporte para múltiplos formatos de data: dueDate, due_date, date
+              const dueDate = action.data.dueDate || action.data.due_date || action.data.date;
+              
+              if (!dueDate) {
+                console.error("[AI ACTION] Future bill sem data de vencimento");
+                assistantText = "Preciso saber a data de vencimento dessa conta. Quando você precisa pagar?";
+                resetConversationState(user.id);
+                return await sendAssistantResponse();
+              }
+
+              const { data: futureBill, error } = await supabase
                 .from("future_expenses")
                 .insert({
                   user_id: user.id,
                   title: action.data.title || action.data.description || "Despesa",
                   category: action.data.category || "Outros",
                   amount: String(action.data.amount || 0),
-                  due_date: action.data.dueDate,
+                  due_date: dueDate,
                   account_type: action.data.account_type || action.data.accountType || "PF",
                   status: "pending",
                   is_recurring: false,
                 })
                 .select()
                 .single();
+
+              if (error) {
+                console.error("[AI ACTION] Supabase error ao criar future bill:", error);
+                throw error;
+              }
+
               if (isDevMode) console.log("[AI ACTION] Future bill criada:", futureBill);
               createdActions.push({ type: "future_bill", data: futureBill });
               actionsProcessed = true;
@@ -2546,10 +2562,14 @@ INSTRUÇÕES:
               console.error("[AI ACTION] ERRO ao criar future bill:", err);
               if ((err as any)?.message) console.error("[AI ACTION] Error message:", (err as any).message);
               if ((err as any)?.details) console.error("[AI ACTION] Error details:", (err as any).details);
+              assistantText = "Tive um problema ao registrar essa conta futura. Pode tentar novamente em alguns segundos?";
+              resetConversationState(user.id);
+              return await sendAssistantResponse();
             }
           } else if (action.type === "goal" && action.data) {
+            if (isDevMode) console.log("[AI DEBUG] Creating goal:", JSON.stringify(action.data));
             try {
-              const { data: goal } = await supabase
+              const { data: goal, error } = await supabase
                 .from("investment_goals")
                 .insert({
                   user_id: user.id,
@@ -2561,11 +2581,22 @@ INSTRUÇÕES:
                 })
                 .select()
                 .single();
+
+              if (error) {
+                console.error("[AI ACTION] Supabase error ao criar goal:", error);
+                throw error;
+              }
+
               if (isDevMode) console.log("[AI ACTION] Goal criada:", goal);
               createdActions.push({ type: "goal", data: goal });
               actionsProcessed = true;
             } catch (err) {
-              console.error("[AI ACTION] erro ao criar goal:", err);
+              console.error("[AI ACTION] ERRO ao criar goal:", err);
+              if ((err as any)?.message) console.error("[AI ACTION] Error message:", (err as any).message);
+              if ((err as any)?.details) console.error("[AI ACTION] Error details:", (err as any).details);
+              assistantText = "Tive um problema ao registrar essa meta. Pode tentar novamente em alguns segundos?";
+              resetConversationState(user.id);
+              return await sendAssistantResponse();
             }
           }
         }

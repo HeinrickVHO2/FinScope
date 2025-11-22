@@ -2,6 +2,18 @@
 
 ## Recent Changes (November 22, 2025)
 
+**IA: Sistema Unificado de Actions[] - PRODUÇÃO ✅**
+- ✅ **Transações imediatas via IA**: System actions[{type: "transaction"}] funcional para PF/PJ
+- ✅ **Dados reais em transações**: Corrigido bug de "placeholder" - agora usa description/amount da IA
+- ✅ **Pipeline único**: Todas ações (transaction/future_bill/goal) processadas via actions[]
+- ✅ **Early return**: Sistema antigo não executa quando actions[] são processadas (evita duplicação)
+- ✅ **Tratamento de erro**: Mensagem clara quando conta PF/PJ não existe
+- ✅ **Validação conversationalMessage**: Fallback quando IA retorna "placeholder" ou mensagem vazia
+- ✅ **Logs de debug**: Rastreamento completo do fluxo de processamento (OpenAI → actions[] → DB)
+- ✅ **E2E tests passando**: Transações PF/PJ com dados reais sem placeholder
+- 📌 **Comportamento**: "Gastei 120 em frutas" → transaction criada IMEDIATAMENTE com description: "frutas", amount: 120
+- 📌 **Arquitetura**: routes.ts linhas 2484-2598 (processamento actions[] + validação + fallbacks)
+
 **IA: Detecção de Contas Futuras - 100% FUNCIONAL ✅**
 - ✅ **Infraestrutura completa**: Backend preparado para processar `actions[]` da IA
 - ✅ **Tipo `AiInterpretationSuccess`**: Inclui campo `actions[]` com suporte a transaction/future_bill/goal
