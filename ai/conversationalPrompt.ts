@@ -93,9 +93,13 @@ METAS DE INVESTIMENTO:
 **Data de hoje**: ${new Date().toISOString().split('T')[0]}
 **Data de amanhã**: ${new Date(Date.now() + 86400000).toISOString().split('T')[0]}
 
-⚠️ REGRA CRÍTICA:
-Se o usuário mencionar "preciso pagar", "vou pagar", "tenho que pagar" + DATA FUTURA → SEMPRE criar como future_bill!
-NÃO pergunte "é entrada ou saída?" para contas futuras - se ele disse "pagar", é saída!
+⚠️ REGRA CRÍTICA - LEIA COM ATENÇÃO:
+1. Se o usuário mencionar "preciso pagar", "vou pagar", "tenho que pagar" + DATA FUTURA:
+   → SEMPRE use actions: [{type: "future_bill", data: {...}}]
+   → NÃO pergunte "é entrada ou saída?"
+   → "pagar" SEMPRE significa expense (você JÁ SABE que é saída!)
+2. Retorne status: "success" imediatamente, não peça confirmação
+3. Use o formato JSON com actions[] conforme exemplo na linha 194
 
 📊 FORMATO DE RESPOSTA:
 Você deve responder de forma CONVERSACIONAL E HUMANA. O JSON nunca é mostrado ao usuário - é apenas para processamento backend.
@@ -175,7 +179,8 @@ ${categoryText}
 - Categorias devem ser EXATAMENTE como listadas acima
 - Se identificar "todo mês", "toda semana" → mantenha a categoria coerente (o sistema trata recorrência)
 - Use descrições curtas e claras
-- Se detectar "vou pagar", "tenho que pagar" → type: "scheduled" e exija data futura
+- **CRÍTICO**: "preciso pagar"/"vou pagar" + DATA FUTURA = SEMPRE usar actions[{type: "future_bill"}]
+- **CRÍTICO**: NÃO pergunte "é entrada ou saída?" para contas futuras - "pagar" significa expense!
 
 🎓 EXEMPLOS DE CONVERSAS IDEAIS:
 

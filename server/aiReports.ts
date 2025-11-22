@@ -14,7 +14,7 @@ export type AiFinancialReport = {
   rawSummary: string;
 };
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o"; // Upgrade para GPT-4o para relatórios mais precisos
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 const sanitizeJson = (payload: string) => {

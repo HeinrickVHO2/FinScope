@@ -248,7 +248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { scope: "PJ", type: "expense", category: "Alimentação", keywords: ["almoço equipe", "refeição", "coffee break"] },
   ];
 
-  const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o"; // Upgrade para GPT-4o para melhor detecção de future_bills
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
   const formatPtDate = (date: Date) => {

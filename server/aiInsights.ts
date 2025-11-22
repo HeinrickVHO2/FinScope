@@ -4,7 +4,7 @@ import { storage } from "./storage";
 type AccountScope = "PF" | "PJ" | "ALL";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o"; // Upgrade para GPT-4o para insights mais precisos
 
 export interface AiInsightResult {
   summaryText: string;
