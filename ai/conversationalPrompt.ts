@@ -55,34 +55,45 @@ Use esse contexto para dar respostas personalizadas! Por exemplo:
 🔄 DECISÃO: TRANSAÇÃO vs CONTA FUTURA vs META
 ATENÇÃO: Leia com CUIDADO para decidir o tipo correto!
 
-**TRANSAÇÃO (type: "transaction")** = Aconteceu HOJE ou no passado
-- "Gastei 50 no mercado" → transaction
-- "Paguei a conta de luz" → transaction
-- "Recebi meu salário" → transaction
-- Palavras-chave: "gastei", "paguei", "recebi", "comprei" (passado)
+**TRANSAÇÃO (type: "transaction")** = Gasto/Receita SEM investimento
+- "Gastei 50 no mercado" → transaction (compra comum)
+- "Paguei 150 de internet" → transaction (conta regular)
+- "Recebi 3000 de salário" → transaction (receita regular)
+- **NÃO é transaction**: Qualquer coisa com "investimento", "CDB", "renda fixa", "emergência", etc.
+- Palavras-chave: "gastei", "paguei", "recebi", "comprei" MAS SEM ser investimento
 
-**CONTA FUTURA (type: "future_bill")** = Acontecerá no FUTURO
-- "Preciso pagar o aluguel dia 10" → future_bill
-- "Vou pagar o financiamento no dia 23/12" → future_bill
-- "Tenho que pagar 2500 de carro dia 15" → future_bill
-- Palavras-chave: "preciso pagar", "vou pagar", "tenho que pagar", "dia X" (futuro)
-- **CRÍTICO**: Se mencionar uma DATA FUTURA (não hoje), SEMPRE criar como future_bill!
+**CONTA FUTURA (type: "future_bill")** = Pagamento agendado FUTURO
+- "Preciso pagar aluguel dia 10" → future_bill
+- "Vou pagar 2500 de carro dia 23/12" → future_bill
+- "Tenho que pagar 2500 de financiamento dia 15" → future_bill
+- **CRÍTICO**: Se mencionar DATA FUTURA (não hoje) + "pagar" = future_bill
+- Palavras-chave: "preciso pagar", "vou pagar", "tenho que pagar", "dia X", "próximo mês"
 
-**META (type: "goal")** = Objetivo financeiro ou investimento
-- "Quero juntar 10 mil para viajar" → goal (apenas meta, sem depósito agora)
-- "Meta de 5000 para emergência" → goal (apenas meta, sem depósito agora)
-- "Adicionei 500 em um CDB. Pretendo juntar 12 mil" → goal com DOIS valores separados!
-- Palavras-chave: "quero juntar", "meta de", "objetivo de", "adicionei em", "criei em"
+**INVESTIMENTO/META (type: "goal")** = Qualquer investimento (CDB, emergência, renda fixa, etc)
+- "Adicionei 2000 na reserva de emergência" → goal com deposit_amount: 2000
+- "Adicionei 500 em um CDB" → goal com deposit_amount: 500
+- "Quero juntar 10 mil para viajar" → goal com target_value: 10000
+- "Criei uma meta de 5000 para emergência" → goal com target_value: 5000
+- "Adicionei 500 em um CDB. Pretendo juntar 12 mil" → goal com deposit_amount: 500 AND target_value: 12000
+- **CRÍTICO**: Se menciona CDB, renda fixa, renda variável, emergência, investimento, meta, objetivo financeiro → SEMPRE type: "goal"
+- Palavras-chave: "CDB", "renda fixa", "renda variável", "emergência", "investimento", "meta", "objetivo", "adicionei em", "vou investir"
 
 ⚠️ ATENÇÃO ESPECIAL - INVESTIMENTOS COM DEPÓSITO:
-Quando o usuário mencionar DOIS valores (depósito agora + meta futura):
-1. "Adicionei 500..." = deposit_amount (quanto foi adicionado AGORA)
+SEMPRE que mencionar valor + investimento/emergência/CDB/renda fixa → retornar como "goal" com deposit_amount!
+
+Exemplos:
+- "Adicionei 2000 na emergência" → { "type": "goal", "deposit_amount": 2000, "investment_type": "reserva_emergencia" }
+- "Adicionei 500 no CDB" → { "type": "goal", "deposit_amount": 500, "investment_type": "cdb" }
+- "Adicionei 1000 em renda fixa" → { "type": "goal", "deposit_amount": 1000, "investment_type": "renda_fixa" }
+- "Adicionei 500 em CDB. Pretendo 12k" → { "type": "goal", "deposit_amount": 500, "target_value": 12000, "investment_type": "cdb" }
+
+Quando usuário mencionar DOIS valores:
+1. "Adicionei 500..." = deposit_amount (AGORA)
 2. "Pretendo juntar 12k" = target_value (meta futura)
-- SEMPRE extrair AMBOS os valores separadamente
-- deposit_amount: é o valor que está sendo investido AGORA
-- target_value: é a meta final que ele quer juntar
-- NO JSON, retornar: { "title": "...", "target_value": 12000, "deposit_amount": 500, "investment_type": "renda_fixa", "description": "..." }
-- Se mencionar apenas meta: { "title": "...", "target_value": 12000, "description": "..." } (sem deposit_amount)
+- NO JSON: AMBOS os campos { "target_value": 12000, "deposit_amount": 500, "investment_type": "..." }
+
+Se mencionar apenas meta (sem valor atual):
+- "Quero juntar 10 mil" → { "type": "goal", "target_value": 10000 } (SEM deposit_amount)
 
 ⚠️ TIPOS DE INVESTIMENTO - MAPEAMENTO AUTOMÁTICO:
 Detectar e mapear automaticamente o tipo de investimento:
@@ -104,20 +115,23 @@ Detectar e mapear automaticamente o tipo de investimento:
 
 🤖 DETECÇÃO AUTOMÁTICA - EXEMPLOS PRÁTICOS:
 
-TRANSAÇÕES (aconteceu hoje/passado):
-- "Gastei 50 no mercado" → transaction (expense, hoje)
-- "Recebi 3000 de salário" → transaction (income, hoje)
-- "Paguei 150 de internet" → transaction (expense, hoje)
+TRANSAÇÕES (gasto/receita comum):
+- "Gastei 50 no mercado" → type: transaction, expense
+- "Recebi 3000 de salário" → type: transaction, income
+- "Paguei 150 de internet" → type: transaction, expense
 
-CONTAS FUTURAS (acontecerá no futuro):
-- "Preciso pagar o aluguel dia 10" → future_bill (dia 10 do próximo mês)
-- "Vou pagar 2500 de carro dia 23/12" → future_bill (23/12/2025)
-- "Tenho que pagar 500 de luz amanhã" → future_bill (amanhã)
-- "Todo dia 15 pago 1000 de condomínio" → future_bill (dia 15)
+CONTAS FUTURAS (pagamento no futuro):
+- "Preciso pagar aluguel dia 10" → type: future_bill
+- "Vou pagar 2500 de carro dia 23/12" → type: future_bill
+- "Tenho que pagar 500 de luz amanhã" → type: future_bill
 
-METAS DE INVESTIMENTO:
-- "Quero juntar 10 mil para viajar" → goal (target: 10000)
-- "Meta de 5000 para emergência" → goal (target: 5000)
+INVESTIMENTOS/METAS (SEMPRE type: "goal"):
+- "Adicionei 2000 na reserva de emergência" → type: goal, deposit_amount: 2000, investment_type: "reserva_emergencia"
+- "Adicionei 500 em um CDB" → type: goal, deposit_amount: 500, investment_type: "cdb"
+- "Adicionei 1000 em renda fixa" → type: goal, deposit_amount: 1000, investment_type: "renda_fixa"
+- "Quero juntar 10 mil para viajar" → type: goal, target_value: 10000
+- "Meta de 5000 para emergência" → type: goal, target_value: 5000
+- "Adicionei 500 em CDB. Pretendo juntar 12 mil" → type: goal, deposit_amount: 500, target_value: 12000, investment_type: "cdb"
 
 **Data de hoje**: ${new Date().toISOString().split('T')[0]}
 **Data de amanhã**: ${new Date(Date.now() + 86400000).toISOString().split('T')[0]}
