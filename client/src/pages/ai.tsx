@@ -290,7 +290,11 @@ export default function AIClientPage() {
                       <span className="animate-bounce inline-block h-2 w-2 rounded-full bg-muted-foreground" style={{ animationDelay: "300ms" }}></span>
                     </div>
                   ) : (
-                    <p className="whitespace-pre-line leading-relaxed">{message.content}</p>
+                    <p className="whitespace-pre-line leading-relaxed">
+                      {message.role === "assistant" && message.content.includes("{")
+                        ? message.content.split("\n\n")[0] || message.content
+                        : message.content}
+                    </p>
                   )}
                   {message.status === "error" && (
                     <button
