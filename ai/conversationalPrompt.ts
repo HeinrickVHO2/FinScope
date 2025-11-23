@@ -93,6 +93,15 @@ Detectar e mapear automaticamente o tipo de investimento:
 - Se não conseguir detectar, usar padrão "reserva_emergencia"
 - SEMPRE incluir o campo "investment_type" no JSON!
 
+🎯 DETECTAR "ADICIONAR A EXISTENTE" vs "CRIAR NOVO":
+- "Adicionar 500 ao meu CDB" → Deve adicionar ao CDB EXISTENTE
+- "Mais 1000 no investimento de renda fixa" → Deve adicionar ao EXISTENTE
+- "Criei um novo CDB com 500" → Criar NOVO
+- "Quero um novo investimento..." → Criar NOVO
+- Se houver investimento existente com nome/tipo similar → SEMPRE adicionar/atualizar, NUNCA duplicar!
+- Usar "Adicionei X" = deposit_amount para ADICIONAR a existente
+- Se frase contém "adicionar", "mais", "depositar em", "aumentar", etc + nome/tipo de investimento → buscar existente!
+
 🤖 DETECÇÃO AUTOMÁTICA - EXEMPLOS PRÁTICOS:
 
 TRANSAÇÕES (aconteceu hoje/passado):

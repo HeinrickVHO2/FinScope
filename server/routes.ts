@@ -1155,7 +1155,7 @@ type AiInterpretationResult =
     content: string;
   };
 
-  const fetchRecentConversation = async (userId: string, limit = 6): Promise<ConversationMessage[]> => {
+  const fetchRecentConversation = async (userId: string, limit = 20): Promise<ConversationMessage[]> => {
     try {
       const { data, error } = await supabase
         .from("ai_messages")
@@ -2400,17 +2400,16 @@ type AiInterpretationResult =
       //   return await sendAssistantResponse();
       // }
 
-      // ⚡ Otimização: Apenas buscar contexto financeiro se for pergunta geral
+      // ⚡ SEMPRE carregar contexto financeiro (para detectar investimentos existentes, etc)
       const isGeneralQuestion = detectFinanceQuestion(content) && state.step === "idle";
       
-      const recentConversation = await fetchRecentConversation(user.id, 6);
-      let financialContext;
-      if (isGeneralQuestion) {
-        financialContext = await buildFinancialContext(user.id, "ALL");
-      }
+      const [recentConversation, financialContext] = await Promise.all([
+        fetchRecentConversation(user.id, 20),
+        buildFinancialContext(user.id, "ALL"),
+      ]);
 
-      // SE É PERGUNTA GERAL, RESPONDER COM CONTEXTO (financialContext já foi carregado acima)
-      if (isGeneralQuestion && financialContext) {
+      // SE É PERGUNTA GERAL, RESPONDER COM CONTEXTO
+      if (isGeneralQuestion) {
         const questionPrompt = `
 O usuário fez uma pergunta sobre suas finanças. Use o contexto para responder de forma útil e personalizada.
 
@@ -2600,31 +2599,69 @@ INSTRUÇÕES:
               const depositAmount = action.data.deposit_amount || 0;
               const targetAmount = action.data.target_value || 0;
               const investmentTitle = action.data.title || "Meta de Investimento";
-              const investmentType = action.data.investment_type || "reserva_emergencia"; // Nova: tipo de investimento
+              const investmentType = action.data.investment_type || "reserva_emergencia";
               
               // Se há depósito, usar esse valor como current_amount. Senão, usar target como initial
               const currentAmount = depositAmount > 0 ? depositAmount : targetAmount;
               
               if (isDevMode) console.log("[AI DEBUG] Investment type detected:", investmentType);
+
+              // 🎯 NOVO: Verificar se existe investimento com nome similar
+              let investment = null;
+              const existingInvestments = financialContext?.activeInvestments || [];
               
-              // 1. Criar investment
-              const { data: investment, error: investmentError } = await supabase
-                .from("investments")
-                .insert({
-                  user_id: user.id,
-                  name: investmentTitle,
-                  type: investmentType,
-                  current_amount: String(currentAmount),
-                })
-                .select()
-                .single();
+              // Buscar investimento com nome similar (case-insensitive)
+              const similarInvestment = existingInvestments.find((inv: any) => 
+                inv.name.toLowerCase().includes(investmentTitle.toLowerCase()) ||
+                investmentTitle.toLowerCase().includes(inv.name.toLowerCase())
+              );
 
-              if (investmentError) {
-                console.error("[AI ACTION] Supabase error ao criar investment:", investmentError);
-                throw investmentError;
+              if (similarInvestment && depositAmount > 0) {
+                // ATUALIZAR investimento existente em vez de criar novo
+                if (isDevMode) console.log("[AI ACTION] Investimento similar encontrado, atualizando:", similarInvestment.name);
+                
+                const newAmount = Number(similarInvestment.current_amount || 0) + depositAmount;
+                const { data: updatedInv, error: updateError } = await supabase
+                  .from("investments")
+                  .update({
+                    current_amount: String(newAmount),
+                  })
+                  .eq("id", similarInvestment.id)
+                  .select()
+                  .single();
+
+                if (updateError) {
+                  console.error("[AI ACTION] Erro ao atualizar investment:", updateError);
+                  throw updateError;
+                }
+
+                investment = updatedInv;
+                assistantText = `Perfeito! Adicionei R$ ${depositAmount.toFixed(2)} ao investimento "${investmentTitle}". Saldo atual: R$ ${newAmount.toFixed(2)}.`;
+                if (isDevMode) console.log("[AI ACTION] Investment atualizado:", investment);
+              } else {
+                // CRIAR novo investimento
+                const { data: newInv, error: investmentError } = await supabase
+                  .from("investments")
+                  .insert({
+                    user_id: user.id,
+                    name: investmentTitle,
+                    type: investmentType,
+                    current_amount: String(currentAmount),
+                  })
+                  .select()
+                  .single();
+
+                if (investmentError) {
+                  console.error("[AI ACTION] Supabase error ao criar investment:", investmentError);
+                  throw investmentError;
+                }
+
+                investment = newInv;
+                if (!assistantText) {
+                  assistantText = `Perfeito! Criei um novo investimento "${investmentTitle}" com R$ ${currentAmount.toFixed(2)}.`;
+                }
+                if (isDevMode) console.log("[AI ACTION] Investment criado:", investment);
               }
-
-              if (isDevMode) console.log("[AI ACTION] Investment criado:", investment);
 
               // 2. Se há depósito (deposit_amount), criar transação negativa (saida) na conta PF
               if (depositAmount > 0 && investment) {

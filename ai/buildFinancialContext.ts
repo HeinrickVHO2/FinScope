@@ -4,13 +4,13 @@ export async function buildFinancialContext(
   userId: string,
   accountType: "PF" | "PJ" | "ALL" = "ALL"
 ) {
-  // Últimas 10 transações
+  // Últimas 15 transações (aumentado para melhor contexto)
   const transactionsQuery = supabase
     .from("transactions")
     .select("*")
     .eq("user_id", userId)
     .order("date", { ascending: false })
-    .limit(10);
+    .limit(15);
 
   if (accountType !== "ALL") {
     transactionsQuery.eq("account_type", accountType);
@@ -33,13 +33,21 @@ export async function buildFinancialContext(
 
   const { data: futureTransactions } = await futureQuery;
 
-  // Metas de investimento
+  // Metas de investimento + Investimentos atuais
   const { data: investmentGoals } = await supabase
     .from("investment_goals")
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(20);
+
+  // NOVO: Carregar investimentos atuais (para detectar existentes)
+  const { data: activeInvestments } = await supabase
+    .from("investments")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(20);
 
   // Plano do usuário
   const { data: user } = await supabase
@@ -53,6 +61,7 @@ export async function buildFinancialContext(
     lastTransactions: lastTransactions ?? [],
     futureTransactions: futureTransactions ?? [],
     investmentGoals: investmentGoals ?? [],
+    activeInvestments: activeInvestments ?? [],
     userPlan: user?.plan ?? "pro",
     billingStatus: user?.billing_status ?? "pending"
   });
@@ -61,6 +70,7 @@ export async function buildFinancialContext(
     lastTransactions: lastTransactions ?? [],
     futureTransactions: futureTransactions ?? [],
     investmentGoals: investmentGoals ?? [],
+    activeInvestments: activeInvestments ?? [],
     userPlan: user?.plan ?? "pro",
     billingStatus: user?.billing_status ?? "pending",
     asPrompt
@@ -101,6 +111,18 @@ function formatContextAsPrompt(context: any): string {
       const target = Number(g.target_value || 0).toFixed(2);
       parts.push(`${i + 1}. ${g.title} - Meta: R$ ${target}`);
     });
+    parts.push("");
+  }
+
+  if (context.activeInvestments.length > 0) {
+    parts.push(`INVESTIMENTOS ATIVOS (${context.activeInvestments.length}):`);
+    context.activeInvestments.forEach((inv: any, i: number) => {
+      const current = Number(inv.current_amount || 0).toFixed(2);
+      const type = inv.type || "renda_fixa";
+      parts.push(`${i + 1}. ${inv.name} (${type}) - Saldo atual: R$ ${current}`);
+    });
+    parts.push("");
+    parts.push("🎯 ATENÇÃO: Se o usuário disser 'adicionar X a um investimento', verifique se já existe um investimento com nome similar. Se existir, ATUALIZE o saldo em vez de criar novo!");
     parts.push("");
   }
 

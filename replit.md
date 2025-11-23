@@ -42,6 +42,13 @@ Preferred communication style: Simple, everyday language.
 **Build & Deployment:** `tsx` for development, Vite for client, esbuild for server, environment variable configuration.
 **File Structure:** `/client`, `/server`, `/shared`, `/migrations`. Path aliases (`@/`, `@shared/`, `@assets/`).
 **AI Integration:** Utilizes OpenAI's GPT-4o for natural language processing, configured with a temperature of 0.7 for balanced creativity and accuracy. Processes user inputs into structured actions (transactions, future bills, investments) for direct database interaction.
+**AI Agent Improvements (Nov 2025):**
+  - Enhanced financial context: Now loads 15 transactions (was 10), 20 investment goals & 20 active investments
+  - Conversation history: Increased from 6 to 20 recent messages for better coherence
+  - **FIXED: Duplicate investments** - Agent now checks for similar investments before creating new; updates existing if found
+  - **FIXED: Investment detection** - Frontend now filters JSON from display (shows only conversational message)
+  - **FIXED: Ultra-fast responses** - Removed confirmation step, responses now 1-sentence max
+  - Improved add-to-existing detection via keywords: "adicionar", "mais", "depositar em", "aumentar"
 
 ## External Dependencies
 
