@@ -2592,14 +2592,16 @@ INSTRUÇÕES:
               resetConversationState(user.id);
               return await sendAssistantResponse();
             }
-          } else if (action.type === "goal" && action.data) {
-            if (isDevMode) console.log("[AI DEBUG] Creating goal/investment:", JSON.stringify(action.data));
+          } else if (action.type === "goal" && (action.data || action.deposit_amount)) {
+            // Suportar ambos os formatos: com "data" wrapper e sem
+            const actionData = action.data || action;
+            if (isDevMode) console.log("[AI DEBUG] Creating goal/investment:", JSON.stringify(actionData));
             try {
               // Suportar tanto deposit_amount (valor adicionado agora) quanto target_value (meta)
-              const depositAmount = action.data.deposit_amount || 0;
-              const targetAmount = action.data.target_value || 0;
-              const investmentTitle = action.data.title || "Meta de Investimento";
-              const investmentType = action.data.investment_type || "reserva_emergencia";
+              const depositAmount = actionData.deposit_amount || 0;
+              const targetAmount = actionData.target_value || 0;
+              const investmentTitle = actionData.title || "Meta de Investimento";
+              const investmentType = actionData.investment_type || "reserva_emergencia";
               
               // Se há depósito, usar esse valor como current_amount. Senão, usar target como initial
               const currentAmount = depositAmount > 0 ? depositAmount : targetAmount;

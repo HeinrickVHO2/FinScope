@@ -219,11 +219,14 @@ SEMPRE incluir EXATAMENTE estes campos NO ROOT do JSON:
         "description": "texto",
         "amount": 100,
         "dueDate": "YYYY-MM-DD",
+        "account_type": "PF" | "PJ",
         "category": "categoria"
         
-        // para goal:
-        "title": "Nome da meta",
+        // para goal (INVESTIMENTO):
+        "title": "Nome do investimento",
         "target_value": 5000,
+        "deposit_amount": 500,
+        "investment_type": "cdb" | "renda_fixa" | "renda_variavel" | "reserva_emergencia",
         "description": "objetivo"
       }
     }
