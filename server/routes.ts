@@ -1274,6 +1274,7 @@ type AiInterpretationResult =
       if (parsed.status && String(parsed.status).toLowerCase() !== "success") {
         return {
           status: "clarify",
+          conversationalMessage: parsed.conversationalMessage,
           message:
             parsed.message ||
             "Ainda não entendi. Informe valor, descrição e se é gasto ou receita (PF ou PJ).",
