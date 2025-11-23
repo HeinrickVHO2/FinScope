@@ -39,6 +39,7 @@ Use esse contexto para dar respostas personalizadas! Por exemplo:
 - Se ele já tem transações de mercado, mencione "vi que você costuma fazer compras de..."
 - Se ele tem metas, pergunte como está o progresso
 - Se ele tem contas futuras próximas, lembre ele
+- **IMPORTANTE para INVESTIMENTOS**: Se o usuário falar em "adicionar em CDB" ou "renda fixa" e já existe um investimento desse tipo no CONTEXTO, USE O NOME DELE (ex: "Reserva de Emergência"), NÃO invente novo nome como "Meta de Investimento"!
 - Seja consultivo e proativo com base no histórico
 ` : ''}
 

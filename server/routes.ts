@@ -2612,11 +2612,16 @@ INSTRUÇÕES:
               let investment = null;
               const existingInvestments = financialContext?.activeInvestments || [];
               
-              // Buscar investimento com nome similar (case-insensitive)
-              const similarInvestment = existingInvestments.find((inv: any) => 
-                inv.name.toLowerCase().includes(investmentTitle.toLowerCase()) ||
-                investmentTitle.toLowerCase().includes(inv.name.toLowerCase())
-              );
+              if (isDevMode) console.log("[AI ACTION] Existentes:", JSON.stringify(existingInvestments.map((inv: any) => ({ name: inv.name, type: inv.type }))));
+              if (isDevMode) console.log("[AI ACTION] Procurando por título:", investmentTitle, "tipo:", investmentType);
+              
+              // Buscar investimento com nome similar (case-insensitive) OU mesmo tipo
+              const similarInvestment = existingInvestments.find((inv: any) => {
+                const nameMatch = inv.name.toLowerCase().includes(investmentTitle.toLowerCase()) ||
+                                 investmentTitle.toLowerCase().includes(inv.name.toLowerCase());
+                const typeMatch = inv.type === investmentType && investmentTitle.toLowerCase() !== "meta de investimento";
+                return nameMatch || typeMatch;
+              });
 
               if (similarInvestment && depositAmount > 0) {
                 // ATUALIZAR investimento existente em vez de criar novo
