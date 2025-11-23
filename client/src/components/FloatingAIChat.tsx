@@ -40,7 +40,7 @@ export function FloatingAIChat() {
     if (isLoadingHistory) return;
     setIsLoadingHistory(true);
     try {
-      const response = await apiFetch("/api/ai/chat?limit=120", {
+      const response = await apiFetch("/api/ai/chat?limit=150", {
         credentials: "include",
         headers: { Accept: "application/json" },
       });
@@ -144,6 +144,11 @@ export function FloatingAIChat() {
             return message;
           })
         );
+        // 🔄 Refetch histórico completo para sincronizar com página principal
+        setTimeout(() => {
+          setHasLoadedHistory(false);
+          fetchHistory();
+        }, 500);
       }
     } catch (error) {
       setMessages((prev) =>
