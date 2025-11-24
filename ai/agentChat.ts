@@ -7,7 +7,9 @@ import { supabase } from "../server/supabase";
 import { buildFinancialContext } from "./buildFinancialContext";
 import { getSessionMemory, addConversationContext, getRecentContext, recordLastAction } from "./sessionMemory";
 import { buildNewAgentPrompt } from "./newPrompt";
+import { buildConversationalPrompt } from "./conversationalPrompt";
 import type { User } from "@shared/schema";
+import fetch from "node-fetch";
 
 export interface ChatRequest {
   content: string;
@@ -24,6 +26,10 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
   const { content, userId, user } = req;
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
   const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
+
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY não configurada");
+  }
 
   // 1. SALVAR MENSAGEM DO USUÁRIO
   const { data: userMessage, error: userError } = await supabase
@@ -43,11 +49,8 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
   // 3. CARREGAR CONTEXTO FINANCEIRO REAL
   const financialContext = await buildFinancialContext(userId, "ALL");
 
-  // 4. CONSTRUIR PROMPT COM NOVO AGENTE
-  const systemPrompt = buildNewAgentPrompt(
-    financialContext?.asPrompt || "Sem histórico financeiro",
-    recentContext
-  );
+  // 4. CONSTRUIR PROMPT - Usar prompt conversacional existente
+  const conversationalPrompt = buildConversationalPrompt("", financialContext?.asPrompt || "", null);
 
   // 5. CHAMAR OPENAI COM CONTEXTO REAL
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -61,7 +64,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
       temperature: 0.7,
       response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: conversationalPrompt },
         ...recentContext.map((msg) => ({ role: msg.role, content: msg.content })),
         { role: "user", content },
       ],
@@ -69,7 +72,9 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
   });
 
   if (!response.ok) {
-    throw new Error("Falha ao chamar OpenAI");
+    const errorText = await response.text();
+    console.error("[AI AGENT] OpenAI erro:", response.status, errorText);
+    throw new Error(`Falha ao chamar OpenAI: ${response.status}`);
   }
 
   const completion = (await response.json()) as any;
