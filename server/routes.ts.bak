@@ -2279,6 +2279,521 @@ type AiInterpretationResult =
   // [CÓDIGO ANTIGO REMOVIDO - 640 linhas da arquitetura anterior]
   // Handler GET mantido abaixo
 
+  app.get("/api/ai/chat-old-fallback", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      if (detectResetIntent(content)) {
+        resetConversationState(user.id);
+        assistantText = "Sem problemas, vamos começar do zero. Qual é o valor dessa movimentação?";
+        logConversationState(user.id, "reset-intent");
+        return await sendAssistantResponse();
+      }
+
+      if (!pendingAction && confirmationIntent === "cancel") {
+        resetConversationState(user.id);
+        assistantText = "Tudo bem, limpei as informações. Vamos começar de novo: qual é o valor?";
+        logConversationState(user.id, "reset/cancel");
+        return await sendAssistantResponse();
+      }
+
+      if (pendingAction && confirmationIntent) {
+        if (confirmationIntent === "confirm") {
+          const result = await executePendingAction(pendingAction, user);
+          assistantText = result.assistantText;
+          createdTransaction = result.transaction ?? null;
+          createdFutureTransaction = result.futureTransaction ?? null;
+          createdRecurringTransaction = result.recurringTransaction ?? null;
+        } else {
+          assistantText = "Sem problemas, descartei essa movimentação. Quando quiser, me envie outra.";
+        }
+        pendingActions.delete(user.id);
+        resetConversationState(user.id);
+        logConversationState(user.id, "after confirmation");
+        return await sendAssistantResponse();
+      }
+
+      // ⚡ REMOVIDO: Confirmação desnecessária - registro automático agora
+      // if (state.step === "confirming_transaction" && pendingAction && !confirmationIntent) {
+      //   return await sendAssistantResponse();
+      // }
+
+      // ⚡ SEMPRE carregar contexto financeiro (para detectar investimentos existentes, etc)
+      const isGeneralQuestion = detectFinanceQuestion(content) && state.step === "idle";
+      
+      const [recentConversation, financialContext] = await Promise.all([
+        fetchRecentConversation(user.id, 20),
+        buildFinancialContext(user.id, "ALL"),
+      ]);
+
+      // SE É PERGUNTA GERAL, RESPONDER COM CONTEXTO
+      if (isGeneralQuestion) {
+        const questionPrompt = `
+O usuário fez uma pergunta sobre suas finanças. Use o contexto para responder de forma útil e personalizada.
+
+Pergunta do usuário: "${content}"
+
+${financialContext?.asPrompt || "Sem histórico financeiro para consultar."}
+
+INSTRUÇÕES:
+- Responda em português brasileiro, de forma amigável
+- Seja direto e útil
+- Se tiver dados, use números reais
+- Ofereça dicas práticas baseadas no contexto
+- Não repita o contexto, apenas use para informar a resposta
+- Máximo 3 sentenças
+`;
+        try {
+          const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [{ role: "user", content: questionPrompt }],
+              temperature: 0.7,
+              max_tokens: 200,
+            }),
+          });
+          if (response.ok) {
+            const completion = (await response.json()) as any;
+            assistantText = completion?.choices?.[0]?.message?.content?.trim() || "Desculpa, não consegui responder agora.";
+            if (isDevMode) console.log(`[AI QUESTION] Respondido: "${assistantText}"`);
+            return await sendAssistantResponse();
+          }
+        } catch (error) {
+          console.error("[AI QUESTION] erro ao responder pergunta:", error);
+          assistantText = "Deixa eu pensar... Use meu painel de análise para mais detalhes sobre suas finanças.";
+          return await sendAssistantResponse();
+        }
+      }
+
+      const interpretation = await interpretTransactionFromMessage(
+        content,
+        recentConversation,
+        user.id,
+        financialContext?.asPrompt,
+        insightFocus
+      );
+      if (!state.memory.type) {
+        const historyType = inferTypeFromHistory(recentConversation);
+        if (historyType) {
+          state.memory.type = historyType;
+        }
+      }
+      if (!state.memory.accountType) {
+        const historyAccount = inferAccountTypeFromHistory(recentConversation, user.plan);
+        if (historyAccount) {
+          state.memory.accountType = historyAccount;
+        }
+      }
+      const futureIntent = detectFutureIntent(content);
+      const recurringFrequency = detectRecurringFrequency(content);
+      const immediateReceipt = detectImmediateReceipt(content);
+
+      const snapshotBefore = JSON.stringify(state.memory);
+
+      if (isDevMode) {
+        console.log("[AI DEBUG] interpretation.status:", interpretation.status);
+        console.log("[AI DEBUG] interpretation.actions:", JSON.stringify((interpretation as any)?.actions));
+      }
+
+      if (interpretation.status === "success") {
+        fillMemoryFromInterpretation(state, interpretation);
+        
+        // Processar ações estruturadas (transaction, future_bill, goal)
+        const actions = (interpretation as any)?.actions || [];
+        if (isDevMode) console.log(`[AI DEBUG] Processing ${actions.length} actions`);
+        let actionsProcessed = false;
+        
+        for (const action of actions) {
+          if (action.type === "transaction" && action.data) {
+            if (isDevMode) console.log("[AI DEBUG] Creating transaction:", JSON.stringify(action.data));
+            try {
+              const accountType = action.data.account_type || action.data.accountType || "PF";
+              
+              // Validar se usuário tem acesso a contas PJ (Premium only)
+              if (accountType === "PJ" && user.plan !== "premium") {
+                console.error("[AI ACTION] Usuário Pro tentou criar transação em conta PJ");
+                assistantText = "Transações em contas empresariais (PJ) estão disponíveis apenas no plano Premium. Faça upgrade para acessar esse recurso.";
+                resetConversationState(user.id);
+                return await sendAssistantResponse();
+              }
+              
+              const accounts = await storage.getAccountsByUserId(user.id);
+              const targetAccount = accounts.find((acc) => acc.type?.toLowerCase() === accountType.toLowerCase());
+              
+              if (!targetAccount) {
+                console.error("[AI ACTION] Conta não encontrada para tipo:", accountType);
+                const accountLabel = accountType === "PJ" ? "empresarial (PJ)" : "pessoal (PF)";
+                assistantText = `Não encontrei uma conta ${accountLabel} configurada. ${accountType === "PJ" ? "Verifique se você tem o plano Premium para usar contas empresariais." : "Configure uma conta pessoal nas configurações."}`;
+                resetConversationState(user.id);
+                return await sendAssistantResponse();
+              }
+
+              const transaction = await storage.createTransaction({
+                userId: user.id,
+                accountId: targetAccount.id,
+                description: action.data.title || action.data.description || "Transação",
+                type: (action.data.type === "income" || action.data.type === "entrada") ? "entrada" : "saida",
+                amount: action.data.amount || 0,
+                category: action.data.category || "Outros",
+                date: action.data.date ? new Date(action.data.date) : new Date(),
+                accountType: accountType,
+                source: "ai",
+              });
+              if (isDevMode) console.log("[AI ACTION] Transaction criada:", transaction);
+              createdTransaction = transaction;
+              createdActions.push({ type: "transaction", data: transaction });
+              actionsProcessed = true;
+            } catch (err) {
+              console.error("[AI ACTION] ERRO ao criar transaction:", err);
+              if ((err as any)?.message) console.error("[AI ACTION] Error message:", (err as any).message);
+              if ((err as any)?.details) console.error("[AI ACTION] Error details:", (err as any).details);
+              assistantText = "Tive um problema ao registrar essa transação. Pode tentar novamente em alguns segundos?";
+              resetConversationState(user.id);
+              return await sendAssistantResponse();
+            }
+          } else if (action.type === "future_bill" && action.data) {
+            if (isDevMode) console.log("[AI DEBUG] Creating future_bill:", JSON.stringify(action.data));
+            try {
+              const accountType = action.data.account_type || action.data.accountType || "PF";
+              
+              // Validar se usuário tem acesso a contas PJ (Premium only)
+              if (accountType === "PJ" && user.plan !== "premium") {
+                console.error("[AI ACTION] Usuário Pro tentou criar future bill em conta PJ");
+                assistantText = "Contas futuras em contas empresariais (PJ) estão disponíveis apenas no plano Premium. Faça upgrade para acessar esse recurso.";
+                resetConversationState(user.id);
+                return await sendAssistantResponse();
+              }
+              
+              // Suporte para múltiplos formatos de data: dueDate, due_date, date
+              const dueDate = action.data.dueDate || action.data.due_date || action.data.date;
+              
+              if (!dueDate) {
+                console.error("[AI ACTION] Future bill sem data de vencimento");
+                assistantText = "Preciso saber a data de vencimento dessa conta. Quando você precisa pagar?";
+                resetConversationState(user.id);
+                return await sendAssistantResponse();
+              }
+
+              const { data: futureBill, error } = await supabase
+                .from("future_expenses")
+                .insert({
+                  user_id: user.id,
+                  title: action.data.title || action.data.description || "Despesa",
+                  category: action.data.category || "Outros",
+                  amount: String(action.data.amount || 0),
+                  due_date: dueDate,
+                  account_type: accountType,
+                  status: "pending",
+                  is_recurring: false,
+                })
+                .select()
+                .single();
+
+              if (error) {
+                console.error("[AI ACTION] Supabase error ao criar future bill:", error);
+                throw error;
+              }
+
+              if (isDevMode) console.log("[AI ACTION] Future bill criada:", futureBill);
+              createdActions.push({ type: "future_bill", data: futureBill });
+              actionsProcessed = true;
+            } catch (err) {
+              console.error("[AI ACTION] ERRO ao criar future bill:", err);
+              if ((err as any)?.message) console.error("[AI ACTION] Error message:", (err as any).message);
+              if ((err as any)?.details) console.error("[AI ACTION] Error details:", (err as any).details);
+              assistantText = "Tive um problema ao registrar essa conta futura. Pode tentar novamente em alguns segundos?";
+              resetConversationState(user.id);
+              return await sendAssistantResponse();
+            }
+          } else if (action.type === "goal" && (action.data || action.deposit_amount)) {
+            // Suportar ambos os formatos: com "data" wrapper e sem
+            const actionData = action.data || action;
+            if (isDevMode) console.log("[AI DEBUG] Creating goal/investment:", JSON.stringify(actionData));
+            try {
+              // Suportar tanto deposit_amount (valor adicionado agora) quanto target_value (meta)
+              const depositAmount = actionData.deposit_amount || 0;
+              const targetAmount = actionData.target_value || 0;
+              const investmentTitle = actionData.title || "Meta de Investimento";
+              const investmentType = actionData.investment_type || "reserva_emergencia";
+              
+              // Se há depósito, usar esse valor como current_amount. Senão, usar target como initial
+              const currentAmount = depositAmount > 0 ? depositAmount : targetAmount;
+              
+              if (isDevMode) console.log("[AI DEBUG] Investment type detected:", investmentType);
+
+              // 🎯 NOVO: Verificar se existe investimento com nome similar
+              let investment = null;
+              const existingInvestments = financialContext?.activeInvestments || [];
+              
+              if (isDevMode) console.log("[AI ACTION] Existentes:", JSON.stringify(existingInvestments.map((inv: any) => ({ name: inv.name, type: inv.type }))));
+              if (isDevMode) console.log("[AI ACTION] Procurando por título:", investmentTitle, "tipo:", investmentType);
+              
+              // Buscar investimento com nome similar (case-insensitive) OU mesmo tipo
+              const similarInvestment = existingInvestments.find((inv: any) => {
+                const nameMatch = inv.name.toLowerCase().includes(investmentTitle.toLowerCase()) ||
+                                 investmentTitle.toLowerCase().includes(inv.name.toLowerCase());
+                const typeMatch = inv.type === investmentType && investmentTitle.toLowerCase() !== "meta de investimento";
+                return nameMatch || typeMatch;
+              });
+
+              if (similarInvestment && depositAmount > 0) {
+                // ATUALIZAR investimento existente em vez de criar novo
+                if (isDevMode) console.log("[AI ACTION] Investimento similar encontrado, atualizando:", similarInvestment.name);
+                
+                const newAmount = Number(similarInvestment.current_amount || 0) + depositAmount;
+                const { data: updatedInv, error: updateError } = await supabase
+                  .from("investments")
+                  .update({
+                    current_amount: String(newAmount),
+                  })
+                  .eq("id", similarInvestment.id)
+                  .select()
+                  .single();
+
+                if (updateError) {
+                  console.error("[AI ACTION] Erro ao atualizar investment:", updateError);
+                  throw updateError;
+                }
+
+                investment = updatedInv;
+                assistantText = `Perfeito! Adicionei R$ ${depositAmount.toFixed(2)} ao investimento "${investmentTitle}". Saldo atual: R$ ${newAmount.toFixed(2)}.`;
+                if (isDevMode) console.log("[AI ACTION] Investment atualizado:", investment);
+              } else {
+                // CRIAR novo investimento
+                const { data: newInv, error: investmentError } = await supabase
+                  .from("investments")
+                  .insert({
+                    user_id: user.id,
+                    name: investmentTitle,
+                    type: investmentType,
+                    current_amount: String(currentAmount),
+                  })
+                  .select()
+                  .single();
+
+                if (investmentError) {
+                  console.error("[AI ACTION] Supabase error ao criar investment:", investmentError);
+                  throw investmentError;
+                }
+
+                investment = newInv;
+                if (!assistantText) {
+                  assistantText = `Perfeito! Criei um novo investimento "${investmentTitle}" com R$ ${currentAmount.toFixed(2)}.`;
+                }
+                if (isDevMode) console.log("[AI ACTION] Investment criado:", investment);
+              }
+
+              // 2. Se há depósito (deposit_amount), criar transação negativa (saida) na conta PF
+              if (depositAmount > 0 && investment) {
+                const accounts = await storage.getAccountsByUserId(user.id);
+                const pfAccount = accounts.find((a) => a.type?.toLowerCase() === "pf");
+                
+                if (pfAccount) {
+                  // Criar transação negativa (saida) na conta PF
+                  const { error: txError } = await supabase
+                    .from("transactions")
+                    .insert({
+                      user_id: user.id,
+                      account_id: pfAccount.id,
+                      type: "saida",
+                      amount: String(depositAmount),
+                      category: "Investimento",
+                      description: `Depósito em investimento: ${investmentTitle}`,
+                      date: new Date().toISOString(),
+                    });
+
+                  if (txError) {
+                    console.error("[AI ACTION] Supabase error ao criar transaction (deposit):", txError);
+                  } else {
+                    if (isDevMode) console.log("[AI ACTION] Transaction (saida) criada para depósito");
+                  }
+                }
+              }
+
+              createdActions.push({ type: "goal", data: investment });
+              actionsProcessed = true;
+            } catch (err) {
+              console.error("[AI ACTION] ERRO ao criar goal/investment:", err);
+              if ((err as any)?.message) console.error("[AI ACTION] Error message:", (err as any).message);
+              if ((err as any)?.details) console.error("[AI ACTION] Error details:", (err as any).details);
+              assistantText = "Tive um problema ao registrar essa meta. Pode tentar novamente em alguns segundos?";
+              resetConversationState(user.id);
+              return await sendAssistantResponse();
+            }
+          }
+        }
+        
+        // Se processamos actions[] com sucesso, resetar estado e retornar
+        if (actionsProcessed) {
+          // Validar e sanitizar a mensagem conversacional da IA
+          let message = interpretation.conversationalMessage || "";
+          message = message.trim();
+          
+          // Se mensagem vazia ou contém "placeholder", usar fallback
+          if (!message || message.toLowerCase().includes("placeholder")) {
+            if (createdTransaction) {
+              const typeLabel = createdTransaction.type === "entrada" ? "receita" : "gasto";
+              message = `Perfeito! Registrei um ${typeLabel} de R$ ${parseFloat(createdTransaction.amount).toFixed(2)} para você.`;
+            } else if (createdActions.length > 0) {
+              message = "Perfeito! Registrei isso para você.";
+            } else {
+              message = "Entendi! Como posso ajudar mais?";
+            }
+          }
+          
+          assistantText = message;
+          console.log("[AI ACTIONS] Processou actions[], retornando mensagem:", assistantText);
+          resetConversationState(user.id);
+          logConversationState(user.id, "actions-processed");
+          return await sendAssistantResponse();
+        }
+      }
+
+      applyHeuristicsFromContent(state, content, user.plan);
+
+      if (state.memory.isScheduled && state.memory.date) {
+        const plannedDate = new Date(state.memory.date);
+        if (plannedDate.getTime() > Date.now()) {
+          state.memory.dueDate = state.memory.date;
+        } else {
+          state.memory.date = undefined;
+          state.memory.dueDate = undefined;
+        }
+      }
+      if (futureIntent && !state.memory.isScheduled) {
+        state.memory.isScheduled = true;
+        state.memory.type = state.memory.type || futureIntent;
+        if (state.memory.date) {
+          state.memory.dueDate = state.memory.date;
+        }
+      }
+
+      if (isDevMode && snapshotBefore === JSON.stringify(state.memory)) {
+        console.log(`[AI STATE][${user.id}] Nenhum novo dado extraído de: "${content}"`);
+      }
+
+      ensureAccountTypeInMemory(state, user.plan);
+      advanceConversationStep(state);
+      if (user.plan === "premium" && !state.memory.accountType) {
+        state.step = "collecting_type";
+      }
+
+      if (state.memory.accountType === "PJ" && user.plan !== "premium") {
+        assistantText =
+          "Transações empresariais exigem o Plano Premium. Vamos continuar na conta pessoal por enquanto.";
+        resetConversationState(user.id);
+        return await sendAssistantResponse();
+      }
+
+      // PRIORIDADE 1: Usar a mensagem conversacional da IA se disponível
+      if (interpretation.conversationalMessage) {
+        assistantText = interpretation.conversationalMessage;
+        console.log(`[AI CONVERSATIONAL] Usando mensagem da IA: "${assistantText}"`);
+      } 
+      // PRIORIDADE 2: Usar mensagem de clarificação da IA (fallback para compatibilidade)
+      else if (interpretation.status === "clarify" && interpretation.message) {
+        assistantText = interpretation.message;
+      }
+      // PRIORIDADE 3: Lógica hardcoded como último recurso (quando IA falha)
+      else if (state.step === "collecting_amount" && !state.memory.amount) {
+        assistantText = "Qual é o valor dessa movimentação? (ex.: 250 ou 1.200,50)";
+      } else if (state.step === "collecting_type" && !state.memory.type) {
+        assistantText = "É um pagamento (saída) ou um recebimento (entrada)?";
+      } else if (state.step === "collecting_type" && state.memory.type && user.plan === "premium" && !state.memory.accountType) {
+        assistantText = "Essa movimentação deve sair da conta pessoal (PF) ou da conta empresarial (PJ)?";
+      } else if (state.step === "collecting_date" && !state.memory.date) {
+        assistantText = 'Qual é a data? Informe dia/mês/ano ou diga "amanhã"/"dia 10".';
+      } else if (state.step === "collecting_description" && !state.memory.description) {
+        assistantText = "Como você quer descrever essa movimentação?";
+      }
+
+      // EXECUTAR IMEDIATAMENTE se temos todos os dados e IA respondeu com mensagem conversacional
+      if (state.step === "confirming_transaction" && hasAllConversationData(state.memory) && assistantText && interpretation.conversationalMessage) {
+        const candidate = buildCandidateFromState(state);
+        if (candidate) {
+          try {
+            if (recurringFrequency) {
+              const action: PendingAction = {
+                kind: "recurring",
+                candidate,
+                frequency: recurringFrequency,
+                immediateReceipt,
+              };
+              const result = await executePendingAction(action, user);
+              createdTransaction = result.transaction ?? null;
+              createdFutureTransaction = result.futureTransaction ?? null;
+              createdRecurringTransaction = result.recurringTransaction ?? null;
+              assistantText = result.assistantText;
+              if (isDevMode) console.log(`[AI AUTO-EXECUTE] Recurring: ${result.assistantText}`);
+            } else if (futureIntent) {
+              const action: PendingAction = {
+                kind: "future",
+                candidate,
+                intent: candidate.type,
+              };
+              const result = await executePendingAction(action, user);
+              createdFutureTransaction = result.futureTransaction ?? null;
+              assistantText = result.assistantText;
+              if (isDevMode) console.log(`[AI AUTO-EXECUTE] Future: ${result.assistantText}`);
+            } else {
+              const action: PendingAction = {
+                kind: "transaction",
+                candidate,
+              };
+              const result = await executePendingAction(action, user);
+              createdTransaction = result.transaction ?? null;
+              assistantText = result.assistantText || assistantText;
+              if (isDevMode) console.log(`[AI AUTO-EXECUTE] Transaction: ${assistantText}`);
+            }
+          } catch (error) {
+            console.error("[AI AUTO-EXECUTE] erro ao executar transação:", error);
+            assistantText = assistantText || "Tive um problema ao salvar, mas registrei sua mensagem. Tente novamente em instantes.";
+          }
+        }
+        resetConversationState(user.id);
+      } 
+      // Fallback: registrar pending action se não conseguimos executar imediatamente
+      else if (state.step === "confirming_transaction" && hasAllConversationData(state.memory)) {
+        const candidate = buildCandidateFromState(state);
+        if (candidate) {
+          if (recurringFrequency) {
+            pendingActions.set(user.id, {
+              kind: "recurring",
+              candidate,
+              frequency: recurringFrequency,
+              immediateReceipt,
+            });
+            if (!assistantText) {
+              assistantText = buildPendingSummary(pendingActions.get(user.id)!);
+            }
+          } else {
+            if (futureIntent && !candidate.isScheduled) {
+              candidate.isScheduled = true;
+              candidate.dueDate = candidate.dueDate || candidate.date;
+            }
+            registerPendingActionForCandidate(user.id, candidate, candidate.type);
+            if (!assistantText) {
+              assistantText = formatConfirmationMessage(state.memory);
+            }
+          }
+        } else if (!assistantText) {
+          assistantText = "Preciso de mais detalhes antes de salvar.";
+        }
+      } else if (!assistantText) {
+        assistantText = "Estou quase lá! Vamos seguir a ordem: valor → tipo → data → descrição.";
+      }
+
+      logConversationState(user.id, "after");
+      return await sendAssistantResponse();
+    } catch (error) {
+      console.error("[AI CLIENT] erro inesperado:", error);
+      return res.status(500).json({ error: "Erro ao processar mensagem" });
+    }
+  });
+
   app.get("/api/ai/chat", requireAuth, requireActiveBilling, async (req: any, res) => {
     const user = req.currentUser;
     if (!user) {
