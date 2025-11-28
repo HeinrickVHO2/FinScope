@@ -35,6 +35,7 @@ import { useDashboardView } from "@/context/dashboard-view";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { Link } from "wouter";
+import { subscribeToUserTransactions, supabaseClient } from "@/lib/realtime";
 
 type Scope = "PF" | "PJ" | "ALL";
 
@@ -203,6 +204,33 @@ export default function TransactionsPage() {
       });
     },
   });
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = subscribeToUserTransactions(user.id, (transaction) => {
+      const mappedAccountType = (transaction.accountType || "PF").toUpperCase() as Scope;
+      const scopesToUpdate: Scope[] = ["ALL"];
+      if (mappedAccountType === "PF" || mappedAccountType === "PJ") {
+        scopesToUpdate.push(mappedAccountType);
+      }
+      scopesToUpdate.forEach((scope) => {
+        queryClient.setQueryData<Transaction[]>([`/api/transactions?type=${scope}`], (prev = []) => {
+          if (!prev) return prev;
+          if (prev.some((item) => item.id === transaction.id)) {
+            return prev;
+          }
+          return [transaction, ...prev];
+        });
+      });
+      invalidateFinanceQueries();
+    });
+
+    return () => {
+      if (channel && supabaseClient) {
+        supabaseClient.removeChannel(channel);
+      }
+    };
+  }, [user?.id]);
 
   const canSubmit = accountType === "PJ" ? isPremiumUser && !!businessAccount?.id : !!personalAccount?.id;
 

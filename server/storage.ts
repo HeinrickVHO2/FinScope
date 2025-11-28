@@ -19,8 +19,8 @@ import {
   type InsertFutureTransaction,
   type RecurringTransaction,
   type InsertRecurringTransaction,
-  type AiReportSetting,
-  type InsertAiReportSetting,
+  type UserReportPreference,
+  type InsertUserReportPreference,
   PLAN_LIMITS
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -118,8 +118,8 @@ export interface IStorage {
   createFutureTransaction(tx: InsertFutureTransaction): Promise<FutureTransaction>;
   getRecurringTransactions(userId: string, scope?: AccountScope): Promise<RecurringTransaction[]>;
   createRecurringTransaction(tx: InsertRecurringTransaction): Promise<RecurringTransaction>;
-  getAiReportSettings(userId: string): Promise<AiReportSetting | undefined>;
-  upsertAiReportSettings(userId: string, settings: InsertAiReportSetting): Promise<AiReportSetting>;
+  getUserReportPreferences(userId: string): Promise<UserReportPreference | undefined>;
+  upsertUserReportPreferences(userId: string, settings: InsertUserReportPreference): Promise<UserReportPreference>;
 }
 
 // MemStorage is deprecated - use SupabaseStorage instead
@@ -130,7 +130,7 @@ export class MemStorage {
   private futureExpenses: Map<string, FutureExpense>;
   private recurringTransactions: Map<string, StoredRecurringTransaction>;
   private futureTransactions: Map<string, StoredFutureTransaction>;
-  private aiReportSettings: Map<string, AiReportSetting>;
+  private userReportPreferences: Map<string, UserReportPreference>;
   private rules: Map<string, Rule>;
 
   constructor() {
@@ -140,7 +140,7 @@ export class MemStorage {
     this.futureExpenses = new Map();
     this.recurringTransactions = new Map();
     this.futureTransactions = new Map();
-    this.aiReportSettings = new Map();
+    this.userReportPreferences = new Map();
     this.rules = new Map();
   }
 
@@ -589,12 +589,12 @@ export class MemStorage {
     return this.toApiRecurringTransaction(record);
   }
 
-  async getAiReportSettings(userId: string): Promise<AiReportSetting | undefined> {
-    return this.aiReportSettings.get(userId);
+  async getUserReportPreferences(userId: string): Promise<UserReportPreference | undefined> {
+    return this.userReportPreferences.get(userId);
   }
 
-  async upsertAiReportSettings(userId: string, settings: InsertAiReportSetting): Promise<AiReportSetting> {
-    const existing = this.aiReportSettings.get(userId) || {
+  async upsertUserReportPreferences(userId: string, settings: InsertUserReportPreference): Promise<UserReportPreference> {
+    const existing = this.userReportPreferences.get(userId) || {
       userId,
       focusEconomy: false,
       focusDebt: false,
@@ -606,7 +606,7 @@ export class MemStorage {
       ...settings,
       updatedAt: new Date(),
     };
-    this.aiReportSettings.set(userId, updated);
+    this.userReportPreferences.set(userId, updated);
     return updated;
   }
 }

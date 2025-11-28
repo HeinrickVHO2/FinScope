@@ -211,7 +211,8 @@ export async function runWeeklyFinanceSummaryJob() {
     for (const user of users) {
       try {
         const stats = await buildWeeklyStats(user.id);
-        const aiInsights = await generateAiInsights(user.id, "ALL");
+        const preferences = await storage.getUserReportPreferences(user.id);
+        const aiInsights = await generateAiInsights(user.id, "ALL", preferences ?? undefined);
         const summary =
           aiInsights.summaryText ||
           `Você recebeu ${formatCurrency(stats.totalIncome)} e gastou ${formatCurrency(
