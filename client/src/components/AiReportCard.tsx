@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -40,6 +40,12 @@ export function AiReportCard() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedRef = useRef<AiReportSettings>({
+    focusEconomy: false,
+    focusDebt: false,
+    focusInvestments: false,
+  });
 
   const currentPeriod = useMemo(() => {
     const now = new Date();
@@ -93,11 +99,13 @@ export function AiReportCard() {
         if (response.ok) {
           const payload = await response.json();
           if (isMounted) {
-            setSettings({
+            const persisted = {
               focusEconomy: Boolean(payload.focusEconomy),
               focusDebt: Boolean(payload.focusDebt),
               focusInvestments: Boolean(payload.focusInvestments),
-            });
+            };
+            setSettings(persisted);
+            lastSavedRef.current = persisted;
             setSettingsError(null);
           }
         } else if (response.status === 403) {
@@ -124,43 +132,98 @@ export function AiReportCard() {
     };
   }, [currentPeriod, fetchReport, isPremium]);
 
-  const handleToggle = async (key: keyof AiReportSettings, value: boolean) => {
-    if (!isPremium) {
-      setIsUpgradeModalOpen(true);
-      return;
-    }
-    const previousSettings = { ...settings };
-    const nextSettings = { ...settings, [key]: value };
-    setSettings(nextSettings);
-    setIsSavingSettings(true);
-    try {
-      const response = await apiFetch("/api/ai/report/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(nextSettings),
-      });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || "Não foi possível salvar preferências.");
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
       }
-    } catch (error) {
-      setSettings(previousSettings);
-      toast({
-        title: "Não foi possível salvar suas preferências",
-        description: (error as Error).message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSavingSettings(false);
-    }
+    };
+  }, []);
 
-    fetchReport();
-  };
+  const persistSettings = useCallback(
+    async (nextSettings: AiReportSettings) => {
+      setIsSavingSettings(true);
+      try {
+        const response = await apiFetch("/api/ai/report/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(nextSettings),
+        });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error || "Não foi possível salvar preferências.");
+        }
+        lastSavedRef.current = nextSettings;
+        fetchReport();
+      } catch (error) {
+        setSettings(lastSavedRef.current);
+        toast({
+          title: "Não foi possível salvar suas preferências",
+          description: (error as Error).message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsSavingSettings(false);
+      }
+    },
+    [fetchReport, toast]
+  );
+
+  const scheduleSave = useCallback(
+    (nextSettings: AiReportSettings) => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      saveTimeoutRef.current = setTimeout(() => {
+        persistSettings(nextSettings);
+      }, 400);
+    },
+    [persistSettings]
+  );
+
+  const handleToggle = useCallback(
+    (key: keyof AiReportSettings, value: boolean) => {
+      if (!isPremium) {
+        setIsUpgradeModalOpen(true);
+        return;
+      }
+      setSettings((prev) => {
+        const nextSettings = { ...prev, [key]: value };
+        scheduleSave(nextSettings);
+        return nextSettings;
+      });
+    },
+    [isPremium, scheduleSave]
+  );
 
   const insights = data?.insights ?? [];
   const tips = data?.tips ?? [];
   const warnings = data?.warnings ?? [];
+  const summaryMessage = useMemo(() => {
+    const fallback = "Gere o primeiro relatório para liberar os insights inteligentes.";
+    if (!data?.projections) return fallback;
+    const trimmed = data.projections.trim();
+    if (!trimmed) return fallback;
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (typeof parsed === "string") {
+          return parsed;
+        }
+        if (parsed?.summary) {
+          return parsed.summary;
+        }
+        if (parsed?.message) {
+          return parsed.message;
+        }
+      } catch {
+        // ignore parse errors and fall back below
+      }
+      return "Insights atualizados automaticamente com base nas suas movimentações.";
+    }
+    return data.projections;
+  }, [data?.projections]);
 
   if (!isPremium) {
     return (
@@ -247,9 +310,7 @@ export function AiReportCard() {
             FinScope AI
           </div>
           <p className="text-sm text-slate-600 mt-2 whitespace-pre-line">
-            {isLoading
-              ? "Gerando resumo personalizado..."
-              : data?.projections || "Gere o primeiro relatório para liberar os insights inteligentes."}
+            {isLoading ? "Gerando resumo personalizado..." : summaryMessage}
           </p>
         </div>
 

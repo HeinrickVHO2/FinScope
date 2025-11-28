@@ -35,19 +35,16 @@ import {
   insertInvestmentTransactionSchema,
   insertFutureExpenseSchema,
   insertFutureTransactionSchema,
-  insertAiReportSettingSchema,
+  insertUserReportPreferenceSchema,
 } from "@shared/schema";
 import type { User, Transaction, FutureTransaction, RecurringTransaction } from "@shared/schema";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import fetch from "node-fetch";
-import { buildFinancialContext } from "../ai/buildFinancialContext";
 import { sanitizeUserInput, generateSafeRejectionMessage } from "../ai/sanitizeInput";
 import { buildConversationalPrompt } from "../ai/conversationalPrompt";
-import { buildNewAgentPrompt } from "../ai/newPrompt";
-import { getSessionMemory, updateSessionMemory, addConversationContext, getRecentContext, recordLastAction } from "../ai/sessionMemory";
-import { findOrCreateInvestment, createTransaction, findOrCreateFutureBill, findOrCreateGoal } from "../ai/agentExecutor";
 import { processAgentChat } from "../ai/agentChat";
+import { saveChatHistoryMessage } from "../ai/chatHistory";
 
 
 // Extend Express session type
@@ -183,6 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const aiChatRequestSchema = z.object({
     content: z.string().min(1, "Mensagem é obrigatória").max(2000, "Mensagem muito longa"),
+    insightFocus: z.enum(["economy", "debt", "investments"]).optional().nullable(),
   });
 
   const scopeLabels: Record<AccountScope, string> = {
@@ -279,8 +277,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const mapAiMessage = (row: any) => ({
     id: row?.id,
-    role: row?.role,
-    content: row?.content,
+    role: row?.role === "assistant" ? "assistant" : "user",
+    content: row?.message ?? row?.content,
     createdAt: row?.created_at || row?.createdAt || new Date().toISOString(),
   });
 
@@ -1455,17 +1453,18 @@ type AiInterpretationResult =
         return;
       }
 
-      const [metrics, transactions, categories] = await Promise.all([
+      const [metrics, transactions, categories, reportPreferences] = await Promise.all([
         storage.getDashboardMetrics(req.session.userId, scope),
         storage.getTransactionsByUserId(req.session.userId, scope),
         storage.getCategoryBreakdown(req.session.userId, scope),
+        storage.getUserReportPreferences(req.session.userId),
       ]);
 
       const insights = includeInsights ? buildPremiumInsights(transactions as any) : [];
       const chartImage = includeCharts ? buildChartImage(categories) : null;
       const [forecast, aiInsights] = await Promise.all([
         computeCashflowForecast(req.session.userId, scope),
-        generateAiInsights(req.session.userId, scope),
+        generateAiInsights(req.session.userId, scope, reportPreferences ?? undefined),
       ]);
       const html = buildReportHtml({
         user,
@@ -2217,24 +2216,14 @@ type AiInterpretationResult =
         return res.status(400).json({ error: "Foco inválido" });
       }
 
-      const { data, error } = await supabase
-        .from("ai_report_settings")
-        .upsert({
-          user_id: req.session.userId,
-          focus_economy: focus === "economy",
-          focus_debt: focus === "debt",
-          focus_investments: focus === "investments",
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" })
-        .select()
-        .single();
+      const updated = await storage.upsertUserReportPreferences(req.session.userId, {
+        userId: req.session.userId,
+        focusEconomy: focus === "economy",
+        focusDebt: focus === "debt",
+        focusInvestments: focus === "investments",
+      });
 
-      if (error) {
-        console.error("[AI INSIGHT] erro ao salvar foco:", error);
-        return res.status(500).json({ error: "Não foi possível salvar o foco" });
-      }
-
-      return res.json({ success: true, data });
+      return res.json({ success: true, data: updated });
     } catch (error) {
       console.error("[AI INSIGHT] erro inesperado:", error);
       res.status(500).json({ error: "Erro ao processar foco" });
@@ -2257,17 +2246,23 @@ type AiInterpretationResult =
 
       if (isDangerous) {
         const rejectionMessage = generateSafeRejectionMessage();
-        const { data: userMsg } = await supabase.from("ai_messages").insert({ user_id: user.id, role: "user", content: clean }).select().single();
-        const { data: assistantMsg } = await supabase.from("ai_messages").insert({ user_id: user.id, role: "assistant", content: rejectionMessage }).select().single();
-        return res.json({ success: true, data: { userMessage: mapAiMessage(userMsg), assistantMessage: mapAiMessage(assistantMsg) } });
+        const userMsg = await saveChatHistoryMessage(user.id, "user", clean || "Mensagem bloqueada");
+        const assistantMsg = await saveChatHistoryMessage(user.id, "assistant", rejectionMessage);
+        return res.json({ success: true, data: { userMessage: mapAiMessage(userMsg), assistantMessage: mapAiMessage(assistantMsg), actions: [] } });
       }
 
-      const result = await processAgentChat({ content: clean, userId: user.id, user });
+      const result = await processAgentChat({
+        content: clean,
+        userId: user.id,
+        user,
+        insightFocus: validation.data.insightFocus ?? null,
+      });
       return res.json({
         success: true,
         data: {
           userMessage: result.userMessage,
           assistantMessage: result.assistantMessage,
+          actions: result.actions,
         },
       });
     } catch (error) {
@@ -2284,14 +2279,14 @@ type AiInterpretationResult =
     if (!user) {
       return res.status(401).json({ error: "Sessão expirada" });
     }
-    const limit = Number(req.query?.limit) || 100;
+    const limit = Math.min(Number(req.query?.limit) || 20, 200);
     try {
       const { data, error } = await supabase
-        .from("ai_messages")
+        .from("ai_chat_history")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: true })
-        .limit(limit);
+        .limit(limit || 20);
 
       if (error) {
         console.error("[AI CLIENT] erro ao buscar histórico:", error);
@@ -2323,7 +2318,7 @@ type AiInterpretationResult =
       const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
       const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
 
-      const preferences = await storage.getAiReportSettings(req.session.userId);
+      const preferences = await storage.getUserReportPreferences(req.session.userId);
 
       const insights = await generateAiFinancialReport(
         req.session.userId,
@@ -2350,7 +2345,8 @@ type AiInterpretationResult =
   app.post("/api/ai/insights", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
     try {
       const scope = parseAccountScope(req.body?.type ?? req.query?.type);
-      const insights = await generateAiInsights(req.session.userId, scope);
+      const prefs = await storage.getUserReportPreferences(req.session.userId);
+      const insights = await generateAiInsights(req.session.userId, scope, prefs ?? undefined);
       res.json(insights);
     } catch (error) {
       console.error("[AI INSIGHTS] erro ao gerar insights:", error);
@@ -2360,9 +2356,9 @@ type AiInterpretationResult =
 
   app.get("/api/ai/report/settings", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
     try {
-      const existingSettings = await storage.getAiReportSettings(req.session.userId);
+      const existingSettings = await storage.getUserReportPreferences(req.session.userId);
       const settings = existingSettings || 
-        (await storage.upsertAiReportSettings(req.session.userId, {
+        (await storage.upsertUserReportPreferences(req.session.userId, {
           userId: req.session.userId,
           focusEconomy: false,
           focusDebt: false,
@@ -2381,11 +2377,11 @@ type AiInterpretationResult =
 
   app.put("/api/ai/report/settings", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
     try {
-      const payload = insertAiReportSettingSchema.partial().parse({
+      const payload = insertUserReportPreferenceSchema.partial().parse({
         userId: req.session.userId,
         ...(req.body || {}),
       } as any);
-      const updated = await storage.upsertAiReportSettings(req.session.userId, payload as any);
+      const updated = await storage.upsertUserReportPreferences(req.session.userId, payload as any);
       res.json({
         focusEconomy: Boolean(updated.focusEconomy),
         focusDebt: Boolean(updated.focusDebt),

@@ -2,6 +2,11 @@ import fetch from "node-fetch";
 import { storage } from "./storage";
 
 type AccountScope = "PF" | "PJ" | "ALL";
+type PreferenceFlags = {
+  focusEconomy?: boolean;
+  focusDebt?: boolean;
+  focusInvestments?: boolean;
+};
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o"; // Upgrade para GPT-4o para insights mais precisos
@@ -66,7 +71,43 @@ const sumByType = (items: { type?: string; amount?: string | number }[], type: s
     .filter((item) => (item.type || "").toLowerCase() === type.toLowerCase())
     .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-const buildHeuristicInsights = (context: PreparedContext): AiInsightResult => {
+const buildPreferenceSummary = (prefs?: PreferenceFlags) => {
+  if (!prefs) return "Sem preferência específica.";
+  const parts: string[] = [];
+  if (prefs.focusEconomy) parts.push("priorize recomendações de economia.");
+  if (prefs.focusDebt) parts.push("dê destaque a dívidas, riscos e pendências.");
+  if (prefs.focusInvestments) parts.push("realce metas e oportunidades de investimento.");
+  return parts.length ? parts.join(" ") : "Sem preferência específica.";
+};
+
+const applyPreferenceBias = (result: AiInsightResult, prefs?: PreferenceFlags): AiInsightResult => {
+  if (!prefs) return result;
+  const next: AiInsightResult = {
+    summaryText: result.summaryText,
+    alerts: [...result.alerts],
+    tips: [...result.tips],
+    predictions: result.predictions,
+  };
+
+  if (prefs.focusEconomy) {
+    next.tips.unshift(
+      "Priorize cortes inteligentes e redirecione parte do caixa para uma reserva de segurança."
+    );
+  }
+  if (prefs.focusDebt) {
+    next.alerts.unshift(
+      "Monitore de perto dívidas e parcelas futuras para evitar juros extras; considere renegociações."
+    );
+  }
+  if (prefs.focusInvestments) {
+    next.tips.unshift(
+      "Reserve uma parcela fixa das receitas para investimentos e acompanhe o progresso das metas."
+    );
+  }
+  return next;
+};
+
+const buildHeuristicInsights = (context: PreparedContext, prefs?: PreferenceFlags): AiInsightResult => {
   const { metrics, futureSummary, predictions } = context;
   const summary = [
     `Saldo atual de ${currency.format(metrics.totalBalance)} com receitas no mês de ${currency.format(
@@ -105,12 +146,13 @@ const buildHeuristicInsights = (context: PreparedContext): AiInsightResult => {
     tips.push("Continue monitorando os valores previstos para garantir folga no caixa.");
   }
 
-  return {
+  const heuristics: AiInsightResult = {
     summaryText: summary,
     alerts,
     tips,
     predictions,
   };
+  return applyPreferenceBias(heuristics, prefs);
 };
 
 const buildContext = async (userId: string, scope: AccountScope): Promise<PreparedContext> => {
@@ -195,10 +237,11 @@ const buildContext = async (userId: string, scope: AccountScope): Promise<Prepar
 
 export async function generateAiInsights(
   userId: string,
-  scope: AccountScope = "ALL"
+  scope: AccountScope = "ALL",
+  preferences?: PreferenceFlags
 ): Promise<AiInsightResult> {
   const context = await buildContext(userId, scope);
-  const fallback = buildHeuristicInsights(context);
+  const fallback = buildHeuristicInsights(context, preferences);
 
   if (!OPENAI_API_KEY) {
     console.warn("[AI INSIGHTS] OPENAI_API_KEY ausente. Retornando heurísticas.");
@@ -224,7 +267,9 @@ export async function generateAiInsights(
           },
           {
             role: "user",
-            content: `Dados atuais do usuário: ${JSON.stringify(context)}`,
+            content: `Dados atuais do usuário: ${JSON.stringify(
+              context
+            )}. Preferências declaradas: ${buildPreferenceSummary(preferences)}`,
           },
         ],
       }),
@@ -242,7 +287,7 @@ export async function generateAiInsights(
 
     const predictions = parsed?.predictions || {};
 
-    return {
+    const result: AiInsightResult = {
       summaryText:
         typeof parsed.summaryText === "string" && parsed.summaryText.trim().length
           ? parsed.summaryText.trim()
@@ -260,6 +305,7 @@ export async function generateAiInsights(
         nextMonthSavings: Number(predictions.nextMonthSavings ?? fallback.predictions.nextMonthSavings) || fallback.predictions.nextMonthSavings,
       },
     };
+    return applyPreferenceBias(result, preferences);
   } catch (error) {
     console.error("[AI INSIGHTS] Falha ao gerar insights com OpenAI:", error);
     return fallback;

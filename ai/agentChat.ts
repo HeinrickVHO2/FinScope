@@ -3,27 +3,36 @@
  * Substitui a lógica complicada anterior por uma arquitetura real de agente financeiro
  */
 
-import { supabase } from "../server/supabase";
 import { buildFinancialContext } from "./buildFinancialContext";
-import { getSessionMemory, addConversationContext, getRecentContext, recordLastAction } from "./sessionMemory";
-import { buildNewAgentPrompt } from "./newPrompt";
+import {
+  addConversationContext,
+  getRecentContext,
+  recordLastAction,
+  getSessionMemory,
+  seedConversationContext,
+  updateSessionMemory,
+} from "./sessionMemory";
 import { buildConversationalPrompt } from "./conversationalPrompt";
 import type { User } from "@shared/schema";
 import fetch from "node-fetch";
+import { executeAgentActions, type AgentActionResult } from "./agentActionsHandler";
+import { fetchChatHistory, saveChatHistoryMessage, type ChatHistoryRow } from "./chatHistory";
 
 export interface ChatRequest {
   content: string;
   userId: string;
   user: User;
+  insightFocus?: "economy" | "debt" | "investments" | null;
 }
 
 export interface ChatResponse {
   userMessage: { id: string; role: string; content: string; createdAt: string };
   assistantMessage: { id: string; role: string; content: string; createdAt: string };
+  actions: AgentActionResult[];
 }
 
 export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> {
-  const { content, userId, user } = req;
+  const { content, userId, user, insightFocus } = req;
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
   const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 
@@ -31,26 +40,50 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     throw new Error("OPENAI_API_KEY não configurada");
   }
 
-  // 1. SALVAR MENSAGEM DO USUÁRIO
-  const { data: userMessage, error: userError } = await supabase
-    .from("ai_messages")
-    .insert({ user_id: userId, role: "user", content })
-    .select()
-    .single();
-
-  if (userError || !userMessage) {
-    throw new Error("Falha ao salvar mensagem do usuário");
+  const session = getSessionMemory(userId);
+  if (!session.hydrated) {
+    const history = await fetchChatHistory(userId, 20);
+    if (history.length) {
+      seedConversationContext(userId, history);
+    } else {
+      updateSessionMemory(userId, { hydrated: true });
+    }
   }
 
-  // 2. ATUALIZAR MEMÓRIA DE SESSÃO
-  addConversationContext(userId, "user", content);
   const recentContext = getRecentContext(userId, 6);
 
-  // 3. CARREGAR CONTEXTO FINANCEIRO REAL
-  const financialContext = await buildFinancialContext(userId, "ALL");
+  const userMessageRow = await saveChatHistoryMessage(userId, "user", content);
+  addConversationContext(userId, "user", content);
+
+  let resolvedAccountType = detectAccountTypeFromText(content) ?? session.lastAccountType;
+
+  if (session.awaitingAccountType) {
+    const answerType = detectAccountTypeFromText(content) ?? detectAccountTypeFromAnswer(content);
+    const inferred = answerType || session.lastAccountType || "PF";
+    resolvedAccountType = inferred;
+    updateSessionMemory(userId, {
+      awaitingAccountType: false,
+      lastAccountType: inferred,
+    });
+  }
+
+  if (!resolvedAccountType) {
+    updateSessionMemory(userId, { awaitingAccountType: true });
+    const question = "Isso é da sua conta pessoal ou da sua conta da empresa (PJ)?";
+    const assistantQuestion = await saveChatHistoryMessage(userId, "assistant", question);
+    addConversationContext(userId, "assistant", question);
+    return {
+      userMessage: mapHistoryToResponse(userMessageRow),
+      assistantMessage: mapHistoryToResponse(assistantQuestion),
+      actions: [],
+    };
+  }
+
+  updateSessionMemory(userId, { lastAccountType: resolvedAccountType });
+  const financialContext = await buildFinancialContext(userId, resolvedAccountType);
 
   // 4. CONSTRUIR PROMPT - Usar prompt conversacional existente
-  const conversationalPrompt = buildConversationalPrompt("", financialContext?.asPrompt || "", null);
+  const conversationalPrompt = buildConversationalPrompt("", financialContext?.asPrompt || "", insightFocus ?? null);
 
   // 5. CHAMAR OPENAI COM CONTEXTO REAL
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -98,54 +131,84 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
 
   const assistantReply = aiResponse.conversationalMessage || aiResponseText;
 
-  // 7. PROCESSAR AÇÕES (se houver)
-  if (aiResponse.actions && Array.isArray(aiResponse.actions)) {
-    for (const action of aiResponse.actions) {
-      try {
-        if (action.type === "transaction" && action.data) {
-          // Executar ação de transação...
-          recordLastAction(userId, "transaction", "transaction", null, action.data.description);
-        } else if (action.type === "future_bill" && action.data) {
-          recordLastAction(userId, "future_bill", "future_bill", null, action.data.description);
-        } else if (action.type === "goal" && action.data) {
-          recordLastAction(userId, "goal", "goal", null, action.data.title);
-        }
-      } catch (err) {
-        console.error("[AI AGENT] Erro ao processar ação:", err);
+  let actionResults: AgentActionResult[] = [];
+  if (aiResponse.actions && Array.isArray(aiResponse.actions) && aiResponse.status !== "clarify") {
+    actionResults = await executeAgentActions(user, aiResponse.actions, financialContext);
+    const lastSuccess = actionResults.find((result) => result.success);
+    if (lastSuccess) {
+      const intention = mapResultTypeToIntention(lastSuccess.type);
+      recordLastAction(userId, intention, lastSuccess.type, lastSuccess.entityId, lastSuccess.entityName);
+      const accountTypeFromResult = extractAccountTypeFromResult(lastSuccess);
+      if (accountTypeFromResult) {
+        updateSessionMemory(userId, { lastAccountType: accountTypeFromResult });
+      }
+      if (lastSuccess.type === "transaction" && lastSuccess.data?.type) {
+        const txType = lastSuccess.data.type === "entrada" ? "income" : "expense";
+        updateSessionMemory(userId, { lastTransactionType: txType as "income" | "expense" });
       }
     }
   }
 
   // 8. SALVAR RESPOSTA DO ASSISTENTE
-  const { data: assistantMessage, error: assistantError } = await supabase
-    .from("ai_messages")
-    .insert({
-      user_id: userId,
-      role: "assistant",
-      content: assistantReply,
-    })
-    .select()
-    .single();
-
-  if (assistantError || !assistantMessage) {
-    throw new Error("Falha ao salvar resposta do assistente");
-  }
+  const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", assistantReply);
 
   // 9. ATUALIZAR MEMÓRIA DE SESSÃO
   addConversationContext(userId, "assistant", assistantReply);
 
   return {
-    userMessage: {
-      id: userMessage.id,
-      role: "user",
-      content: userMessage.content,
-      createdAt: userMessage.created_at,
-    },
-    assistantMessage: {
-      id: assistantMessage.id,
-      role: "assistant",
-      content: assistantMessage.content,
-      createdAt: assistantMessage.created_at,
-    },
+    userMessage: mapHistoryToResponse(userMessageRow),
+    assistantMessage: mapHistoryToResponse(assistantMessageRow),
+    actions: actionResults,
   };
+}
+
+function mapResultTypeToIntention(type: "transaction" | "future_bill" | "goal"): "transaction" | "future_bill" | "goal" | "question" {
+  if (type === "transaction") return "transaction";
+  if (type === "future_bill") return "future_bill";
+  if (type === "goal") return "goal";
+  return "question";
+}
+
+function mapHistoryToResponse(row: ChatHistoryRow) {
+  return {
+    id: row.id,
+    role: row.role,
+    content: row.message,
+    createdAt: row.createdAt,
+  };
+}
+
+function detectAccountTypeFromText(text: string | undefined | null): "PF" | "PJ" | null {
+  if (!text) return null;
+  const normalized = text.toLowerCase();
+  const pjKeywords = ["empresa", "pj", "cnpj", "cliente", "nota", "emiti", "fornecedor", "contrato", "mei", "negócio", "negocio", "serviço", "servico", "projeto", "fatura"];
+  const pfKeywords = ["pessoal", "casa", "família", "familia", "cartão", "cartao", "mercado", "aluguel", "minha vida", "salário", "salario"];
+
+  if (pjKeywords.some((kw) => normalized.includes(kw))) {
+    return "PJ";
+  }
+  if (pfKeywords.some((kw) => normalized.includes(kw))) {
+    return "PF";
+  }
+  return null;
+}
+
+function detectAccountTypeFromAnswer(text: string): "PF" | "PJ" | null {
+  const normalized = text.toLowerCase().trim();
+  if (!normalized) return null;
+  if (normalized.includes("pessoal") || normalized.includes("pf") || normalized.includes("minha") || normalized.includes("vida")) {
+    return "PF";
+  }
+  if (normalized.includes("empresa") || normalized.includes("pj") || normalized.includes("negócio") || normalized.includes("negocio")) {
+    return "PJ";
+  }
+  return null;
+}
+
+function extractAccountTypeFromResult(result: AgentActionResult): "PF" | "PJ" | null {
+  const data = result.data;
+  if (!data) return null;
+  const accountType = data.accountType || data.account_type;
+  if (!accountType) return null;
+  return String(accountType).toUpperCase() === "PJ" ? "PJ" : "PF";
 }

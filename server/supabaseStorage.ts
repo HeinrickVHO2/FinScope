@@ -19,8 +19,8 @@ import {
   type InsertFutureTransaction,
   type RecurringTransaction,
   type InsertRecurringTransaction,
-  type AiReportSetting,
-  type InsertAiReportSetting,
+  type UserReportPreference,
+  type InsertUserReportPreference,
   PLAN_LIMITS
 } from "@shared/schema";
 import bcrypt from "bcrypt";
@@ -76,12 +76,13 @@ export class SupabaseStorage implements IStorage {
     };
   }
 
-  private mapAiReportSettingRow(row: any): AiReportSetting {
+  private mapUserReportPreferenceRow(row: any): UserReportPreference {
     if (!row) return undefined as any;
     return {
+      id: row.id,
       userId: row.user_id,
-      focusEconomy: Boolean(row.focus_economy),
-      focusDebt: Boolean(row.focus_debt),
+      focusEconomy: Boolean(row.focus_saving),
+      focusDebt: Boolean(row.focus_debts),
       focusInvestments: Boolean(row.focus_investments),
       updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(),
     };
@@ -1141,31 +1142,35 @@ export class SupabaseStorage implements IStorage {
     return this.mapRecurringTransactionRow(data);
   }
 
-  async getAiReportSettings(userId: string): Promise<AiReportSetting | undefined> {
+  async getUserReportPreferences(userId: string): Promise<UserReportPreference | undefined> {
     const { data, error } = await supabase
-      .from("ai_report_settings")
+      .from("user_report_preferences")
       .select("*")
       .eq("user_id", userId)
       .single();
 
     if (error || !data) return undefined;
-    return this.mapAiReportSettingRow(data);
+    return this.mapUserReportPreferenceRow(data);
   }
 
-  async upsertAiReportSettings(userId: string, settings: InsertAiReportSetting): Promise<AiReportSetting> {
+  async upsertUserReportPreferences(userId: string, settings: InsertUserReportPreference): Promise<UserReportPreference> {
     const payload = {
-      focus_economy: settings.focusEconomy ?? false,
-      focus_debt: settings.focusDebt ?? false,
+      focus_saving: settings.focusEconomy ?? false,
+      focus_debts: settings.focusDebt ?? false,
       focus_investments: settings.focusInvestments ?? false,
       updated_at: new Date().toISOString(),
     };
 
     const { data, error } = await supabase
-      .from("ai_report_settings")
-      .upsert({
-        user_id: userId,
-        ...payload,
-      })
+      .from("user_report_preferences")
+      .upsert(
+        {
+          id: settings.id,
+          user_id: userId,
+          ...payload,
+        },
+        { onConflict: "user_id" }
+      )
       .select()
       .single();
 
@@ -1173,6 +1178,6 @@ export class SupabaseStorage implements IStorage {
       throw new Error(error?.message || "Erro ao salvar preferências de relatório");
     }
 
-    return this.mapAiReportSettingRow(data);
+    return this.mapUserReportPreferenceRow(data);
   }
 }

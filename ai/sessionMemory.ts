@@ -13,6 +13,10 @@ export interface SessionMemory {
   lastEntityType: "transaction" | "investment" | "goal" | "future_bill" | null;
   lastEntityId: string | null;
   lastEntityName: string | null;
+  lastAccountType: "PF" | "PJ" | null;
+  lastTransactionType: "income" | "expense" | null;
+  awaitingAccountType: boolean;
+  hydrated: boolean;
   conversationContext: Array<{ role: "user" | "assistant"; content: string }>;
   createdAt: number;
   updatedAt: number;
@@ -32,6 +36,10 @@ export function getSessionMemory(userId: string): SessionMemory {
       lastEntityType: null,
       lastEntityId: null,
       lastEntityName: null,
+      lastAccountType: null,
+      lastTransactionType: null,
+      awaitingAccountType: false,
+      hydrated: false,
       conversationContext: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -68,6 +76,7 @@ export function addConversationContext(
 ): void {
   const session = getSessionMemory(userId);
   session.conversationContext.push({ role, content });
+  session.hydrated = true;
 
   // Manter últimas 20 mensagens
   if (session.conversationContext.length > 20) {
@@ -104,4 +113,16 @@ export function shouldAskForClarification(userId: string): boolean {
   const session = getSessionMemory(userId);
   // Se não há intenção clara nas últimas mensagens, pedir clarificação
   return !session.lastIntention;
+}
+
+export function seedConversationContext(
+  userId: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>
+): void {
+  const session = getSessionMemory(userId);
+  if (session.hydrated) return;
+  session.conversationContext = history.slice(-20);
+  session.hydrated = true;
+  session.updatedAt = Date.now();
+  sessionMemoryMap.set(userId, session);
 }

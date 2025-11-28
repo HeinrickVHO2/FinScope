@@ -93,10 +93,19 @@ export const aiMessages = pgTable("ai_messages", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const aiReportSettings = pgTable("ai_report_settings", {
-  userId: varchar("user_id").primaryKey().notNull(),
-  focusEconomy: boolean("focus_economy").notNull().default(false),
-  focusDebt: boolean("focus_debt").notNull().default(false),
+export const aiChatHistory = pgTable("ai_chat_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  role: text("role").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const userReportPreferences = pgTable("user_report_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  focusEconomy: boolean("focus_saving").notNull().default(false),
+  focusDebt: boolean("focus_debts").notNull().default(false),
   focusInvestments: boolean("focus_investments").notNull().default(false),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -265,11 +274,12 @@ export const insertAiMessageSchema = createInsertSchema(aiMessages, {
   userId: true,
 });
 
-export const insertAiReportSettingSchema = createInsertSchema(aiReportSettings, {
+export const insertUserReportPreferenceSchema = createInsertSchema(userReportPreferences, {
   focusEconomy: z.boolean().optional(),
   focusDebt: z.boolean().optional(),
   focusInvestments: z.boolean().optional(),
 }).omit({
+  id: true,
   userId: true,
   updatedAt: true,
 });
@@ -388,8 +398,10 @@ export type RecurringTransaction = typeof recurringTransactions.$inferSelect;
 export type InsertAiMessage = z.infer<typeof insertAiMessageSchema> & { userId: string };
 export type AiMessage = typeof aiMessages.$inferSelect;
 
-export type AiReportSetting = typeof aiReportSettings.$inferSelect;
-export type InsertAiReportSetting = z.infer<typeof insertAiReportSettingSchema> & { userId: string };
+export type UserReportPreference = typeof userReportPreferences.$inferSelect;
+export type InsertUserReportPreference = z.infer<typeof insertUserReportPreferenceSchema> & {
+  userId: string;
+};
 
 export type InsertRule = z.infer<typeof insertRuleSchema> & {userID: string;};
 export type UpdateRule = z.infer<typeof updateRuleSchema>;
@@ -456,6 +468,3 @@ export const goals = pgTable("goals", {
   targetValue: numeric("target_value").notNull(),
   createdAt: timestamp("created_at").defaultNow()
 });
-
-
-
