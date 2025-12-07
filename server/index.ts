@@ -1,12 +1,15 @@
+import "./env";
+
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import dotenv from "dotenv";
 import { scheduleWeeklyFinanceSummaryJob } from "./jobs/weeklyFinanceSummary";
+import path from "path";
 
 // Only load .env files in development (not in production/deployment)
-if (process.env.NODE_ENV !== 'production' && !process.env.REPLIT_DEPLOYMENT) {
-  dotenv.config();
+if (!process.env.REPLIT_DEPLOYMENT) {
+  dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 }
 
 const app = express();

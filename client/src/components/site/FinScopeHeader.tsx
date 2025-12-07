@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,56 +8,81 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Menu } from "lucide-react";
+import { ArrowLeft, Menu } from "lucide-react";
 
-export function FinScopeHeader() {
+type FinScopeHeaderProps = {
+  backHref?: string;
+  backLabel?: string;
+};
+
+export function FinScopeHeader({ backHref, backLabel = "Voltar" }: FinScopeHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const showBackLink = Boolean(backHref);
+  const linkClass = "hover:text-primary transition-colors";
+  const navClass = "hidden md:flex items-center gap-6 text-sm font-medium text-slate-700";
 
   return (
-    <header className="
-      sticky top-0 z-50 w-full border-b
-      bg-white/80 backdrop-blur-xl 
-      supports-[backdrop-filter]:bg-white/70
-      shadow-sm
-    ">
-      <div className="container flex h-16 items-center justify-between">
-        
-        {/* Logo */}
-        <Link href="/">
-          <div className="flex items-center gap-3 cursor-pointer">
-            <img
-              src="/logo.png"
-              alt="FinScope"
-              className="h-19 w-auto mas h-20"
-            />
-          </div>
-        </Link>
+    <header
+      className="sticky top-0 z-50 w-full border-b bg-white shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-white/80"
+    >
+      <div className="container flex h-16 items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          {showBackLink && (
+            <Link href={backHref!}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-slate-700 hover:text-primary"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                {backLabel}
+              </Button>
+            </Link>
+          )}
+
+          {/* Logo */}
+          <Link href="/">
+            <div className="flex items-center gap-3 cursor-pointer">
+              <img
+                src="/logo.png"
+                alt="FinScope"
+                className="h-12 w-auto"
+              />
+            </div>
+          </Link>
+        </div>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-700">
-          <Link href="/recursos" className="hover:text-primary transition-colors">
+        <nav className={navClass}>
+          <Link href="/dashboard" className={linkClass}>
+            Início
+          </Link>
+          <Link href="/recursos" className={linkClass}>
             Recursos
           </Link>
-          <Link href="/faq" className="hover:text-primary transition-colors">
+          <Link href="/faq" className={linkClass}>
             FAQ
           </Link>
-          <Link href="/sobre" className="hover:text-primary transition-colors">
+          <Link href="/sobre" className={linkClass}>
             Sobre
           </Link>
-          <Link href="/blog" className="hover:text-primary transition-colors">
+          <Link href="/blog" className={linkClass}>
             Blog
           </Link>
-          <Link href="/contato" className="hover:text-primary transition-colors">
+          <Link href="/contato" className={linkClass}>
             Contato
           </Link>
 
           <Link href="/login">
-            <Button variant="ghost" className="text-slate-700 hover:text-primary">
+            <Button
+              variant="ghost"
+              className="text-slate-700 hover:text-primary"
+            >
               Entrar
             </Button>
           </Link>
           <Link href="/signup">
-            <Button> Criar Conta </Button>
+            <Button> Entrar para o FinScope </Button>
           </Link>
         </nav>
 
@@ -69,17 +94,30 @@ export function FinScopeHeader() {
             </Button>
           </SheetTrigger>
 
-          <SheetContent side="right" className="w-[300px]">
+          <SheetContent
+            side="right"
+            className="w-[300px] bg-white text-slate-900"
+          >
             <SheetHeader>
               <SheetTitle className="flex items-center gap-2">
                 <img src="/logo.png" alt="FinScope" className="h-10 w-auto" />
               </SheetTitle>
             </SheetHeader>
 
-            <nav className="flex flex-col gap-4 mt-8 text-base font-medium text-slate-700">
+            <nav
+              className="flex flex-col gap-4 mt-8 text-base font-medium text-slate-700"
+            >
+              <Link href="/dashboard">
+                <span
+                  className={`block py-2 transition-colors ${linkClass}`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Início
+                </span>
+              </Link>
               <Link href="/recursos">
                 <span 
-                  className="block py-2 hover:text-primary transition-colors"
+                  className={`block py-2 transition-colors ${linkClass}`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Recursos
@@ -87,7 +125,7 @@ export function FinScopeHeader() {
               </Link>
               <Link href="/faq">
                 <span 
-                  className="block py-2 hover:text-primary transition-colors"
+                  className={`block py-2 transition-colors ${linkClass}`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   FAQ
@@ -95,7 +133,7 @@ export function FinScopeHeader() {
               </Link>
               <Link href="/sobre">
                 <span 
-                  className="block py-2 hover:text-primary transition-colors"
+                  className={`block py-2 transition-colors ${linkClass}`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Sobre
@@ -103,7 +141,7 @@ export function FinScopeHeader() {
               </Link>
               <Link href="/blog">
                 <span 
-                  className="block py-2 hover:text-primary transition-colors"
+                  className={`block py-2 transition-colors ${linkClass}`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Blog
@@ -111,7 +149,7 @@ export function FinScopeHeader() {
               </Link>
               <Link href="/contato">
                 <span 
-                  className="block py-2 hover:text-primary transition-colors"
+                  className={`block py-2 transition-colors ${linkClass}`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Contato
@@ -134,7 +172,7 @@ export function FinScopeHeader() {
                     className="w-full justify-start"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Criar Conta
+                    Entrar para o FinScope
                   </Button>
                 </Link>
               </div>
