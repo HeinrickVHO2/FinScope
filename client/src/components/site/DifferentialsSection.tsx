@@ -1,36 +1,36 @@
-﻿import { Card } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Zap, BellRing, Goal, LayoutDashboard, Briefcase } from "lucide-react";
 
 const differentiators = [
   {
-    title: "IA financeira integrada",
-    description: "Detecta padrões, alerta sobre riscos e sugere cortes sem você pedir.",
+    title: "Visao clara do mes",
+    description: "Entenda rapidamente o que entrou, o que saiu e o que ainda falta pagar.",
     icon: Sparkles,
   },
   {
-    title: "Zero complexidade",
-    description: "Experiência guiada, sem planilhas escondidas e sem configurações confusas.",
+    title: "Uso simples no dia a dia",
+    description: "Uma experiencia direta para voce organizar as financas sem complicacao.",
     icon: Zap,
   },
   {
-    title: "Alertas inteligentes personalizados",
-    description: "Avisos sobre gastos fora da média e cobranças inesperadas na hora.",
+    title: "Lembretes importantes",
+    description: "Acompanhe vencimentos e tarefas para nao esquecer contas essenciais.",
     icon: BellRing,
   },
   {
-    title: "Metas automáticas por categoria",
-    description: "Criamos metas realistas com base no seu histórico e nas próximas contas.",
+    title: "Metas mais conscientes",
+    description: "Defina objetivos e acompanhe sua evolucao ao longo do mes.",
     icon: Goal,
   },
   {
-    title: "Painéis minimalistas e claros",
-    description: "PF e PJ lado a lado, com visão do que gastou, vai gastar e do que sobra.",
+    title: "Painel facil de acompanhar",
+    description: "Tudo em um lugar para voce tomar decisoes com mais seguranca.",
     icon: LayoutDashboard,
   },
   {
-    title: "Investimentos e finanças no mesmo lugar",
-    description: "Acompanhe aplicações, saldo e obrigações em um só cockpit.",
+    title: "Pessoal e negocio no mesmo app",
+    description: "Organize as duas rotinas sem perder contexto e sem confusao.",
     icon: Briefcase,
   },
 ];
@@ -42,10 +42,10 @@ export function DifferentialsSection() {
         <div className="space-y-3 text-center">
           <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">Por que o FinScope</Badge>
           <h2 className="text-3xl md:text-4xl font-poppins font-bold">
-            Não é mais um app de planilha. É seu copiloto financeiro.
+            Mais clareza, menos confusao no dia a dia.
           </h2>
           <p className="text-slate-600 max-w-3xl mx-auto">
-            100% seu assistente financeiro pessoal — criado para superar Organizze e Mobills com IA, automação e foco em ação.
+            O FinScope foi feito para ajudar voce a manter o controle financeiro com uma rotina leve e organizada.
           </p>
         </div>
 

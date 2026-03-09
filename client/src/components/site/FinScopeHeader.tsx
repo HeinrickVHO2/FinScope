@@ -73,16 +73,11 @@ export function FinScopeHeader({ backHref, backLabel = "Voltar" }: FinScopeHeade
             Contato
           </Link>
 
-          <Link href="/login">
-            <Button
-              variant="ghost"
-              className="text-slate-700 hover:text-primary"
-            >
-              Entrar
-            </Button>
+          <Link href="/login" className={linkClass}>
+            Acessar
           </Link>
           <Link href="/signup">
-            <Button> Entrar para o FinScope </Button>
+            <Button>Cadastre-se</Button>
           </Link>
         </nav>
 
@@ -159,11 +154,11 @@ export function FinScopeHeader({ backHref, backLabel = "Voltar" }: FinScopeHeade
               <div className="border-t pt-4 mt-2 space-y-3">
                 <Link href="/login">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     className="w-full justify-start"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Entrar
+                    Acessar
                   </Button>
                 </Link>
 
@@ -172,7 +167,7 @@ export function FinScopeHeader({ backHref, backLabel = "Voltar" }: FinScopeHeade
                     className="w-full justify-start"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Entrar para o FinScope
+                    Cadastre-se
                   </Button>
                 </Link>
               </div>

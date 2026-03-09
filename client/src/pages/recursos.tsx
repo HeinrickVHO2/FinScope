@@ -7,45 +7,45 @@ export default function RecursosPage() {
   const recursos = [
     {
       icon: BarChart3,
-      title: "Dashboard com Previsões",
+      title: "Painel do mes",
       description:
-        "Saldo atual, histórico e projeções de caixa lado a lado para você decidir com antecedência.",
+        "Veja entradas, saidas e saldo em um unico lugar para acompanhar sua rotina com clareza.",
     },
     {
       icon: Wallet,
-      title: "Contas PF e PJ integradas",
+      title: "Controle pessoal e do negocio",
       description:
-        "Controle o que já gastou e planeje o que vai gastar em contas pessoais ou empresariais.",
+        "Organize suas contas sem misturar contextos e acompanhe melhor cada decisao.",
     },
     {
       icon: CalendarClock,
-      title: "Planejamento de gastos futuros",
+      title: "Planejamento de contas",
       description:
-        "Cadastre boletos, assinaturas e impostos, receba lembretes e veja o impacto no saldo previsto.",
+        "Registre vencimentos e compromissos para se preparar antes do aperto.",
     },
     {
       icon: Zap,
-      title: "Automação e alertas",
+      title: "Lembretes importantes",
       description:
-        "Regras inteligentes categorizam transações automaticamente e avisam sobre vencimentos.",
+        "Receba avisos para nao esquecer contas e manter o mes sob controle.",
     },
     {
       icon: TrendingUp,
-      title: "Previsão de saldo livre",
+      title: "Visao do que sobra",
       description:
-        "Mostramos quanto dinheiro vai sobrar depois de pagar as contas e quanto é ideal reservar.",
+        "Acompanhe quanto ainda esta disponivel para planejar melhor seus proximos passos.",
     },
     {
       icon: FileText,
-      title: "Relatórios e PDFs",
+      title: "Relatorios para acompanhar",
       description:
-        "Exporte relatórios PRO e Premium com comparativo entre despesas reais e previstas.",
+        "Use relatorios para revisar seu mes e entender sua evolucao.",
     },
     {
       icon: Shield,
-      title: "Segurança plena",
+      title: "Privacidade e seguranca",
       description:
-        "Backups, criptografia e isolamento de dados para você confiar seus números ao FinScope.",
+        "Seus dados sao tratados com cuidado para voce usar o FinScope com tranquilidade.",
     },
   ];
 
@@ -54,18 +54,16 @@ export default function RecursosPage() {
       <FinScopeHeader />
 
       <main className="max-w-6xl mx-auto px-4 py-24 space-y-16">
-
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center space-y-4"
         >
           <h1 className="text-4xl font-poppins font-bold">
-            Todos os recursos para dominar suas finanças
+            Recursos para organizar sua vida financeira
           </h1>
           <p className="text-slate-600 max-w-2xl mx-auto">
-            O FinScope entrega tecnologia, automação e simplicidade para você ter
-            controle total do seu dinheiro — pessoal e empresarial.
+            O FinScope foi feito para voce acompanhar seu dinheiro com mais clareza, controle e tranquilidade.
           </p>
         </motion.div>
 
@@ -87,7 +85,6 @@ export default function RecursosPage() {
             </motion.div>
           ))}
         </div>
-
       </main>
 
       <FinScopeFooter />

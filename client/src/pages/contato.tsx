@@ -30,7 +30,7 @@ export default function ContatoPage() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "Não foi possível enviar sua mensagem.");
+        throw new Error(data.error || "Nao foi possivel enviar sua mensagem.");
       }
 
       setStatus("success");
@@ -55,7 +55,7 @@ export default function ContatoPage() {
         >
           <h1 className="text-4xl font-poppins font-bold">Fale com a gente</h1>
           <p className="text-slate-600 max-w-lg mx-auto">
-            Tem dúvidas, sugestões ou precisa de ajuda? Nosso time está pronto para te ouvir.
+            Tem duvidas, sugestoes ou precisa de ajuda? Nosso time esta pronto para te ouvir.
           </p>
         </motion.div>
 
@@ -93,7 +93,7 @@ export default function ContatoPage() {
             </div>
 
             {status === "success" && (
-              <p className="text-sm text-green-600">Mensagem enviada! Responderemos em breve.</p>
+              <p className="text-sm text-green-600">Mensagem enviada! Vamos responder em breve.</p>
             )}
             {status === "error" && (
               <p className="text-sm text-red-600">{errorMessage || "Ocorreu um erro ao enviar sua mensagem."}</p>
@@ -104,7 +104,7 @@ export default function ContatoPage() {
               disabled={status === "loading"}
               className="px-4 py-2 bg-primary text-white rounded-lg shadow hover:shadow-md transition disabled:opacity-60"
             >
-              {status === "loading" ? "Enviando..." : "Enviar Mensagem"}
+              {status === "loading" ? "Enviando..." : "Enviar mensagem"}
             </button>
           </form>
 
@@ -114,11 +114,11 @@ export default function ContatoPage() {
               <p className="font-semibold">contato@finscope.com.br</p>
             </div>
             <div className="p-4 rounded-xl border bg-muted/40">
-              <p className="text-sm text-muted-foreground">SLA de atendimento</p>
-              <p className="font-semibold">Até 6 horas úteis</p>
+              <p className="text-sm text-muted-foreground">Tempo de resposta</p>
+              <p className="font-semibold">Ate 6 horas uteis</p>
             </div>
             <p className="text-sm">
-              Tem sugestões para novos recursos de planejamento? Fale com a gente — o roadmap do FinScope é guiado pelos clientes.
+              Quer sugerir melhorias? Fale com a gente. O produto evolui com base no que os clientes mais precisam.
             </p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-﻿import { Link } from "wouter";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, PlayCircle } from "lucide-react";
@@ -8,18 +8,18 @@ export function DemoSection() {
     <section id="demo" className="py-16 bg-slate-50 text-slate-900 border-t border-slate-200">
       <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-2 gap-10 items-center">
         <div className="space-y-4">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Veja na prática</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Veja na pratica</p>
           <h2 className="text-3xl md:text-4xl font-poppins font-bold">
             Um painel claro, pronto para usar
           </h2>
           <p className="text-slate-600 leading-relaxed">
-            Visualize entradas e saídas, acompanhe metas e receba alertas inteligentes sem navegar por menus confusos.
-            Tudo pensado para que você se sinta no controle desde o primeiro login.
+            Visualize entradas e saidas, acompanhe metas e organize suas contas sem navegar por menus confusos.
+            Tudo pensado para voce se sentir no controle desde o primeiro acesso.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Link href="/signup">
               <Button className="bg-primary text-white hover:bg-primary/90">
-                Começar agora
+                Cadastre-se
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
@@ -36,36 +36,36 @@ export function DemoSection() {
             <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
               <PlayCircle className="h-5 w-5" />
             </div>
-            <CardTitle className="font-poppins">Prévia do dashboard</CardTitle>
+            <CardTitle className="font-poppins">Previa do dashboard</CardTitle>
           </CardHeader>
           <CardContent className="relative space-y-4 text-sm text-slate-700">
             <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-xs uppercase text-slate-500">Resumo mensal</p>
+              <p className="text-xs uppercase text-slate-500">Resumo mensal (ilustrativo)</p>
               <div className="mt-2 grid grid-cols-3 gap-3">
                 <div>
-                  <p className="text-xs text-slate-500">Saldo livre</p>
-                  <p className="text-lg font-semibold text-slate-900">R$ 6.560</p>
+                  <p className="text-xs text-slate-500">Entradas</p>
+                  <p className="text-lg font-semibold text-slate-900">Ex.: R$ 6.560</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Gastos previstos</p>
-                  <p className="text-lg font-semibold text-amber-600">R$ 4.820</p>
+                  <p className="text-xs text-slate-500">Saidas</p>
+                  <p className="text-lg font-semibold text-amber-600">Ex.: R$ 4.820</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Metas</p>
-                  <p className="text-lg font-semibold text-emerald-600">92% batidas</p>
+                  <p className="text-lg font-semibold text-emerald-600">Acompanhamento</p>
                 </div>
               </div>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs uppercase text-slate-500">Alertas do assistente</p>
+              <p className="text-xs uppercase text-slate-500">Resumo do mes</p>
               <ul className="mt-2 space-y-2">
                 <li className="flex items-center justify-between">
-                  <span>Assinatura duplicada detectada</span>
-                  <span className="text-emerald-600 font-semibold">Resolver</span>
+                  <span>Agora eu sei para onde meu dinheiro estava indo</span>
+                  <span className="text-emerald-600 font-semibold">Clareza</span>
                 </li>
                 <li className="flex items-center justify-between">
-                  <span>Meta de reserva próxima de atingir</span>
-                  <span className="text-primary font-semibold">Revisar</span>
+                  <span>Passei a planejar melhor e gastar com mais consciencia</span>
+                  <span className="text-primary font-semibold">Controle</span>
                 </li>
               </ul>
             </div>

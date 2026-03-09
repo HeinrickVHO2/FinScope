@@ -1,4 +1,4 @@
-﻿import { Link } from "wouter";
+import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,12 +8,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ArrowRight, Check, PlayCircle, Shield, Sparkles, Timer } from "lucide-react";
+import { ArrowRight, Check, Shield, Timer } from "lucide-react";
 
 const microClaims = [
-  { icon: Shield, label: "Dados protegidos" },
-  { icon: Timer, label: "Comece em minutos" },
-  { icon: Check, label: "Você no controle sempre" },
+  { icon: Shield, label: "Seguranca e privacidade" },
+  { icon: Timer, label: "Comece sem complicacao" },
+  { icon: Check, label: "Voce no controle" },
 ];
 
 export function HeroSection() {
@@ -26,35 +26,34 @@ export function HeroSection() {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
-              Nova geração de controle financeiro
+              Controle financeiro sem complicacao
             </Badge>
             <div className="space-y-4">
               <h1 className="text-4xl md:text-5xl font-poppins font-bold leading-tight text-slate-900">
-                Controle financeiro inteligente. Ganhe clareza total em minutos.
+                Veja para onde seu dinheiro vai e planeje seu mes com mais tranquilidade.
               </h1>
               <p className="text-lg text-slate-600 leading-relaxed max-w-xl">
-                A única plataforma que combina IA + simplicidade para você dominar seu dinheiro,
-                eliminar gastos invisíveis e bater suas metas.
+                O FinScope organiza sua rotina financeira em um painel simples para voce acompanhar
+                gastos, metas e contas sem planilhas confusas.
               </p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
               <Link href="/signup">
                 <Button size="lg" className="w-full sm:w-auto">
-                  Começar agora
+                  Cadastre-se
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
-              <a href="#demo">
+              <Link href="/login">
                 <Button
                   size="lg"
                   variant="outline"
                   className="w-full sm:w-auto border-primary/30 text-primary hover:bg-primary/5"
                 >
-                  Ver demonstração
-                  <PlayCircle className="ml-2 h-4 w-4" />
+                  Acessar
                 </Button>
-              </a>
+              </Link>
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -71,12 +70,12 @@ export function HeroSection() {
 
             <div className="flex flex-wrap gap-6 text-sm text-slate-600">
               <div>
-                <p className="font-semibold text-slate-900">+1.200 contas organizadas</p>
-                <p>Time dedicado para te guiar no primeiro acesso</p>
+                <p className="font-semibold text-slate-900">Visao clara do mes</p>
+                <p>Acompanhe entradas, saidas e metas no mesmo lugar</p>
               </div>
               <div>
-                <p className="font-semibold text-slate-900">Planejamento claro todo mês</p>
-                <p>Usuários prontos em menos de 10 minutos</p>
+                <p className="font-semibold text-slate-900">Rotina mais organizada</p>
+                <p>Tome decisoes com mais calma e previsibilidade</p>
               </div>
             </div>
           </div>
@@ -86,51 +85,50 @@ export function HeroSection() {
             <Card className="relative bg-white text-slate-900 border border-slate-200 shadow-xl overflow-hidden">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#2563eb] via-sky-400 to-emerald-400" />
               <CardHeader>
-                <CardTitle className="font-poppins">Clareza total do mês</CardTitle>
+                <CardTitle className="font-poppins">Clareza do mes</CardTitle>
                 <CardDescription className="text-slate-600">
-                  O FinScope organiza entradas, saídas e metas sem você perder tempo.
+                  Exemplo ilustrativo de como voce pode acompanhar seu dinheiro no dia a dia.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-3 gap-3">
                   <div className="p-4 rounded-xl bg-muted/30 border border-slate-200">
-                    <p className="text-xs text-slate-500">Saldo livre</p>
-                    <p className="text-2xl font-semibold text-slate-900">R$ 6.560</p>
-                    <p className="text-emerald-600 text-xs mt-1">+18% vs mês passado</p>
+                    <p className="text-xs text-slate-500">Entradas</p>
+                    <p className="text-lg font-semibold text-slate-900">O que entrou</p>
+                    <p className="text-slate-600 text-xs mt-1">Salario, vendas e extras</p>
                   </div>
                   <div className="p-4 rounded-xl bg-muted/30 border border-slate-200">
-                    <p className="text-xs text-slate-500">Gastos previstos</p>
-                    <p className="text-2xl font-semibold text-amber-600">R$ 4.820</p>
-                    <p className="text-slate-600 text-xs mt-1">Contas e assinaturas</p>
+                    <p className="text-xs text-slate-500">Saidas</p>
+                    <p className="text-lg font-semibold text-amber-600">O que saiu</p>
+                    <p className="text-slate-600 text-xs mt-1">Contas, compras e assinaturas</p>
                   </div>
                   <div className="p-4 rounded-xl bg-muted/30 border border-slate-200">
-                    <p className="text-xs text-slate-500">Meta batida</p>
-                    <p className="text-2xl font-semibold text-slate-900">92%</p>
-                    <p className="text-slate-600 text-xs mt-1">Reserva mensal</p>
+                    <p className="text-xs text-slate-500">Saldo do mes</p>
+                    <p className="text-lg font-semibold text-slate-900">Planejamento claro</p>
+                    <p className="text-slate-600 text-xs mt-1">Com mais consciencia ao gastar</p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <p className="text-xs text-slate-500 uppercase tracking-wide">
-                    Gastos invisíveis eliminados
+                    Evolucao da sua organizacao
                   </p>
                   <div className="h-3 rounded-full bg-muted/30 border border-slate-200 overflow-hidden">
                     <div className="h-full w-[78%] bg-gradient-to-r from-[#2563eb] via-sky-400 to-emerald-400" />
                   </div>
-                  <p className="text-xs text-slate-600">IA encontrou 12 cobranças duplicadas</p>
+                  <p className="text-xs text-slate-600">"Consegui enxergar meus gastos do mes com clareza."</p>
                 </div>
 
                 <div className="p-4 rounded-xl bg-muted/30 border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-slate-500">Assistente IA</p>
-                      <p className="text-sm font-medium text-slate-900">“Você gastou 18% menos com delivery este mês.”</p>
-                    </div>
-                    <Sparkles className="h-6 w-6 text-primary" />
+                  <div>
+                    <p className="text-xs text-slate-500">Resumo rapido</p>
+                    <p className="text-sm font-medium text-slate-900">
+                      "Agora eu sei para onde meu dinheiro estava indo."
+                    </p>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-700">Sugestão automática</span>
-                    <span className="text-emerald-600 font-semibold">Economize +R$ 220</span>
+                    <span className="text-slate-700">Exemplo de resultado</span>
+                    <span className="text-emerald-600 font-semibold">Ex.: economizei R$ 220 no mes</span>
                   </div>
                 </div>
               </CardContent>

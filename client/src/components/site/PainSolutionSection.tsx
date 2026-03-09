@@ -4,10 +4,10 @@ import { Card } from "@/components/ui/card";
 import { ArrowRight, AlertTriangle, Target } from "lucide-react";
 
 const pains = [
-  "Gastos invisíveis que somem com seu salário",
-  "Dificuldade em saber quanto pode gastar com segurança",
-  "Metas que nunca avançam",
-  "Falta de clareza sobre o mês",
+  "No fim do mes, voce nao sabe para onde o dinheiro foi",
+  "Dificuldade para equilibrar contas pessoais e do negocio",
+  "Falta de rotina para planejar as proximas semanas",
+  "Sensacao de estar sempre apagando incendio",
 ];
 
 export function PainSolutionSection() {
@@ -21,10 +21,10 @@ export function PainSolutionSection() {
               <span>Problemas que custam caro</span>
             </div>
             <h2 className="text-3xl md:text-4xl font-poppins font-bold leading-tight">
-              Se suas finanças parecem um caos, não é culpa sua.
+              Se suas financas parecem um caos, nao e culpa sua.
             </h2>
             <p className="text-slate-600 leading-relaxed">
-              Planilhas são confusas. Apps tradicionais são complicados. O FinScope faz o trabalho pesado por você.
+              Planilhas cansam. Apps complicados desanimam. O FinScope ajuda voce a organizar tudo de um jeito simples.
             </p>
           </div>
 
@@ -48,15 +48,15 @@ export function PainSolutionSection() {
         <div className="mt-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-2xl bg-gradient-to-r from-primary/5 via-white to-primary/5 border border-primary/10 p-6 shadow-sm">
           <div>
             <p className="text-lg font-semibold text-slate-900">
-              Pare de adivinhar. Deixe o FinScope organizar tudo automaticamente.
+              Pare de adivinhar. Tenha uma visao clara do seu mes.
             </p>
             <p className="text-sm text-slate-600">
-              Importamos suas contas, categorizamos gastos invisíveis e avisamos antes de qualquer surpresa.
+              Registre suas contas, acompanhe seus gastos e planeje melhor cada decisao.
             </p>
           </div>
           <Link href="/signup">
             <Button className="bg-primary text-white">
-              Começar agora
+              Cadastre-se
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>

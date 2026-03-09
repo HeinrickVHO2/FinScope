@@ -10,15 +10,12 @@ export default function PrivacidadePage() {
       <FinScopeHeader />
 
       <main className="flex-1 relative">
-        
-        {/* Efeito premium claro */}
         <div className="absolute inset-0 -z-10">
           <div className="absolute top-10 right-10 w-72 h-72 bg-blue-200/40 blur-[120px] rounded-full opacity-60" />
           <div className="absolute bottom-20 left-10 w-72 h-72 bg-indigo-200/40 blur-[120px] rounded-full opacity-60" />
         </div>
 
         <section className="container max-w-4xl mx-auto py-20">
-          {/* HERO */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -27,28 +24,26 @@ export default function PrivacidadePage() {
           >
             <Shield className="h-14 w-14 text-primary mx-auto mb-4" />
             <h1 className="text-4xl md:text-5xl font-poppins font-bold text-slate-900">
-              Política de Privacidade
+              Politica de Privacidade
             </h1>
             <p className="mt-4 text-slate-600 max-w-2xl mx-auto">
-              Suas informações são tratadas com segurança, transparência e responsabilidade.
+              Suas informacoes sao tratadas com cuidado, privacidade e responsabilidade.
             </p>
           </motion.div>
 
-          {/* Accordion */}
           <div className="mt-12">
             <Accordion type="single" collapsible className="space-y-4">
-              
               <AccordionItem value="dados">
                 <AccordionTrigger className="text-lg font-semibold text-slate-900">
                   Quais dados coletamos?
                 </AccordionTrigger>
                 <AccordionContent className="text-slate-600 leading-relaxed">
-                  Coletamos apenas informações essenciais:
+                  Coletamos apenas informacoes essenciais:
                   <ul className="list-disc ml-6 mt-3">
                     <li>Nome e e-mail</li>
-                    <li>Transações adicionadas por você</li>
-                    <li>Dados de login e autenticação</li>
-                    <li>Métricas de uso para melhorias</li>
+                    <li>Transacoes adicionadas por voce</li>
+                    <li>Dados de login</li>
+                    <li>Metricas de uso para melhorias</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -58,12 +53,12 @@ export default function PrivacidadePage() {
                   Como protegemos seus dados?
                 </AccordionTrigger>
                 <AccordionContent className="text-slate-600 leading-relaxed">
-                  Utilizamos:
+                  Mantemos medidas de protecao como:
                   <ul className="list-disc ml-6 mt-3">
-                    <li>Criptografia de ponta</li>
-                    <li>Backups automáticos</li>
-                    <li>Práticas de AppSec</li>
-                    <li>Infraestrutura segura e monitorada</li>
+                    <li>Acesso protegido por login</li>
+                    <li>Copias de seguranca regulares</li>
+                    <li>Monitoramento para evitar acessos indevidos</li>
+                    <li>Cuidados de privacidade desde o desenvolvimento</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -73,12 +68,12 @@ export default function PrivacidadePage() {
                   Compartilhamento de dados
                 </AccordionTrigger>
                 <AccordionContent className="text-slate-600 leading-relaxed">
-                  Nunca vendemos seus dados.  
-                  Compartilhamos apenas com:
+                  Nao vendemos seus dados.
+                  Compartilhamos apenas quando necessario, como:
                   <ul className="list-disc ml-6 mt-3">
-                    <li>Serviços essenciais de pagamento</li>
+                    <li>Servicos essenciais para funcionamento da plataforma</li>
                     <li>Fornecedores contratados (como e-mail)</li>
-                    <li>Exigências legais</li>
+                    <li>Exigencias legais</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -88,16 +83,15 @@ export default function PrivacidadePage() {
                   Seus direitos segundo a LGPD
                 </AccordionTrigger>
                 <AccordionContent className="text-slate-600 leading-relaxed">
-                  Você pode:
+                  Voce pode:
                   <ul className="list-disc ml-6 mt-3">
-                    <li>Solicitar remoção dos dados</li>
-                    <li>Solicitar cópia/exportação</li>
-                    <li>Corrigir informações</li>
+                    <li>Solicitar remocao dos dados</li>
+                    <li>Solicitar copia/exportacao</li>
+                    <li>Corrigir informacoes</li>
                     <li>Encerrar conta a qualquer momento</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
-
             </Accordion>
           </div>
         </section>

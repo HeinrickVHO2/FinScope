@@ -14,61 +14,61 @@ export default function SobrePage() {
         </div>
 
         <section className="max-w-5xl mx-auto px-4 py-24 space-y-20">
-
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center max-w-2xl mx-auto space-y-4"
           >
             <h1 className="text-4xl md:text-5xl font-poppins font-bold">
-              Criado para quem leva finanças a sério
+              Criado para quem quer mais clareza com o dinheiro
             </h1>
             <p className="text-slate-600">
-              O FinScope nasceu da necessidade real de separar, organizar e entender
-              finanças pessoais e empresariais de forma simples, moderna e intuitiva.
+              O FinScope nasceu para ajudar pessoas e pequenos negocios a organizar as financas
+              de forma simples, pratica e sem complicacao.
             </p>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-12">
             <div className="text-center space-y-3">
               <TrendingUp className="h-10 w-10 text-primary mx-auto" />
-              <h3 className="font-semibold text-lg">Foco em Resultado</h3>
+              <h3 className="font-semibold text-lg">Foco no que importa</h3>
               <p className="text-slate-600 text-sm">
-                Clareza nos números para decisões financeiras mais inteligentes.
+                Mais clareza para decidir melhor no dia a dia.
               </p>
             </div>
 
             <div className="text-center space-y-3">
               <Users className="h-10 w-10 text-primary mx-auto" />
-              <h3 className="font-semibold text-lg">Feito para Pessoas Reais</h3>
+              <h3 className="font-semibold text-lg">Feito para pessoas reais</h3>
               <p className="text-slate-600 text-sm">
-                Do iniciante ao avançado: o FinScope evolui junto com você.
+                Do comeco ao avancado, com uma experiencia facil de usar.
               </p>
             </div>
 
             <div className="text-center space-y-3">
               <Shield className="h-10 w-10 text-primary mx-auto" />
-              <h3 className="font-semibold text-lg">Segurança Primeiro</h3>
+              <h3 className="font-semibold text-lg">Privacidade e seguranca</h3>
               <p className="text-slate-600 text-sm">
-                Construído com princípios de AppSec e proteção de dados desde o design.
+                Seus dados sao tratados com cuidado e privacidade desde o inicio.
               </p>
             </div>
+
             <div className="text-center space-y-3">
               <CalendarClock className="h-10 w-10 text-primary mx-auto" />
               <h3 className="font-semibold text-lg">Planejamento real</h3>
               <p className="text-slate-600 text-sm">
-                O FinScope nasceu para acabar com a planilha improvisada de contas futuras e mostrar cenários com semanas de antecedência.
+                Organize contas futuras e acompanhe melhor os proximos passos.
               </p>
             </div>
+
             <div className="text-center space-y-3">
               <BarChart3 className="h-10 w-10 text-primary mx-auto" />
-              <h3 className="font-semibold text-lg">Visão de longo prazo</h3>
+              <h3 className="font-semibold text-lg">Visao de longo prazo</h3>
               <p className="text-slate-600 text-sm">
-                Saldo previsto, relatórios automáticos e recomendações de economia incorporados ao produto.
+                Acompanhe sua evolucao financeira ao longo do tempo com mais controle.
               </p>
             </div>
           </div>
-
         </section>
       </main>
 

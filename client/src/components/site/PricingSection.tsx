@@ -15,26 +15,26 @@ const plans = [
   {
     name: "Pro",
     highlight: false,
-    description: "Para começar com clareza e cortar desperdícios.",
-    value: "Rotina pessoal organizada",
+    description: "Para quem quer organizar a rotina financeira com simplicidade.",
+    value: "Base completa para o dia a dia",
     features: [
-      "Controle PF completo",
-      "Planejamento de contas futuras",
-      "Alertas essenciais e lembretes",
-      "Relatórios PDF básicos",
+      "Controle de contas e gastos",
+      "Planejamento mensal",
+      "Lembretes importantes",
+      "Relatorios basicos",
     ],
   },
   {
     name: "Premium",
     highlight: true,
-    description: "IA destravada, PF + PJ, metas automáticas e dashboards avançados.",
-    value: "Tudo do Pro + cockpit PF/PJ",
+    description: "Para quem precisa de mais recursos de organizacao e acompanhamento.",
+    value: "Tudo do Pro + visao avancada",
     features: [
-      "PF + PJ no mesmo cockpit",
-      "IA financeira completa e insights proativos",
-      "Metas automáticas por categoria",
-      "Exportação avançada e backups",
-      "Suporte prioritário",
+      "Mais opcoes de acompanhamento",
+      "Mais recursos para rotina PF e negocio",
+      "Relatorios mais completos",
+      "Exportacao de dados",
+      "Atendimento prioritario",
     ],
   },
 ];
@@ -46,10 +46,10 @@ export function PricingSection() {
         <div className="space-y-3 text-center">
           <Badge className="bg-primary/10 text-primary border-primary/20">Planos</Badge>
           <h2 className="text-3xl md:text-4xl font-poppins font-bold">
-            Planos pensados para cada jornada
+            Escolha o plano ideal para sua rotina
           </h2>
           <p className="text-slate-600 max-w-3xl mx-auto">
-            Comece pelo cadastro e escolha o plano que fizer sentido dentro do app. Sem burocracia, com foco em clareza e ação.
+            Voce pode se cadastrar primeiro e escolher o plano no app, com calma.
           </p>
         </div>
 
@@ -84,10 +84,10 @@ export function PricingSection() {
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs text-slate-600">
                   <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/5 border border-primary/10">
-                    Onboarding guiado disponível
+                    Cadastro rapido
                   </span>
                   <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/5 border border-primary/10">
-                    Acesso seguro e criptografado
+                    Seguranca e privacidade
                   </span>
                 </div>
               </CardContent>
@@ -97,7 +97,7 @@ export function PricingSection() {
                     className="w-full"
                     variant={plan.highlight ? "default" : "outline"}
                   >
-                    Começar pelo cadastro
+                    Cadastre-se
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>

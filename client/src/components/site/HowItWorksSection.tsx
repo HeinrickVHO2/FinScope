@@ -1,22 +1,22 @@
-﻿import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Link2, Sparkles, Gauge, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 
 const steps = [
   {
-    title: "Informe ou conecte suas contas",
-    description: "Traga bancos, cartões e planilhas em poucos cliques. Sem fricção, sem formulários infinitos.",
+    title: "Adicione suas contas e gastos",
+    description: "Registre suas movimentacoes em poucos passos e mantenha tudo no mesmo lugar.",
     icon: Link2,
   },
   {
-    title: "A IA interpreta tudo automaticamente",
-    description: "Identifica gastos invisíveis, ajusta categorias e prevê o impacto das próximas contas.",
+    title: "Organize por categorias",
+    description: "Veja com clareza quanto voce gastou em cada tipo de despesa no mes.",
     icon: Sparkles,
   },
   {
-    title: "Você só acompanha a evolução",
-    description: "Alertas inteligentes, metas atualizadas e clareza do que vai sobrar até o fim do mês.",
+    title: "Acompanhe seu mes com clareza",
+    description: "Visualize saldo, metas e proximos compromissos para decidir melhor.",
     icon: Gauge,
   },
 ];
@@ -29,15 +29,15 @@ export function HowItWorksSection() {
           <div className="space-y-3">
             <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Como funciona</p>
             <h2 className="text-3xl md:text-4xl font-poppins font-bold">
-              Clareza total em três passos simples
+              Clareza total em tres passos simples
             </h2>
             <p className="text-slate-600 max-w-2xl">
-              O fluxo foi desenhado para você começar a usar sem suporte. Mas se preferir, um especialista te acompanha.
+              Um fluxo simples para voce entender seu dinheiro e manter uma rotina financeira mais organizada.
             </p>
           </div>
           <Link href="/signup">
             <Button className="bg-primary text-white hover:bg-primary/90">
-              Começar agora
+              Cadastre-se
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
