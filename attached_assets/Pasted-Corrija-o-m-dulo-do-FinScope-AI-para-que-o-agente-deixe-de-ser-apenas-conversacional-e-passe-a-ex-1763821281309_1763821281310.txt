@@ -1,0 +1,110 @@
+Corrija o módulo do FinScope AI para que o agente deixe de ser apenas “conversacional” 
+e passe a executar ações reais dentro do sistema.
+
+PROBLEMAS A CORRIGIR:
+1. O agente perde o contexto da conversa.
+2. Ele responde errado sobre datas/valores.
+3. Ele apenas "fala" que registrou algo, mas não cria nada no banco.
+4. Ele não entende continuidade da conversa.
+
+====== COMPORTAMENTO CORRETO DO AGENTE ======
+
+Toda mensagem do usuário deve ser tratada em 3 camadas:
+
+1) INTERPRETAÇÃO
+- Identifique se é:
+  - gasto (saída)
+  - entrada (recebimento)
+  - conta futura (previsto)
+  - criação de meta
+
+2) CONFIRMAÇÃO
+- Se faltar algum dado:
+  - Data
+  - Valor
+  - Tipo PF/PJ
+  - Categoria
+
+Perguntar APENAS o que faltar.
+
+3) AÇÃO REAL
+Após confirmação, o agente **DEVE** chamar as funções do sistema, por exemplo:
+
+- createTransaction()
+- createFutureBill()
+- createGoal()
+
+Ele NÃO pode mais apenas responder com texto.
+
+====== CONTEXTO OBRIGATÓRIO ======
+
+Antes de responder, o agente deve sempre usar:
+
+buildFinancialContext(userId, accountType)
+
+Isso deve incluir no prompt interno:
+
+- Últimas 10 transações
+- Metas existentes
+- Contas futuras
+- Plano do usuário
+
+Esse contexto NÃO deve ser mostrado para o usuário.
+
+====== MEMÓRIA DA CONVERSA ======
+
+Criar um estado simples por usuário:
+
+memory[userId] = {
+  lastIntent,
+  lastAmount,
+  lastDate,
+  lastAccountType
+}
+
+E usar isso para evitar perguntas repetidas.
+
+====== PROBLEMA DO PRINT MOSTRADO ======
+
+Hoje o agente:
+- Fica preso em loops
+- Confirma coisas erradas
+- Não mantém continuidade
+
+Corrigir para:
+
+Se o usuário disser:
+"Gastei 300 no mercado hoje"
+
+Fluxo ideal:
+
+1. Classificar como saída
+2. Detectar categoria "mercado"
+3. Detectar data (hoje)
+4. Criar transação real no banco
+5. Responder:
+   "Pronto! Registrei um gasto de R$300 no mercado para hoje."
+
+Sem perguntar novamente coisas óbvias.
+
+====== CHAT UX ======
+
+Ao enviar uma mensagem:
+
+- Mostrar mensagem do usuário imediatamente na tela
+- Mostrar "FinScope AI está digitando..."
+- Quando resposta chegar, substituir o loading
+
+Hoje está travado → corrigir.
+
+====== RESULTADO ESPERADO ======
+
+O agente agora:
+✔ entende contexto
+✔ executa ações reais
+✔ não repete perguntas
+✔ não reinicia fluxo
+✔ cria transações de verdade
+✔ cria metas automaticamente
+
+Implemente essas correções sem quebrar o restante do sistema.

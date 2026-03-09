@@ -1,0 +1,162 @@
+Refatore COMPLETAMENTE o agente de IA do projeto FinScope.
+
+O comportamento atual está errado e deve ser substituído por uma arquitetura de agente financeiro real.
+
+==============================
+OBJETIVO
+==============================
+
+O agente deve funcionar como um ASSISTENTE FINANCEIRO REAL, integrado com o sistema.
+
+Ele deve:
+
+- Ler dados reais da plataforma
+- Atualizar registros reais
+- Não alucinar dados
+- Não duplicar entidades existentes
+- Não criar entidades novas se já existir contexto compatível
+
+==============================
+MEMÓRIA OBRIGATÓRIA
+==============================
+
+Implemente memória de sessão:
+
+- Histórico das últimas mensagens
+- Última intenção do usuário
+- Última entidade manipulada (transação, investimento, meta, conta futura)
+
+Persistir isso em memória por sessão.
+
+==============================
+REGRA CRÍTICA
+==============================
+
+O agente NÃO pode:
+
+- Criar novo investimento se já existir um com mesmo nome
+- Criar nova meta se já existir algo semanticamente igual
+- Criar nova conta futura se já existir algo parecido
+
+Em vez disso deve:
+
+- Atualizar o registro existente
+- Somar valores
+- Atualizar datas
+
+==============================
+INTELIGÊNCIA CONTEXTUAL
+==============================
+
+Antes de responder, sempre usar:
+
+- Últimas 10 transações
+- Lista de investimentos reais
+- Metas existentes
+- Contas futuras
+- Plano do usuário
+- Tipo de conta ativa (PF/PJ)
+
+Se o usuário disser, por exemplo:
+"Comprei mais ações da Petrobras"
+
+O agente deve:
+1. Ver se já existe investimento Petrobras
+2. Se existir → atualizar saldo
+3. Se não existir → criar novo
+
+==============================
+AÇÕES QUE O AGENTE DEVE FAZER
+==============================
+
+O agente deve SER CAPAZ DE:
+
+- Criar e atualizar transações
+- Criar e atualizar metas
+- Criar e atualizar investimentos
+- Criar e atualizar contas a pagar
+- Atualizar dashboard automaticamente (via backend)
+
+Não pode apenas "falar", ele deve executar as operações reais.
+
+==============================
+CONTROLE DE CONTEXTO
+==============================
+
+O agente **não pode delirar**.
+
+Se não tiver certeza do que o usuário quer:
+- Fazer UMA pergunta objetiva
+
+Nunca:
+- Perguntar coisas repetidas
+- Resetar conversa
+- Mandar "vamos começar de novo"
+
+==============================
+PROMPT BASE (OBRIGATÓRIO)
+==============================
+
+Fixar este system prompt internamente:
+
+"Você é o FinScope AI.
+Seu papel é ser um consultor financeiro.
+Você ajuda o usuário a controlar o presente e o futuro financeiro.
+Nunca reinicia conversas.
+Nunca repete perguntas.
+Nunca alucina dados.
+Sempre usa dados reais do sistema."
+
+==============================
+UX DO CHAT
+==============================
+
+Corrigir frontend:
+
+- Mensagem do usuário deve aparecer instantaneamente
+- Mostrar bolha "Digitando..."
+- Substituir por resposta real
+
+==============================
+CASOS QUE DEVEM FUNCIONAR
+==============================
+
+1. "Gastei 50 no mercado"
+→ Criar transação
+→ Atualizar dashboard
+
+2. "Preciso pagar aluguel dia 10"
+→ Criar conta futura
+→ Mostrar no painel de contas a pagar
+
+3. "Quero juntar pra viajar"
+→ Criar meta
+
+4. "Coloquei mais 500 no CDB"
+→ Atualizar investimento existente
+
+==============================
+PROIBIÇÕES
+==============================
+
+- Não criar registros duplicados
+- Não perder contexto
+- Não responder genérico
+- Não fingir ações que não foram executadas
+
+==============================
+ENTREGA
+==============================
+
+Refatorar:
+
+- ai/*
+- services/*
+- controllers/*
+- chat frontend
+
+Até o agente se comportar como um assistente financeiro profissional real.
+
+==============================
+FAZER ISSO SEM QUEBRAR NENHUMA OUTRA FUNCIONALIDADE EXISTENTE
+==============================
