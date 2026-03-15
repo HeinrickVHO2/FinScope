@@ -369,39 +369,34 @@ export class WhatsAppRepository {
     message: string;
     metadata?: Record<string, unknown>;
   }) {
+    if (!params.inboundMessageId) {
+      console.info("[WHATSAPP] persisted processing log skipped: missing inbound_message_id", {
+        event: params.event,
+        userId: params.userId ?? null,
+      });
+      return false;
+    }
+
     try {
-      await insertFirstSuccessful(
-        "whatsapp_processing_logs",
-        [
-          {
-            inbound_message_id: params.inboundMessageId ?? null,
-            user_id: params.userId ?? null,
-            level: params.level,
-            event: params.event,
-            message: params.message,
-            metadata: params.metadata ?? null,
-          },
-          {
-            inbound_message_id: params.inboundMessageId ?? null,
-            user_id: params.userId ?? null,
-            log_level: params.level,
-            event_type: params.event,
-            message: params.message,
-            metadata: params.metadata ?? null,
-          },
-          {
-            inbound_message_id: params.inboundMessageId ?? null,
-            user_id: params.userId ?? null,
-            level: params.level,
-            event: params.event,
-            message: params.message,
-            payload: params.metadata ?? null,
-          },
-        ],
-        { select: false, single: false },
-      );
+      const { error } = await supabase
+        .from("whatsapp_processing_logs")
+        .insert({
+          inbound_message_id: params.inboundMessageId,
+          user_id: params.userId ?? null,
+          level: params.level,
+          event: params.event,
+          message: params.message,
+          metadata: params.metadata ?? null,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      return true;
     } catch (error) {
       console.warn("[WHATSAPP] whatsapp_processing_logs insert skipped:", error);
+      return false;
     }
   }
 }

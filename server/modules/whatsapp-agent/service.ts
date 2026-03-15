@@ -118,15 +118,11 @@ export class WhatsAppAgentService {
     this.pendingBindingsByUser.set(userId, pending);
     this.pendingBindingsByCode.set(code, pending);
 
-    await this.repository.appendProcessingLog({
+    this.logInternal("info", "binding_code_generated", "Codigo de vinculo gerado", {
       userId,
-      level: "info",
-      event: "binding_code_generated",
+      phone,
+      expiresAt: pending.expiresAt,
       message: "Código de vínculo gerado",
-      metadata: {
-        phone,
-        expiresAt: pending.expiresAt,
-      },
     });
 
     return {
@@ -151,9 +147,9 @@ export class WhatsAppAgentService {
       this.pendingBindingsByUser.delete(userId);
     }
 
-    await this.repository.appendProcessingLog({
+    this.logInternal("info", "binding_removed", "WhatsApp binding removed", {
       userId,
-      level: "info",
+      phone: binding.phone_e164,
       event: "binding_removed",
       message: "Vínculo do WhatsApp removido",
       metadata: {
@@ -211,7 +207,7 @@ export class WhatsAppAgentService {
       persistedTransactionId: transaction.id,
     });
 
-    await this.repository.appendProcessingLog({
+    await this.appendInboundProcessingLog({
       inboundMessageId: candidate.inbound_message_id,
       userId: params.userId,
       level: "info",
@@ -242,7 +238,7 @@ export class WhatsAppAgentService {
       persistedTransactionId: null,
     });
 
-    await this.repository.appendProcessingLog({
+    await this.appendInboundProcessingLog({
       inboundMessageId: candidate.inbound_message_id,
       userId: params.userId,
       level: "info",
@@ -287,7 +283,7 @@ export class WhatsAppAgentService {
       status: userId ? "received" : "pending_user_link",
     });
 
-    await this.repository.appendProcessingLog({
+    await this.appendInboundProcessingLog({
       inboundMessageId: inbound.id,
       userId,
       level: "info",
@@ -301,7 +297,7 @@ export class WhatsAppAgentService {
     });
 
     if (!userId) {
-      await this.repository.appendProcessingLog({
+      await this.appendInboundProcessingLog({
         inboundMessageId: inbound.id,
         level: "warn",
         event: "binding_not_found",
@@ -318,7 +314,7 @@ export class WhatsAppAgentService {
         status: "blocked_inactive_subscription",
         errorMessage: "Assinatura inativa para processamento do WhatsApp.",
       });
-      await this.repository.appendProcessingLog({
+      await this.appendInboundProcessingLog({
         inboundMessageId: inbound.id,
         userId,
         level: "warn",
@@ -362,7 +358,7 @@ export class WhatsAppAgentService {
       }
     }
 
-    await this.repository.appendProcessingLog({
+    await this.appendInboundProcessingLog({
       inboundMessageId: inbound.id,
       userId,
       level: "info",
@@ -396,7 +392,7 @@ export class WhatsAppAgentService {
         confidenceScore: intent.confidence,
         extractedPayload,
       });
-      await this.repository.appendProcessingLog({
+      await this.appendInboundProcessingLog({
         inboundMessageId: inbound.id,
         userId,
         level: "warn",
@@ -435,7 +431,7 @@ export class WhatsAppAgentService {
       extractedPayload,
     });
 
-    await this.repository.appendProcessingLog({
+    await this.appendInboundProcessingLog({
       inboundMessageId: inbound.id,
       userId,
       level: "info",
@@ -469,7 +465,7 @@ export class WhatsAppAgentService {
     });
 
     if (!user || user.billingStatus !== "active") {
-      await this.repository.appendProcessingLog({
+      await this.appendInboundProcessingLog({
         inboundMessageId: inbound.id,
         userId: pending.userId,
         level: "warn",
@@ -499,7 +495,7 @@ export class WhatsAppAgentService {
       },
     });
 
-    await this.repository.appendProcessingLog({
+    await this.appendInboundProcessingLog({
       inboundMessageId: inbound.id,
       userId: pending.userId,
       level: "info",
@@ -572,6 +568,46 @@ export class WhatsAppAgentService {
 
     const pfAccount = accounts.find((account) => account.type.toLowerCase() === "pf");
     return pfAccount || accounts[0];
+  }
+
+  private async appendInboundProcessingLog(params: {
+    inboundMessageId?: string | null;
+    userId?: string | null;
+    level: "info" | "warn" | "error";
+    event: string;
+    message: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    if (!params.inboundMessageId) {
+      this.logInternal("warn", "processing_log_skipped_missing_inbound", "Persisted log skipped without inbound_message_id", {
+        event: params.event,
+        userId: params.userId ?? null,
+      });
+      return false;
+    }
+
+    return this.repository.appendProcessingLog(params);
+  }
+
+  private logInternal(
+    level: "info" | "warn" | "error",
+    event: string,
+    message: string,
+    metadata?: Record<string, unknown>,
+  ) {
+    const payload = metadata ? { event, message, metadata } : { event, message };
+
+    if (level === "error") {
+      console.error("[WHATSAPP]", payload);
+      return;
+    }
+
+    if (level === "warn") {
+      console.warn("[WHATSAPP]", payload);
+      return;
+    }
+
+    console.info("[WHATSAPP]", payload);
   }
 
   private getBusinessPhone() {

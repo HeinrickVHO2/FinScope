@@ -6,6 +6,7 @@ import type { WhatsAppInboundEvent } from "./types";
 class FakeRepository {
   public inboundCounter = 0;
   public candidateCounter = 0;
+  public appendProcessingLogCalls = 0;
   public bindings = new Map<string, any>();
   public candidates = new Map<string, any>();
   public inboundStatus: string | null = null;
@@ -96,7 +97,8 @@ class FakeRepository {
   }
 
   async appendProcessingLog() {
-    return;
+    this.appendProcessingLogCalls += 1;
+    return true;
   }
 }
 
@@ -178,6 +180,7 @@ test("WhatsAppAgentService confirms binding when code arrives from the informed 
   const service = new WhatsAppAgentService(repository as any, storage as any);
 
   const binding = await service.startBinding("user-1", "+55 11 99999-9999");
+  assert.equal(repository.appendProcessingLogCalls, 0);
   const result = await service.processInboundEvent({
     ...baseEvent,
     providerMessageId: "provider-msg-binding",
@@ -233,4 +236,33 @@ test("WhatsAppAgentService confirms candidate into transaction", async () => {
   assert.equal(result.transactionId, "tx-1");
   assert.equal(storage.createTransactionCalls, 1);
   assert.equal(repository.candidates.get("candidate-1")?.status, "confirmed");
+});
+
+test("WhatsAppAgentService confirms candidate even when inbound_message_id is missing", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const service = new WhatsAppAgentService(repository as any, storage as any);
+
+  repository.candidates.set("candidate-2", {
+    id: "candidate-2",
+    inbound_message_id: null,
+    proposed_type: "expense",
+    amount: 27.5,
+    description: "lanche",
+    category_suggestion: "AlimentaÃ§Ã£o",
+    transaction_date: "2026-03-15T00:00:00.000Z",
+    status: "pending_review",
+    persisted_transaction_id: null,
+  });
+
+  const result = await service.confirmCandidate({
+    userId: "user-1",
+    candidateId: "candidate-2",
+    accountId: "acc-1",
+  });
+
+  assert.equal(result.transactionId, "tx-1");
+  assert.equal(storage.createTransactionCalls, 1);
+  assert.equal(repository.appendProcessingLogCalls, 0);
+  assert.equal(repository.candidates.get("candidate-2")?.status, "confirmed");
 });
