@@ -26,5 +26,5 @@ export function hasMetaWebhookConfig() {
 
 export function hasMetaOutboundConfig() {
   const config = getWhatsAppMetaConfig();
-  return Boolean(config.accessToken && config.phoneNumberId && config.wabaId);
+  return Boolean(config.accessToken && config.phoneNumberId);
 }

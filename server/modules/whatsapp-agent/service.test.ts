@@ -493,6 +493,27 @@ test("WhatsAppAgentService answers finance assistant questions in chat", async (
   assert.match(messenger.sentMessages.at(-1)?.text || "", /Reserva de emerg/i);
 });
 
+test("WhatsAppAgentService answers simple greetings in chat", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, { messenger: messenger as any });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-greeting",
+    text: "ola",
+  }));
+
+  assert.equal(result.status, "assistant_answered");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /Posso registrar gastos/i);
+});
+
 test("WhatsAppAgentService creates invoice suggestion from media and stores evidence", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();
@@ -534,6 +555,61 @@ test("WhatsAppAgentService creates invoice suggestion from media and stores evid
   assert.equal(repository.mediaEvidence.length, 1);
   assert.equal(repository.candidates.get("candidate-1")?.evidence?.mode, "invoice");
   assert.match(messenger.sentMessages.at(-1)?.text || "", /Recebi sua nota/i);
+});
+
+test("WhatsAppAgentService does not trap a new standalone transaction behind an older pending candidate", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const parser = buildParser([{
+    kind: "expense",
+    amount: 50,
+    description: "Gasolina",
+    merchant: "Posto",
+    categorySuggestion: "Transporte",
+    transactionDate: new Date("2026-03-15T00:00:00.000Z"),
+    confidence: 0.95,
+    missingFields: [],
+  }]);
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    parser: parser as any,
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  repository.candidates.set("candidate-old", {
+    id: "candidate-old",
+    user_id: "user-1",
+    inbound_message_id: "in-old",
+    proposed_type: "expense",
+    amount: 10,
+    currency: "BRL",
+    description: "Coxinha",
+    merchant_name: "Padaria",
+    category_suggestion: "Alimentacao",
+    transaction_date: "2026-03-15T00:00:00.000Z",
+    confidence_score: 0.78,
+    status: "awaiting_user_confirmation",
+    evidence: { rawMessage: "paguei 10 no lanche" },
+    persisted_transaction_id: null,
+    created_at: new Date("2026-03-15T10:00:00.000Z").toISOString(),
+    updated_at: new Date("2026-03-15T10:00:00.000Z").toISOString(),
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-new-transaction",
+    text: "paguei 50 reais de gasolina",
+  }));
+
+  assert.equal(result.status, "auto_created_pending_review");
+  assert.equal(repository.candidates.get("candidate-old")?.status, "ignored");
+  assert.equal(storage.createTransactionCalls, 1);
+  assert.equal(repository.candidates.get("candidate-1")?.status, "auto_created_pending_review");
 });
 
 test("WhatsAppAgentService updates and removes auto created review transactions", async () => {

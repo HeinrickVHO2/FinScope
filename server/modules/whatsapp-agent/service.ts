@@ -84,6 +84,10 @@ function detectResetIntent(text?: string) {
   return /reset|reinicia|do zero/.test(normalizeText(text));
 }
 
+function looksLikeGreeting(text?: string) {
+  return /^(oi|ola|olá|bom dia|boa tarde|boa noite)\b/.test(normalizeText(text));
+}
+
 function detectAccountScopeHint(text?: string): "PF" | "PJ" | null {
   const normalized = normalizeText(text);
   if (!normalized) return null;
@@ -531,12 +535,57 @@ export class WhatsAppAgentService {
       : await this.repository.getLatestCandidateByUser(userId, WHATSAPP_OPEN_CANDIDATE_STATUSES);
 
     if (openCandidate && sanitizedEvent.text) {
-      const result = await this.handleOpenCandidateReply(openCandidate, inbound, user, sanitizedEvent.text);
-      if (result) return result;
+      if (this.shouldHandleAsReplyToOpenCandidate(openCandidate, sanitizedEvent.text)) {
+        const result = await this.handleOpenCandidateReply(openCandidate, inbound, user, sanitizedEvent.text);
+        if (result) return result;
+      } else {
+        await this.repository.updateCandidate({
+          candidateId: openCandidate.id,
+          userId: user.id,
+          status: WHATSAPP_CANDIDATE_STATUS.IGNORED,
+          evidence: this.mergeCandidateEvidence(openCandidate, {
+            reviewStatus: WHATSAPP_CANDIDATE_STATUS.IGNORED,
+            supersededAt: new Date().toISOString(),
+            supersededByMessage: sanitizedEvent.text,
+            supersededReason: "new_standalone_message",
+          }),
+        });
+        await this.appendInboundProcessingLog({
+          inboundMessageId: openCandidate.inbound_message_id,
+          userId: user.id,
+          level: "info",
+          event: "candidate_superseded",
+          message: "Candidate pendente foi descartado porque o usuario enviou uma nova solicitacao independente.",
+          metadata: {
+            candidateId: openCandidate.id,
+            supersededByMessageId: inbound.id,
+          },
+        });
+      }
     }
 
     if (sanitizedEvent.media?.length) {
       return this.handleMediaMessage(inbound, user, sanitizedEvent);
+    }
+
+    if (looksLikeGreeting(sanitizedEvent.text || "")) {
+      await this.repository.updateInboundMessage({
+        id: inbound.id,
+        status: "assistant_answered",
+        extractedPayload: { mode: "greeting" },
+      });
+      await this.appendInboundProcessingLog({
+        inboundMessageId: inbound.id,
+        userId: user.id,
+        level: "info",
+        event: "greeting_answered",
+        message: "Saudacao respondida no chat.",
+      });
+      await this.sendReplyToInbound(
+        inbound,
+        "Oi. Posso registrar gastos, recebimentos, notas e tambem responder duvidas simples sobre seu financeiro. Se quiser, me mande algo como 'paguei 50 de gasolina'.",
+      );
+      return { status: "assistant_answered" };
     }
 
     if (looksLikeFinanceAssistantQuestion(sanitizedEvent.text || "")) {
@@ -1102,6 +1151,32 @@ export class WhatsAppAgentService {
   private async isSuppressedPattern(userId: string, normalizedDescription: string) {
     const ignored = await this.repository.listCandidatesByStatuses(userId, [WHATSAPP_CANDIDATE_STATUS.IGNORED_PATTERN]);
     return ignored.some((candidate) => candidate.evidence?.ignoreFutureSimilar && candidate.evidence?.normalizedDescription === normalizedDescription);
+  }
+
+  private shouldHandleAsReplyToOpenCandidate(candidate: CandidateRecord, text: string) {
+    if (!text.trim()) return true;
+    if (detectResetIntent(text) || detectConfirmationIntent(text) || detectAccountScopeHint(text)) return true;
+
+    const normalized = normalizeText(text);
+    if (/^\d+$/.test(normalized)) return true;
+
+    if (candidate.status === WHATSAPP_CANDIDATE_STATUS.AWAITING_ACCOUNT_SELECTION) {
+      const optionNames = ((candidate.evidence?.accountOptions || []) as Array<{ name?: string }>).map((item) => normalizeText(item.name || ""));
+      if (optionNames.some((name) => name && normalized.includes(name))) return true;
+    }
+
+    if (looksLikeGreeting(text) || looksLikeFinanceAssistantQuestion(text)) return false;
+
+    if (/\b(paguei|gastei|comprei|recebi|ganhei|pix|boleto|faturamento|entrada|saida)\b/.test(normalized)) {
+      return false;
+    }
+
+    const parsed = this.parser.parse({ text });
+    if (parsed.amount !== null && parsed.kind !== "unknown" && parsed.confidence >= WHATSAPP_CONFIRMATION_THRESHOLD) {
+      return false;
+    }
+
+    return true;
   }
 
   private describeIntent(intent: { kind: "income" | "expense" | "unknown"; amount: number | null; categorySuggestion?: string }) {
