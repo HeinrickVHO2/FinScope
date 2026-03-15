@@ -646,8 +646,42 @@ test("WhatsAppAgentService gives a practical answer for weekly saving guidance",
   }));
 
   assert.equal(result.status, "assistant_answered");
-  assert.match(messenger.sentMessages.at(-1)?.text || "", /durante a semana/i);
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /dia a dia|fim da semana/i);
   assert.doesNotMatch(messenger.sentMessages.at(-1)?.text || "", /Posso ajudar com resumo do mes/i);
+});
+
+test("WhatsAppAgentService answers day-to-day saving tips as assistant guidance", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, { messenger: messenger as any });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  await storage.createTransaction({
+    userId: "user-1",
+    accountId: "acc-1",
+    description: "Mercado",
+    type: "saida",
+    amount: 180,
+    category: "Alimentacao",
+    date: new Date(),
+    accountType: "PF",
+    source: "manual",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-daily-guidance",
+    text: "Me de dicas para economizar no dia a dia.",
+  }));
+
+  assert.equal(result.status, "assistant_answered");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /economizar|dia a dia|semana/i);
+  assert.doesNotMatch(messenger.sentMessages.at(-1)?.text || "", /Nao consegui identificar o valor/i);
 });
 
 test("WhatsAppAgentService answers monthly summary questions with real user data", async () => {

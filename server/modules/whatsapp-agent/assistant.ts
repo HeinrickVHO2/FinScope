@@ -78,7 +78,7 @@ function detectScope(text: string): "PF" | "PJ" | "ALL" {
 }
 
 function includesFinanceTopic(text: string) {
-  return /gasto|gastei|despesa|entrada|receita|recebi|mes|mes atual|categoria|saldo|sobrou|economizar|guardar|reserva|poupanca|cdb|invest|finance|dinheiro|conta|orcamento/.test(text);
+  return /gasto|gastei|despesa|entrada|receita|recebi|mes|mes atual|categoria|saldo|sobrou|economizar|economia|guardar|reserva|poupanca|cdb|invest|finance|dinheiro|conta|orcamento|dicas/.test(text);
 }
 
 function findEducationalAnswer(text: string) {
@@ -130,11 +130,11 @@ function classifyAssistantIntent(text: string): AssistantIntent | null {
     return { type: "spending_health", scope };
   }
 
-  if (/posso economizar mais|como posso melhorar minhas financas|como organizar meus gastos|como melhorar minhas financas|como melhorar meu financeiro/.test(normalized)) {
+  if (/posso economizar mais|como posso melhorar minhas financas|como organizar meus gastos|como melhorar minhas financas|como melhorar meu financeiro|me de dicas|me da dicas|quero dicas/.test(normalized)) {
     return { type: "guidance", scope };
   }
 
-  if (/como posso economizar mais durante a semana|economizar mais durante a semana|gastar menos durante a semana/.test(normalized)) {
+  if (/como posso economizar mais durante a semana|economizar mais durante a semana|gastar menos durante a semana|economizar no dia a dia|gastar menos no dia a dia|economizar no cotidiano|economizar melhor na rotina/.test(normalized)) {
     return { type: "guidance", scope };
   }
 
@@ -294,11 +294,11 @@ export async function buildFinanceAssistantReply(storage: IStorage, userId: stri
     const topCategory = topCategories[0];
     const normalizedText = normalize(text);
 
-    if (/durante a semana|na semana/.test(normalizedText)) {
+    if (/durante a semana|na semana|dia a dia|cotidiano|rotina/.test(normalizedText)) {
       if (topCategory) {
-        return `Para economizar mais durante a semana${scopeLabel(intent.scope)}, vale definir um teto curto para ${topCategory[0]}, evitar compras por impulso no dia a dia e revisar pequenos gastos recorrentes antes do fim da semana.`;
+        return `Para economizar mais no dia a dia${scopeLabel(intent.scope)}, vale definir um teto curto para ${topCategory[0]}, evitar compras por impulso na rotina e revisar pequenos gastos recorrentes antes do fim da semana.`;
       }
-      return `Para economizar mais durante a semana${scopeLabel(intent.scope)}, vale definir um limite para gastos variaveis, planejar alimentacao e acompanhar pequenas despesas antes que elas se acumulem.`;
+      return `Para economizar mais no dia a dia${scopeLabel(intent.scope)}, vale definir um limite para gastos variaveis, planejar alimentacao e acompanhar pequenas despesas antes que elas se acumulem.`;
     }
 
     if (net <= 0) {

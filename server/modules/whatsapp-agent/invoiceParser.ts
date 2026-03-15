@@ -32,15 +32,32 @@ function parseBrazilianAmount(raw: string) {
   return Number.isFinite(value) ? Number(value.toFixed(2)) : null;
 }
 
+function extractAmountTokens(line: string) {
+  return Array.from(line.matchAll(/\d{1,3}(?:\.\d{3})*,\d{2}|\d+\.\d{2}/g)).map((match) => match[0]);
+}
+
+function extractLastAmountFromLine(line: string) {
+  const tokens = extractAmountTokens(line);
+  if (!tokens.length) return null;
+  return parseBrazilianAmount(tokens[tokens.length - 1]);
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function looksLikeMerchant(line: string) {
   if (line.length < 4) return false;
   if (/\d{5,}/.test(line)) return false;
+  if (/http|www\.|qrcode|qr code|protocolo|consumidor|chave de acesso|consulta via/i.test(line)) return false;
   return /[A-Za-zÀ-ÿ]/.test(line);
 }
 
 function parseItemLine(line: string): ParsedInvoiceItem | null {
   const trimmed = line.trim().replace(/\s+/g, " ");
-  const totalMatch = trimmed.match(/(.+?)\s+(\d+[.,]?\d*)\s*x\s*(\d+[.,]\d{2})\s+(\d+[.,]\d{2})$/i);
+  const normalized = trimmed.replace(/^\d{5,}\s+/, "");
+
+  const totalMatch = normalized.match(/(.+?)\s+(\d+[.,]?\d*)\s*x\s*(\d+[.,]\d{2})\s+(\d+[.,]\d{2})$/i);
   if (totalMatch) {
     return {
       description: totalMatch[1].trim(),
@@ -50,7 +67,35 @@ function parseItemLine(line: string): ParsedInvoiceItem | null {
     };
   }
 
-  const looseMatch = trimmed.match(/(.+?)\s+(\d+[.,]\d{2})$/);
+  const receiptStyleMatch = normalized.match(/(.+?)\s+(\d+[.,]?\d*)\s+(un|und|kg|g|lt|l)\s+(\d+[.,]\d{2})\s+(\d+[.,]\d{2})$/i);
+  if (receiptStyleMatch) {
+    return {
+      description: receiptStyleMatch[1].trim(),
+      quantity: parseBrazilianAmount(receiptStyleMatch[2]),
+      unitPrice: parseBrazilianAmount(receiptStyleMatch[4]),
+      totalPrice: parseBrazilianAmount(receiptStyleMatch[5]),
+    };
+  }
+
+  const amounts = extractAmountTokens(normalized);
+  if (amounts.length >= 2 && /[A-Za-zÀ-ÿ]/.test(normalized)) {
+    const totalToken = amounts[amounts.length - 1];
+    const unitToken = amounts[amounts.length - 2];
+    const description = normalized
+      .replace(new RegExp(`${escapeRegex(unitToken)}\\s+${escapeRegex(totalToken)}$`), "")
+      .replace(/\b\d+[.,]?\d*\s*(un|und|kg|g|lt|l)\b/i, "")
+      .trim();
+
+    if (description.length >= 3) {
+      return {
+        description,
+        unitPrice: parseBrazilianAmount(unitToken),
+        totalPrice: parseBrazilianAmount(totalToken),
+      };
+    }
+  }
+
+  const looseMatch = normalized.match(/(.+?)\s+(\d+[.,]\d{2})$/);
   if (!looseMatch || looseMatch[1].trim().length < 3) {
     return null;
   }
@@ -72,12 +117,19 @@ export function parseInvoiceText(text: string): ParsedInvoice | null {
     return null;
   }
 
-  const merchant = lines.find(looksLikeMerchant) ?? null;
+  const merchant = lines.slice(0, 8).find(looksLikeMerchant) ?? lines.find(looksLikeMerchant) ?? null;
   const dateMatch = lines.join(" ").match(/\b(\d{2}\/\d{2}\/\d{2,4})\b/);
-  const totalLine = lines.find((line) => /total|valor total|vl total|subtotal/i.test(line));
-  const detectedTotal = totalLine
-    ? parseBrazilianAmount(totalLine)
-    : parseBrazilianAmount(lines.slice().reverse().find((line) => /\d+[.,]\d{2}/.test(line)) || "");
+  const prioritizedTotalLine = lines.find((line) => /valor pago|valor a pagar|vlr total|v\.?\s*total|valor total|total da nota|total r\$|^total$/i.test(line));
+  const secondaryTotalLine = lines.find((line) => /subtotal|totais|total/i.test(line));
+  const detectedTotal = prioritizedTotalLine
+    ? extractLastAmountFromLine(prioritizedTotalLine)
+    : secondaryTotalLine
+      ? extractLastAmountFromLine(secondaryTotalLine)
+      : lines
+        .slice()
+        .reverse()
+        .map(extractLastAmountFromLine)
+        .find((value) => value !== null) ?? null;
 
   const items = lines
     .map(parseItemLine)
@@ -86,12 +138,12 @@ export function parseInvoiceText(text: string): ParsedInvoice | null {
 
   const confidence = Number(
     Math.min(
-      0.94,
-      0.35 +
-        (merchant ? 0.1 : 0) +
-        (detectedTotal !== null ? 0.28 : 0) +
+      0.96,
+      0.34 +
+        (merchant ? 0.12 : 0) +
+        (detectedTotal !== null ? 0.3 : 0) +
         (dateMatch ? 0.08 : 0) +
-        Math.min(0.25, items.length * 0.06),
+        Math.min(0.28, items.length * 0.06),
     ).toFixed(2),
   );
 

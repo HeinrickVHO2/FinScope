@@ -17,7 +17,7 @@ import { parseInvoiceText, formatInvoiceReplySummary } from "./invoiceParser";
 import { FinancialIntentParser } from "./intentParser";
 import { WhatsAppMediaService } from "./media";
 import { WhatsAppMessenger } from "./messenger";
-import { MockOcrProvider } from "./ocr";
+import { createDefaultOcrProvider, type OcrProvider } from "./ocr";
 import { buildWhatsAppConversationUrl, normalizePhone } from "./phone";
 import type { InboundMessageRecord, WhatsAppRepository } from "./repository";
 import type {
@@ -125,7 +125,7 @@ function textPreview(text?: string) {
 
 export class WhatsAppAgentService {
   private readonly parser: FinancialIntentParser;
-  private readonly ocrProvider: MockOcrProvider;
+  private readonly ocrProvider: OcrProvider;
   private readonly messenger: WhatsAppMessenger;
   private readonly mediaService: WhatsAppMediaService;
   private readonly runtimeInfo = getWhatsAppAgentRuntimeInfo();
@@ -137,13 +137,13 @@ export class WhatsAppAgentService {
     private readonly storage: IStorage,
     deps: {
       parser?: FinancialIntentParser;
-      ocrProvider?: MockOcrProvider;
+      ocrProvider?: OcrProvider;
       messenger?: WhatsAppMessenger;
       mediaService?: WhatsAppMediaService;
     } = {},
   ) {
     this.parser = deps.parser ?? new FinancialIntentParser();
-    this.ocrProvider = deps.ocrProvider ?? new MockOcrProvider();
+    this.ocrProvider = deps.ocrProvider ?? createDefaultOcrProvider();
     this.messenger = deps.messenger ?? new WhatsAppMessenger();
     this.mediaService = deps.mediaService ?? new WhatsAppMediaService();
   }
