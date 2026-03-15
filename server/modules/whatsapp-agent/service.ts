@@ -4,7 +4,7 @@ import { normalizeDescriptionForMatching } from "../statement-import/normalizer"
 import { getWhatsAppMetaConfig } from "./config";
 import { FinancialIntentParser } from "./intentParser";
 import { MockOcrProvider } from "./ocr";
-import { normalizePhone } from "./phone";
+import { buildWhatsAppConversationUrl, normalizePhone } from "./phone";
 import type { WhatsAppRepository } from "./repository";
 import type {
   PendingPhoneBinding,
@@ -25,11 +25,11 @@ function generateBindingCode() {
 }
 
 function buildConversationUrl(phone: string | null, text?: string) {
-  if (!phone) return null;
-  const digits = phone.replace(/\D+/g, "");
-  if (!digits) return null;
-  const suffix = text ? `?text=${encodeURIComponent(text)}` : "";
-  return `https://wa.me/${digits}${suffix}`;
+  return buildWhatsAppConversationUrl(
+    phone,
+    text,
+    text ? "server_binding_start_conversation_link" : "server_session_conversation_link",
+  );
 }
 
 export class WhatsAppAgentService {

@@ -1,4 +1,4 @@
-import { normalizePhone } from "./phone";
+import { buildWhatsAppConversationUrl, normalizePhone } from "./phone";
 
 export function getWhatsAppMetaConfig() {
   return {
@@ -11,6 +11,9 @@ export function getWhatsAppMetaConfig() {
       const raw = process.env.WHATSAPP_META_PUBLIC_PHONE
         || process.env.WHATSAPP_BUSINESS_PHONE
         || process.env.WHATSAPP_META_PHONE_NUMBER;
+      if (raw) {
+        buildWhatsAppConversationUrl(raw, undefined, "server_meta_public_phone_config");
+      }
       return raw ? normalizePhone(raw) : null;
     })(),
   };

@@ -5,6 +5,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import type { Account } from "@shared/schema";
+import { buildWhatsAppConversationUrl, normalizePhone } from "@shared/whatsapp-phone";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +89,10 @@ export default function WhatsAppAgentPage() {
   const startBindingMutation = useMutation({
     mutationFn: async () => {
       console.log("[WHATSAPP UI] tentativa de vínculo", { phone });
+      console.log("[WHATSAPP UI] telefone normalizado para vinculo", {
+        rawPhone: phone,
+        normalizedPhone: normalizePhone(phone),
+      });
       const response = await apiRequest("POST", "/api/whatsapp/binding/start", { phone });
       return response.json();
     },
@@ -190,6 +195,17 @@ export default function WhatsAppAgentPage() {
   );
 
   const session = sessionQuery.data;
+  const pendingConversationUrl = useMemo(() => {
+    if (!session?.businessPhone || !session?.pendingBinding?.code) {
+      return null;
+    }
+
+    return buildWhatsAppConversationUrl(
+      session.businessPhone,
+      session.pendingBinding.code,
+      "client_pending_binding_conversation_link",
+    );
+  }, [session?.businessPhone, session?.pendingBinding?.code]);
 
   return (
     <div className="space-y-6 p-6">
@@ -342,9 +358,9 @@ export default function WhatsAppAgentPage() {
                           <Copy className="mr-2 h-4 w-4" />
                           Copiar código
                         </Button>
-                        {session.businessPhone ? (
+                        {pendingConversationUrl ? (
                           <a
-                            href={`https://wa.me/${session.businessPhone.replace(/\D+/g, "")}?text=${encodeURIComponent(session.pendingBinding.code)}`}
+                            href={pendingConversationUrl}
                             target="_blank"
                             rel="noreferrer"
                           >
