@@ -12,7 +12,7 @@ import {
   WHATSAPP_REVIEW_QUEUE_STATUSES,
   sanitizeIncomingText,
 } from "./decision";
-import { getWhatsAppMetaConfig } from "./config";
+import { getWhatsAppAgentRuntimeInfo, getWhatsAppMetaConfig } from "./config";
 import { parseInvoiceText, formatInvoiceReplySummary } from "./invoiceParser";
 import { FinancialIntentParser } from "./intentParser";
 import { WhatsAppMediaService } from "./media";
@@ -128,6 +128,7 @@ export class WhatsAppAgentService {
   private readonly ocrProvider: MockOcrProvider;
   private readonly messenger: WhatsAppMessenger;
   private readonly mediaService: WhatsAppMediaService;
+  private readonly runtimeInfo = getWhatsAppAgentRuntimeInfo();
   private readonly pendingBindingsByCode = new Map<string, PendingPhoneBinding>();
   private readonly pendingBindingsByUser = new Map<string, PendingPhoneBinding>();
 
@@ -496,6 +497,7 @@ export class WhatsAppAgentService {
 
     const sanitizedEvent = sanitizeEvent(event);
     this.logInternal("info", "process_inbound_start", "Iniciando processamento do evento do WhatsApp.", {
+      runtimeSignature: this.runtimeInfo.signature,
       providerMessageId: sanitizedEvent.providerMessageId,
       fromPhone: sanitizedEvent.fromPhone,
       type: sanitizedEvent.type,

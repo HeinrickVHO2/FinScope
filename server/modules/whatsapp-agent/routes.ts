@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Express } from "express";
 import { z } from "zod";
 import type { IStorage } from "../../storage";
-import { getWhatsAppMetaConfig } from "./config";
+import { getWhatsAppAgentRuntimeInfo, getWhatsAppMetaConfig } from "./config";
 import { parseMetaWebhookPayload, buildMetaVerificationResponse } from "./metaWebhook";
 import { normalizePhone } from "./phone";
 import { WhatsAppRepository } from "./repository";
@@ -112,6 +112,9 @@ export function registerWhatsAppAgentRoutes(params: {
   const { app, storage, requireAuth } = params;
   const repository = new WhatsAppRepository();
   const service = new WhatsAppAgentService(repository, storage);
+  const runtimeInfo = getWhatsAppAgentRuntimeInfo();
+
+  console.info("[WHATSAPP] runtime registered", runtimeInfo);
 
   app.get("/api/whatsapp/session", requireAuth, async (req: any, res) => {
     try {
@@ -160,6 +163,20 @@ export function registerWhatsAppAgentRoutes(params: {
       const status = message === "Disponível para assinantes ativos." ? 403 : 400;
       return res.status(status).json({ error: message });
     }
+  });
+
+  app.get("/api/whatsapp/debug/runtime", requireAuth, async (_req: any, res) => {
+    const config = getWhatsAppMetaConfig();
+    return res.json({
+      ...runtimeInfo,
+      metaConfig: {
+        hasAccessToken: Boolean(config.accessToken),
+        hasPhoneNumberId: Boolean(config.phoneNumberId),
+        hasVerifyToken: Boolean(config.verifyToken),
+        hasAppSecret: Boolean(config.appSecret),
+        publicPhone: config.publicPhone,
+      },
+    });
   });
 
   app.get("/api/whatsapp/review-items", requireAuth, async (req: any, res) => {
