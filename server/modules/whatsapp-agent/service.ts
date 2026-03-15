@@ -34,6 +34,7 @@ type CandidateRecord = any;
 type AccountResolution = {
   selectedAccount: Account | null;
   accountOptions: Account[];
+  selectionReason: string | null;
 };
 
 function formatCurrencyBRL(value: number) {
@@ -97,7 +98,16 @@ function detectAccountScopeHint(text?: string): "PF" | "PJ" | null {
 }
 
 function accountLabel(account: Account) {
-  return `${account.name} ${account.type.toUpperCase()}`;
+  const name = String(account.name || "").trim();
+  const type = account.type.toUpperCase();
+  if (normalizeText(name).endsWith(` ${type.toLowerCase()}`)) {
+    return name;
+  }
+  return `${name} ${type}`;
+}
+
+function isPreferredDefaultAccount(account: Account) {
+  return /\b(principal|main|default|padrao)\b/.test(normalizeText(account.name));
 }
 
 function sanitizeEvent(event: WhatsAppInboundEvent): WhatsAppInboundEvent {
@@ -835,6 +845,7 @@ export class WhatsAppAgentService {
         invoice,
         mediaSummary,
         selectedAccountId: resolution.selectedAccount?.id ?? null,
+        accountSelectionReason: resolution.selectionReason,
         accountOptions: resolution.accountOptions.map((account) => ({
           id: account.id,
           name: account.name,
@@ -859,6 +870,7 @@ export class WhatsAppAgentService {
         candidateId: candidate.id,
         confidence: invoice.confidence,
         selectedAccountId: resolution.selectedAccount?.id ?? null,
+        accountSelectionReason: resolution.selectionReason,
       },
     });
 
@@ -918,6 +930,7 @@ export class WhatsAppAgentService {
       needsClarification,
       selectedAccountId: resolution.selectedAccount?.id ?? null,
       accountOptions: resolution.accountOptions.map((account) => account.id),
+      accountSelectionReason: resolution.selectionReason,
       suppressed,
       autoCreateThreshold: WHATSAPP_AUTO_CREATE_THRESHOLD,
       confirmationThreshold: WHATSAPP_CONFIRMATION_THRESHOLD,
@@ -943,6 +956,7 @@ export class WhatsAppAgentService {
         rawMessage: event.text || "",
         normalizedDescription,
         selectedAccountId: resolution.selectedAccount?.id ?? null,
+        accountSelectionReason: resolution.selectionReason,
         accountOptions: resolution.accountOptions.map((account) => ({
           id: account.id,
           name: account.name,
@@ -976,6 +990,7 @@ export class WhatsAppAgentService {
         metadata: {
           candidateId: candidate.id,
           confidence: intent.confidence,
+          accountSelectionReason: resolution.selectionReason,
         },
       });
       await this.sendReplyToInbound(
@@ -1029,6 +1044,7 @@ export class WhatsAppAgentService {
       status: WHATSAPP_CANDIDATE_STATUS.AWAITING_USER_CONFIRMATION,
       evidence: this.mergeCandidateEvidence(candidate, {
         selectedAccountId: resolution.selectedAccount.id,
+        accountSelectionReason: resolution.selectionReason,
         selectedAccountLabel: accountLabel(resolution.selectedAccount),
       }),
     });
@@ -1048,6 +1064,7 @@ export class WhatsAppAgentService {
         candidateId: candidate.id,
         confidence: intent.confidence,
         selectedAccountId: resolution.selectedAccount.id,
+        accountSelectionReason: resolution.selectionReason,
       },
     });
 
@@ -1156,6 +1173,7 @@ export class WhatsAppAgentService {
         evidence: this.mergeCandidateEvidence(candidate, {
           rawMessage: `${candidate.evidence?.rawMessage || candidate.description || ""} ${text}`.trim(),
           selectedAccountId: resolution.selectedAccount?.id ?? null,
+          accountSelectionReason: resolution.selectionReason,
           selectedAccountLabel: resolution.selectedAccount ? accountLabel(resolution.selectedAccount) : null,
           accountOptions: resolution.accountOptions.map((account) => ({
             id: account.id,
@@ -1194,16 +1212,48 @@ export class WhatsAppAgentService {
     }
 
     const selectedAccount = await this.resolveAccountByCandidate(userId, candidate, accountId);
-    const transaction = await this.storage.createTransaction({
+    this.logInternal("info", "transaction_create_start", "Iniciando criacao de transacao a partir do candidate.", {
+      candidateId: candidate.id,
+      inboundMessageId: candidate.inbound_message_id,
       userId,
-      accountId: selectedAccount.id,
-      description: candidate.description,
-      type: candidate.proposed_type === "income" ? "entrada" : "saida",
-      amount: Number(candidate.amount),
-      category: candidate.category_suggestion || categoryFromIntent(candidate.proposed_type === "income" ? "income" : "expense", candidate.category_suggestion),
-      date: new Date(candidate.transaction_date),
-      accountType: selectedAccount.type.toUpperCase() === "PJ" ? "PJ" : "PF",
+      selectedAccountId: selectedAccount.id,
+      selectedAccountType: selectedAccount.type,
+      amount: candidate.amount,
+      proposedType: candidate.proposed_type,
       source: "whatsapp_agent",
+    });
+    let transaction: Transaction;
+    try {
+      transaction = await this.storage.createTransaction({
+        userId,
+        accountId: selectedAccount.id,
+        description: candidate.description,
+        type: candidate.proposed_type === "income" ? "entrada" : "saida",
+        amount: Number(candidate.amount),
+        category: candidate.category_suggestion || categoryFromIntent(candidate.proposed_type === "income" ? "income" : "expense", candidate.category_suggestion),
+        date: new Date(candidate.transaction_date),
+        accountType: selectedAccount.type.toUpperCase() === "PJ" ? "PJ" : "PF",
+        source: "whatsapp_agent",
+      });
+    } catch (error) {
+      this.logInternal("error", "transaction_create_failed", "Falha ao criar transacao a partir do candidate.", {
+        candidateId: candidate.id,
+        inboundMessageId: candidate.inbound_message_id,
+        userId,
+        selectedAccountId: selectedAccount.id,
+        amount: candidate.amount,
+        proposedType: candidate.proposed_type,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+    this.logInternal("info", "transaction_create_success", "Transacao criada com sucesso a partir do candidate.", {
+      candidateId: candidate.id,
+      inboundMessageId: candidate.inbound_message_id,
+      userId,
+      transactionId: transaction.id,
+      selectedAccountId: selectedAccount.id,
+      source: transaction.source,
     });
 
     await this.repository.updateCandidate({
@@ -1258,10 +1308,40 @@ export class WhatsAppAgentService {
     const scoped = scopeHint ? accounts.filter((account) => account.type.toUpperCase() === scopeHint) : accounts;
     const directMatch = scoped.find((account) => normalized.includes(normalizeText(account.name)));
 
-    if (directMatch) return { selectedAccount: directMatch, accountOptions: scoped };
-    if (scoped.length === 1) return { selectedAccount: scoped[0], accountOptions: scoped };
+    if (directMatch) {
+      return { selectedAccount: directMatch, accountOptions: scoped, selectionReason: "direct_name_match" };
+    }
+    if (scoped.length === 1) {
+      return { selectedAccount: scoped[0], accountOptions: scoped, selectionReason: "single_account_after_scope" };
+    }
 
-    return { selectedAccount: null, accountOptions: scoped };
+    const preferredDefaults = scoped.filter((account) => isPreferredDefaultAccount(account));
+    if (preferredDefaults.length === 1) {
+      return {
+        selectedAccount: preferredDefaults[0],
+        accountOptions: scoped,
+        selectionReason: "principal_name_hint",
+      };
+    }
+
+    const transactions = await this.storage.getTransactionsByUserId(userId, "ALL");
+    const recentTransactions = transactions
+      .filter((transaction) => scoped.some((account) => account.id === transaction.accountId))
+      .sort((left, right) => right.date.getTime() - left.date.getTime());
+
+    const recentPreferredAccount = recentTransactions
+      .map((transaction) => scoped.find((account) => account.id === transaction.accountId) || null)
+      .find((account): account is Account => Boolean(account));
+
+    if (recentPreferredAccount) {
+      return {
+        selectedAccount: recentPreferredAccount,
+        accountOptions: scoped,
+        selectionReason: scopeHint ? "recent_history_in_scope" : "recent_history_default",
+      };
+    }
+
+    return { selectedAccount: null, accountOptions: scoped, selectionReason: "ambiguous_account_selection" };
   }
 
   private async resolveAccountByCandidate(userId: string, candidate: CandidateRecord, accountId?: string) {

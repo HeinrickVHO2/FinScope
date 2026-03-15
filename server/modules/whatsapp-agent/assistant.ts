@@ -1,28 +1,59 @@
+import type { Transaction } from "@shared/schema";
 import type { IStorage } from "../../storage";
+
+type AssistantIntent =
+  | { type: "education"; answer: string }
+  | { type: "monthly_summary"; scope: "PF" | "PJ" | "ALL" }
+  | { type: "cash_flow"; scope: "PF" | "PJ" | "ALL" }
+  | { type: "net_balance"; scope: "PF" | "PJ" | "ALL" }
+  | { type: "category_total"; scope: "PF" | "PJ" | "ALL"; categoryLabel: string; aliases: string[] }
+  | { type: "top_categories"; scope: "PF" | "PJ" | "ALL" }
+  | { type: "spending_health"; scope: "PF" | "PJ" | "ALL" }
+  | { type: "guidance"; scope: "PF" | "PJ" | "ALL" }
+  | { type: "help" };
 
 const EDUCATIONAL_ANSWERS: Array<{ pattern: RegExp; answer: string }> = [
   {
-    pattern: /reserva de emergencia|reserva de emergência/i,
-    answer: "Reserva de emergência é um valor guardado para imprevistos. Em geral, faz sentido buscar liquidez e baixo risco antes de pensar em investimentos mais voláteis.",
+    pattern: /reserva de emergencia/i,
+    answer:
+      "Reserva de emergencia e um valor guardado para imprevistos. Em geral, faz sentido priorizar liquidez e baixo risco antes de pensar em investimentos mais volateis.",
   },
   {
-    pattern: /diferen[cç]a.*cdb.*poupan[cç]a|cdb.*poupan[cç]a/i,
-    answer: "De forma geral, CDB costuma ter rendimento potencial maior que a poupança, mas depende da taxa, prazo e liquidez. A poupança é mais simples; o CDB exige comparar regras e vencimento.",
+    pattern: /diferenca.*cdb.*poupanca|cdb.*poupanca/i,
+    answer:
+      "De forma geral, CDB pode render mais que a poupanca, mas depende da taxa, do prazo e da liquidez. A poupanca e mais simples; no CDB vale comparar rendimento, vencimento e resgate.",
   },
   {
-    pattern: /o que e[é] cdb|o que é cdb/i,
-    answer: "CDB é um título emitido por banco. Você empresta dinheiro para a instituição e recebe uma remuneração combinada. Vale olhar liquidez, prazo, rentabilidade e cobertura do FGC.",
+    pattern: /o que e cdb/i,
+    answer:
+      "CDB e um titulo emitido por banco. Voce empresta dinheiro para a instituicao e recebe uma remuneracao. Vale olhar liquidez, prazo, rentabilidade e cobertura do FGC.",
   },
   {
-    pattern: /o que e[é] poupan[cç]a|o que é poupança/i,
-    answer: "Poupança é uma aplicação simples e líquida. Ela pode ser útil pela praticidade, mas costuma render menos do que outras alternativas conservadoras em muitos cenários.",
+    pattern: /o que e poupanca/i,
+    answer:
+      "Poupanca e uma aplicacao simples e liquida. Ela ajuda pela praticidade, mas costuma render menos do que outras alternativas conservadoras em muitos cenarios.",
+  },
+  {
+    pattern: /vale mais a pena guardar ou investir/i,
+    answer:
+      "Como orientacao geral, primeiro vale garantir caixa para despesas proximas e uma reserva de emergencia. Depois disso, investir costuma fazer mais sentido do que apenas deixar parado, mas a escolha depende de prazo e risco.",
   },
 ];
 
-function currentMonthRange() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+const CATEGORY_ALIASES: Array<{ label: string; aliases: string[] }> = [
+  { label: "Alimentacao", aliases: ["alimentacao", "mercado", "supermercado", "padaria", "restaurante", "lanche"] },
+  { label: "Transporte", aliases: ["transporte", "gasolina", "combustivel", "uber", "onibus", "carro"] },
+  { label: "Moradia", aliases: ["moradia", "aluguel", "condominio", "casa", "luz", "agua"] },
+  { label: "Saude", aliases: ["saude", "farmacia", "medico", "remedio", "exame"] },
+  { label: "Lazer", aliases: ["lazer", "cinema", "viagem", "bar", "show"] },
+  { label: "Educacao", aliases: ["educacao", "curso", "faculdade", "livro", "escola"] },
+  { label: "Investimentos", aliases: ["investimento", "investimentos", "aporte", "aplicacao"] },
+  { label: "Outros", aliases: ["outros", "diversos"] },
+];
+
+function currentMonthRange(reference = new Date()) {
+  const start = new Date(reference.getFullYear(), reference.getMonth(), 1);
+  const end = new Date(reference.getFullYear(), reference.getMonth() + 1, 1);
   return { start, end };
 }
 
@@ -35,55 +66,240 @@ function normalize(text: string) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
-export function looksLikeFinanceAssistantQuestion(text: string) {
+function detectScope(text: string): "PF" | "PJ" | "ALL" {
   const normalized = normalize(text);
-  if (!normalized) return false;
+  if (/\bpj\b|empresa|empresarial|negocio|cnpj/.test(normalized)) return "PJ";
+  if (/\bpf\b|pessoal|particular/.test(normalized)) return "PF";
+  return "ALL";
+}
 
-  return (
-    normalized.includes("?") ||
-    /^(quanto|qual|como|me mostra|mostra|resumo|posso|o que e|o que é)/.test(normalized) ||
-    /reserva de emergencia|poupanca|poupança|cdb|investimento|investir|economizar|guardar dinheiro/.test(normalized)
-  );
+function includesFinanceTopic(text: string) {
+  return /gasto|gastei|despesa|entrada|receita|recebi|mes|mes atual|categoria|saldo|sobrou|economizar|guardar|reserva|poupanca|cdb|invest|finance|dinheiro|conta|orcamento/.test(text);
+}
+
+function findEducationalAnswer(text: string) {
+  return EDUCATIONAL_ANSWERS.find((item) => item.pattern.test(text))?.answer ?? null;
+}
+
+function detectCategory(text: string) {
+  const normalized = normalize(text);
+  return CATEGORY_ALIASES.find((item) => item.aliases.some((alias) => normalized.includes(alias))) ?? null;
+}
+
+function classifyAssistantIntent(text: string): AssistantIntent | null {
+  const normalized = normalize(text);
+  if (!normalized) return null;
+
+  const educationalAnswer = findEducationalAnswer(normalized);
+  if (educationalAnswer) {
+    return { type: "education", answer: educationalAnswer };
+  }
+
+  const scope = detectScope(normalized);
+  const category = detectCategory(normalized);
+
+  if (/o que voce faz|me ajuda|ajuda com meu financeiro|como voce pode ajudar/.test(normalized)) {
+    return { type: "help" };
+  }
+
+  if (/resumo.*mes|como foi meu mes|fechamento do mes|resuma meu mes/.test(normalized)) {
+    return { type: "monthly_summary", scope };
+  }
+
+  if (/quanto entrou.*quanto saiu|quanto entrou e quanto saiu|entradas? e saidas? do mes/.test(normalized)) {
+    return { type: "cash_flow", scope };
+  }
+
+  if (/quanto sobrou|saldo do mes|saldo liquido|liquido do mes/.test(normalized)) {
+    return { type: "net_balance", scope };
+  }
+
+  if ((/quanto.*gastei|gastos? com|despesas? com/.test(normalized) && category) || (/categoria/.test(normalized) && category)) {
+    return { type: "category_total", scope, categoryLabel: category.label, aliases: category.aliases };
+  }
+
+  if (/maiores categorias|categorias mais pesaram|onde estou gastando mais|principais categorias|maiores gastos/.test(normalized)) {
+    return { type: "top_categories", scope };
+  }
+
+  if (/estou gastando muito|meus gastos estao altos|to gastando muito/.test(normalized)) {
+    return { type: "spending_health", scope };
+  }
+
+  if (/posso economizar mais|como posso melhorar minhas financas|como organizar meus gastos|como melhorar minhas financas|como melhorar meu financeiro/.test(normalized)) {
+    return { type: "guidance", scope };
+  }
+
+  if ((normalized.includes("?") && includesFinanceTopic(normalized)) || /quanto|qual|como|resumo|mostra|me mostra/.test(normalized)) {
+    return { type: "help" };
+  }
+
+  return null;
+}
+
+function filterCurrentMonth(transactions: Transaction[]) {
+  const { start, end } = currentMonthRange();
+  return transactions.filter((item) => item.date >= start && item.date < end);
+}
+
+function sumTransactions(transactions: Transaction[], type: "entrada" | "saida") {
+  return transactions
+    .filter((item) => item.type === type)
+    .reduce((sum, item) => sum + Number(item.amount), 0);
+}
+
+function getTopExpenseCategories(transactions: Transaction[]) {
+  const totals = new Map<string, number>();
+
+  for (const transaction of transactions) {
+    if (transaction.type !== "saida") continue;
+    const key = transaction.category || "Sem categoria";
+    totals.set(key, (totals.get(key) || 0) + Number(transaction.amount));
+  }
+
+  return Array.from(totals.entries())
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 3);
+}
+
+function matchCategory(transaction: Transaction, aliases: string[]) {
+  const category = normalize(transaction.category || "");
+  const description = normalize(transaction.description || "");
+  return aliases.some((alias) => category.includes(alias) || alias.includes(category) || description.includes(alias));
+}
+
+function scopeLabel(scope: "PF" | "PJ" | "ALL") {
+  if (scope === "PF") return " na sua conta pessoal";
+  if (scope === "PJ") return " na sua conta empresarial";
+  return "";
+}
+
+async function getCurrentMonthTransactions(storage: IStorage, userId: string, scope: "PF" | "PJ" | "ALL") {
+  const transactions = await storage.getTransactionsByUserId(userId, scope);
+  return filterCurrentMonth(transactions);
+}
+
+export function looksLikeFinanceAssistantQuestion(text: string) {
+  return Boolean(classifyAssistantIntent(text));
 }
 
 export async function buildFinanceAssistantReply(storage: IStorage, userId: string, text: string) {
-  const normalized = normalize(text);
+  const intent = classifyAssistantIntent(text);
+  if (!intent) {
+    return "Posso ajudar com resumo do mes, gastos por categoria, saldo do periodo e explicacoes simples sobre reserva de emergencia, CDB e poupanca.";
+  }
 
-  for (const item of EDUCATIONAL_ANSWERS) {
-    if (item.pattern.test(normalized)) {
-      return item.answer;
+  if (intent.type === "education") {
+    return intent.answer;
+  }
+
+  if (intent.type === "help") {
+    return "Posso registrar gastos e recebimentos, resumir seu mes, mostrar categorias com mais impacto e responder duvidas simples sobre organizacao financeira, reserva de emergencia, CDB e poupanca.";
+  }
+
+  const monthTransactions = await getCurrentMonthTransactions(storage, userId, intent.scope);
+  const income = sumTransactions(monthTransactions, "entrada");
+  const expenses = sumTransactions(monthTransactions, "saida");
+  const net = income - expenses;
+
+  if (intent.type === "monthly_summary") {
+    if (!monthTransactions.length) {
+      return `Ainda nao encontrei movimentacoes suficientes${scopeLabel(intent.scope)} neste mes para montar um resumo confiavel.`;
     }
+
+    const topCategory = getTopExpenseCategories(monthTransactions)[0];
+    const topCategoryText = topCategory
+      ? ` A categoria com maior peso foi ${topCategory[0]}, com ${formatCurrency(topCategory[1])}.`
+      : "";
+
+    return `Neste mes${scopeLabel(intent.scope)}, entraram ${formatCurrency(income)} e sairam ${formatCurrency(expenses)}. Seu saldo liquido esta em ${formatCurrency(net)}.${topCategoryText}`;
   }
 
-  if (/resumo.*m[eê]s|como foi meu m[eê]s|fechamento do m[eê]s/i.test(normalized)) {
-    const metrics = await storage.getDashboardMetrics(userId, "ALL");
-    return `No mês atual, você tem ${formatCurrency(metrics.monthlyIncome)} de entradas, ${formatCurrency(metrics.monthlyExpenses)} de saídas e saldo mensal de ${formatCurrency(metrics.netCashFlow)}.`;
+  if (intent.type === "cash_flow") {
+    if (!monthTransactions.length) {
+      return `Ainda nao tenho movimentacoes suficientes${scopeLabel(intent.scope)} neste mes para comparar entradas e saidas.`;
+    }
+
+    return `Neste mes${scopeLabel(intent.scope)}, entraram ${formatCurrency(income)} e sairam ${formatCurrency(expenses)}. O saldo liquido parcial esta em ${formatCurrency(net)}.`;
   }
 
-  if (/quanto.*gastei.*alimenta|gastos?.*alimenta/i.test(normalized)) {
-    const transactions = await storage.getTransactionsByUserId(userId, "ALL");
-    const { start, end } = currentMonthRange();
-    const total = transactions
+  if (intent.type === "net_balance") {
+    if (!monthTransactions.length) {
+      return `Ainda nao tenho dados suficientes${scopeLabel(intent.scope)} neste mes para calcular quanto sobrou.`;
+    }
+
+    return `Neste mes${scopeLabel(intent.scope)}, seu saldo liquido esta em ${formatCurrency(net)}.`;
+  }
+
+  if (intent.type === "category_total") {
+    const total = monthTransactions
       .filter((item) => item.type === "saida")
-      .filter((item) => item.date >= start && item.date < end)
-      .filter((item) => item.category.toLowerCase().includes("alimenta"))
+      .filter((item) => matchCategory(item, intent.aliases))
       .reduce((sum, item) => sum + Number(item.amount), 0);
 
-    return `Neste mês, seus gastos com alimentação somam ${formatCurrency(total)}.`;
-  }
-
-  if (/posso guardar mais dinheiro|consigo economizar mais/i.test(normalized)) {
-    const metrics = await storage.getDashboardMetrics(userId, "ALL");
-    if (metrics.netCashFlow <= 0) {
-      return "Seu fluxo do mês está apertado. Antes de guardar mais, vale revisar categorias com saída alta e cortar gastos recorrentes pouco úteis.";
+    if (total <= 0) {
+      return `Ainda nao encontrei gastos de ${intent.categoryLabel.toLowerCase()}${scopeLabel(intent.scope)} neste mes.`;
     }
 
-    const suggested = metrics.netCashFlow * 0.2;
-    return `Seu mês está positivo. Como orientação geral, você pode separar algo próximo de ${formatCurrency(suggested)} sem comprometer tanto o caixa, desde que não falte para despesas já previstas.`;
+    return `Neste mes${scopeLabel(intent.scope)}, seus gastos com ${intent.categoryLabel.toLowerCase()} somam ${formatCurrency(total)}.`;
   }
 
-  return "Posso ajudar com resumo do mês, gastos por categoria e explicações simples sobre reserva de emergência, CDB, poupança e organização financeira.";
+  if (intent.type === "top_categories") {
+    const topCategories = getTopExpenseCategories(monthTransactions);
+    if (!topCategories.length) {
+      return `Ainda nao tenho saidas suficientes${scopeLabel(intent.scope)} neste mes para apontar as categorias com maior peso.`;
+    }
+
+    const text = topCategories
+      .map(([category, amount], index) => `${index + 1}. ${category} (${formatCurrency(amount)})`)
+      .join(" ");
+
+    return `As categorias que mais pesaram${scopeLabel(intent.scope)} neste mes foram: ${text}`;
+  }
+
+  if (intent.type === "spending_health") {
+    if (!monthTransactions.length) {
+      return `Ainda nao tenho movimentacoes suficientes${scopeLabel(intent.scope)} neste mes para avaliar seu ritmo de gastos.`;
+    }
+
+    if (income <= 0 && expenses > 0) {
+      return `Neste mes${scopeLabel(intent.scope)}, so encontrei saidas. Vale revisar se faltam entradas registradas antes de concluir se voce esta gastando demais.`;
+    }
+
+    const expenseRatio = income > 0 ? expenses / income : 1;
+    if (expenseRatio >= 0.9) {
+      return `Seus gastos estao altos${scopeLabel(intent.scope)} neste mes: as saidas ja consomem cerca de ${Math.round(expenseRatio * 100)}% das entradas. Vale revisar as categorias com maior peso antes do fechamento.`;
+    }
+    if (expenseRatio >= 0.7) {
+      return `Seu mes esta relativamente equilibrado${scopeLabel(intent.scope)}, mas as saidas ja consomem ${Math.round(expenseRatio * 100)}% das entradas. Ainda da para ajustar categorias menos essenciais.`;
+    }
+
+    return `Seu ritmo de gastos esta controlado${scopeLabel(intent.scope)} neste mes. As saidas consomem cerca de ${Math.round(expenseRatio * 100)}% das entradas.`;
+  }
+
+  if (intent.type === "guidance") {
+    if (!monthTransactions.length) {
+      return "Posso te orientar melhor quando houver mais movimentacoes registradas. Por enquanto, um bom começo e separar gastos essenciais, limitar despesas recorrentes e criar uma reserva para imprevistos.";
+    }
+
+    const topCategories = getTopExpenseCategories(monthTransactions);
+    const topCategory = topCategories[0];
+
+    if (net <= 0) {
+      return topCategory
+        ? `Seu fluxo do mes esta apertado${scopeLabel(intent.scope)}. Eu comecaria revisando ${topCategory[0]}, que ja soma ${formatCurrency(topCategory[1])}, e tambem gastos recorrentes pouco uteis.`
+        : `Seu fluxo do mes esta apertado${scopeLabel(intent.scope)}. Vale revisar gastos recorrentes e tentar reduzir as categorias menos essenciais.`;
+    }
+
+    const suggestedReserve = net * 0.2;
+    return topCategory
+      ? `Seu mes esta positivo${scopeLabel(intent.scope)}. Como proximo passo, vale observar ${topCategory[0]} e considerar separar algo perto de ${formatCurrency(suggestedReserve)} para reserva ou objetivo de curto prazo.`
+      : `Seu mes esta positivo${scopeLabel(intent.scope)}. Como orientacao geral, voce pode separar parte do saldo para reserva e acompanhar os gastos variaveis para nao perder o controle.`;
+  }
+
+  return "Posso ajudar com resumo do mes, gastos por categoria, saldo do periodo e explicacoes simples sobre organizacao financeira.";
 }

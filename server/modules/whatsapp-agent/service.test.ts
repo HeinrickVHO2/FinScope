@@ -204,16 +204,20 @@ class FakeStorage {
     return this.accounts.find((account) => account.id === accountId);
   }
 
-  async getAccountsByUserId() {
-    return this.accounts;
+  async getAccountsByUserId(userId: string) {
+    return this.accounts.filter((account) => account.userId === userId);
   }
 
   async getTransaction(id: string) {
     return this.transactions.get(id);
   }
 
-  async getTransactionsByUserId(userId: string) {
-    return Array.from(this.transactions.values()).filter((item) => item.userId === userId);
+  async getTransactionsByUserId(userId: string, scope: "PF" | "PJ" | "ALL" = "ALL") {
+    return Array.from(this.transactions.values()).filter((item) => {
+      if (item.userId !== userId) return false;
+      if (scope === "ALL") return true;
+      return (item.accountType || "PF") === scope;
+    });
   }
 
   async createTransaction(payload: any) {
@@ -259,11 +263,23 @@ class FakeStorage {
     return this.transactions.delete(id);
   }
 
-  async getDashboardMetrics() {
+  async getDashboardMetrics(userId: string, scope: "PF" | "PJ" | "ALL" = "ALL") {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const transactions = await this.getTransactionsByUserId(userId, scope);
+    const monthTransactions = transactions.filter((item) => item.date >= start && item.date < end);
+    const monthlyIncome = monthTransactions
+      .filter((item) => item.type === "entrada")
+      .reduce((sum, item) => sum + Number(item.amount), 0);
+    const monthlyExpenses = monthTransactions
+      .filter((item) => item.type === "saida")
+      .reduce((sum, item) => sum + Number(item.amount), 0);
     return {
-      monthlyIncome: 5000,
-      monthlyExpenses: 3200,
-      netCashFlow: 1800,
+      totalBalance: monthlyIncome - monthlyExpenses,
+      monthlyIncome,
+      monthlyExpenses,
+      netCashFlow: monthlyIncome - monthlyExpenses,
     };
   }
 }
@@ -531,6 +547,127 @@ test("WhatsAppAgentService answers finance assistant questions in chat", async (
   assert.match(messenger.sentMessages.at(-1)?.text || "", /Reserva de emerg/i);
 });
 
+test("WhatsAppAgentService answers monthly summary questions with real user data", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, { messenger: messenger as any });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  await storage.createTransaction({
+    userId: "user-1",
+    accountId: "acc-1",
+    description: "Salario",
+    type: "entrada",
+    amount: 5000,
+    category: "Salario",
+    date: new Date(),
+    accountType: "PF",
+    source: "manual",
+  });
+  await storage.createTransaction({
+    userId: "user-1",
+    accountId: "acc-1",
+    description: "Mercado",
+    type: "saida",
+    amount: 420,
+    category: "Alimentacao",
+    date: new Date(),
+    accountType: "PF",
+    source: "manual",
+  });
+  await storage.createTransaction({
+    userId: "user-1",
+    accountId: "acc-1",
+    description: "Gasolina",
+    type: "saida",
+    amount: 180,
+    category: "Transporte",
+    date: new Date(),
+    accountType: "PF",
+    source: "manual",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-summary",
+    text: "Faca um resumo do meu mes",
+  }));
+
+  assert.equal(result.status, "assistant_answered");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /entraram R\$ 5\.000,00/i);
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /Alimentacao/i);
+});
+
+test("WhatsAppAgentService answers category queries from current month data", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, { messenger: messenger as any });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  await storage.createTransaction({
+    userId: "user-1",
+    accountId: "acc-1",
+    description: "Mercado do bairro",
+    type: "saida",
+    amount: 200,
+    category: "Alimentacao",
+    date: new Date(),
+    accountType: "PF",
+    source: "manual",
+  });
+  await storage.createTransaction({
+    userId: "user-1",
+    accountId: "acc-1",
+    description: "Padaria",
+    type: "saida",
+    amount: 50,
+    category: "Alimentacao",
+    date: new Date(),
+    accountType: "PF",
+    source: "manual",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-category-question",
+    text: "Quanto eu gastei com alimentacao esse mes?",
+  }));
+
+  assert.equal(result.status, "assistant_answered");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /R\$ 250,00/i);
+});
+
+test("WhatsAppAgentService answers capability fallback in chat", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, { messenger: messenger as any });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-help",
+    text: "o que voce faz?",
+  }));
+
+  assert.equal(result.status, "assistant_answered");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /Posso registrar gastos e recebimentos/i);
+});
+
 test("WhatsAppAgentService answers simple greetings in chat", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();
@@ -648,6 +785,84 @@ test("WhatsAppAgentService does not trap a new standalone transaction behind an 
   assert.equal(repository.candidates.get("candidate-old")?.status, "ignored");
   assert.equal(storage.createTransactionCalls, 1);
   assert.equal(repository.candidates.get("candidate-1")?.status, "auto_created_pending_review");
+});
+
+test("WhatsAppAgentService auto creates transaction with multiple accounts when recent history indicates the likely account", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const parser = buildParser([{
+    kind: "expense",
+    amount: 27,
+    description: "Uber",
+    merchant: "Uber",
+    categorySuggestion: "Transporte",
+    transactionDate: new Date("2026-03-15T00:00:00.000Z"),
+    confidence: 0.95,
+    missingFields: [],
+  }]);
+  storage.accounts = [
+    {
+      id: "acc-1",
+      userId: "user-1",
+      name: "Carteira PF",
+      type: "pf",
+      businessCategory: null,
+      initialBalance: "0",
+      createdAt: new Date(),
+    },
+    {
+      id: "acc-2",
+      userId: "user-1",
+      name: "Nubank PF",
+      type: "pf",
+      businessCategory: null,
+      initialBalance: "0",
+      createdAt: new Date(),
+    },
+    {
+      id: "acc-3",
+      userId: "user-1",
+      name: "Caixa PJ",
+      type: "pj",
+      businessCategory: null,
+      initialBalance: "0",
+      createdAt: new Date(),
+    },
+  ];
+
+  await storage.createTransaction({
+    userId: "user-1",
+    accountId: "acc-2",
+    description: "Transporte recente",
+    type: "saida",
+    amount: 80,
+    category: "Transporte",
+    date: new Date(),
+    accountType: "PF",
+    source: "manual",
+  });
+
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    parser: parser as any,
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-history-account",
+    text: "paguei 27 de uber",
+  }));
+
+  assert.equal(result.status, "auto_created_pending_review");
+  assert.equal(storage.createTransactionCalls, 2);
+  assert.equal(storage.transactions.get("tx-2")?.accountId, "acc-2");
+  assert.equal(repository.candidates.get("candidate-1")?.evidence?.accountSelectionReason, "recent_history_default");
 });
 
 test("WhatsAppAgentService updates and removes auto created review transactions", async () => {
