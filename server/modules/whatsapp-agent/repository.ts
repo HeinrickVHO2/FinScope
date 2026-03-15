@@ -1,5 +1,10 @@
 import { supabase } from "../../supabase";
 import { insertFirstSuccessful } from "../shared/supabaseFallback";
+import {
+  mapLogicalCandidateStatusToPersisted,
+  mapLogicalStatusesForQuery,
+  normalizeCandidateRow,
+} from "./candidateStatusCompat";
 import type { WhatsAppInboundEvent } from "./types";
 
 function nowIso() {
@@ -41,6 +46,13 @@ export interface MediaEvidenceRecord {
   ocr_confidence: number | null;
   status: string;
   created_at?: string | null;
+}
+
+function normalizeEvidenceRecord(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {} as Record<string, unknown>;
+  }
+  return value as Record<string, unknown>;
 }
 
 function mapInboundRow(data: any): InboundMessageRecord {
@@ -254,6 +266,11 @@ export class WhatsAppRepository {
     evidence?: Record<string, unknown>;
     persistedTransactionId?: string;
   }) {
+    const persistedStatus = mapLogicalCandidateStatusToPersisted(params.status);
+    const evidence = {
+      ...(params.evidence ?? {}),
+      reviewStatus: params.status,
+    };
     const { data, error } = await supabase
       .from("agent_transaction_candidates")
       .insert({
@@ -267,8 +284,8 @@ export class WhatsAppRepository {
         category_suggestion: params.categorySuggestion ?? null,
         transaction_date: params.transactionDate.toISOString(),
         confidence_score: params.confidenceScore,
-        status: params.status,
-        evidence: params.evidence ?? null,
+        status: persistedStatus,
+        evidence,
         persisted_transaction_id: params.persistedTransactionId ?? null,
       })
       .select("*")
@@ -278,7 +295,7 @@ export class WhatsAppRepository {
       throw new Error(error?.message || "Erro ao salvar candidato do WhatsApp");
     }
 
-    return data;
+    return normalizeCandidateRow(data);
   }
 
   async listCandidatesByUser(userId: string, status?: string) {
@@ -289,12 +306,12 @@ export class WhatsAppRepository {
       .order("created_at", { ascending: false });
 
     if (status) {
-      query = query.eq("status", status);
+      query = query.eq("status", mapLogicalCandidateStatusToPersisted(status));
     }
 
     const { data, error } = await query;
     if (error || !data) return [];
-    return data;
+    return data.map(normalizeCandidateRow).filter((item) => !status || item.status === status);
   }
 
   async listCandidatesByStatuses(userId: string, statuses: string[]) {
@@ -306,12 +323,12 @@ export class WhatsAppRepository {
       .order("created_at", { ascending: false });
 
     if (statuses.length) {
-      query = query.in("status", statuses);
+      query = query.in("status", mapLogicalStatusesForQuery(statuses));
     }
 
     const { data, error } = await query;
     if (error || !data) return [];
-    return data;
+    return data.map(normalizeCandidateRow).filter((item) => !statuses.length || statuses.includes(item.status));
   }
 
   async getCandidateById(candidateId: string, userId: string) {
@@ -323,7 +340,7 @@ export class WhatsAppRepository {
       .maybeSingle();
 
     if (error || !data) return null;
-    return data;
+    return normalizeCandidateRow(data);
   }
 
   async updateCandidate(params: {
@@ -340,15 +357,34 @@ export class WhatsAppRepository {
     confidenceScore?: number;
   }) {
     const patch: Record<string, unknown> = { updated_at: nowIso() };
+    const shouldMergeEvidence = params.status !== undefined || params.evidence !== undefined;
+    const currentCandidate = shouldMergeEvidence
+      ? await this.getCandidateById(params.candidateId, params.userId)
+      : null;
 
     if (params.status !== undefined) {
-      patch.status = params.status;
+      patch.status = mapLogicalCandidateStatusToPersisted(params.status);
     }
 
     if (params.persistedTransactionId !== undefined) {
       patch.persisted_transaction_id = params.persistedTransactionId;
     }
-    if (params.evidence !== undefined) patch.evidence = params.evidence;
+    if (shouldMergeEvidence) {
+      const currentEvidence = normalizeEvidenceRecord(currentCandidate?.evidence);
+      const nextEvidence = {
+        ...currentEvidence,
+        ...(params.evidence ?? {}),
+      } as Record<string, unknown>;
+      const nextReviewStatus = params.status
+        ?? (typeof params.evidence?.reviewStatus === "string" ? params.evidence.reviewStatus : undefined)
+        ?? (typeof currentEvidence.reviewStatus === "string" ? currentEvidence.reviewStatus : undefined);
+
+      if (nextReviewStatus) {
+        nextEvidence.reviewStatus = nextReviewStatus;
+      }
+
+      patch.evidence = Object.keys(nextEvidence).length ? nextEvidence : null;
+    }
     if (params.categorySuggestion !== undefined) patch.category_suggestion = params.categorySuggestion;
     if (params.description !== undefined) patch.description = params.description;
     if (params.amount !== undefined) patch.amount = params.amount;
@@ -377,12 +413,14 @@ export class WhatsAppRepository {
       .limit(1);
 
     if (statuses.length) {
-      query = query.in("status", statuses);
+      query = query.in("status", mapLogicalStatusesForQuery(statuses));
     }
 
     const { data, error } = await query.maybeSingle();
     if (error || !data) return null;
-    return data;
+    const normalized = normalizeCandidateRow(data);
+    if (statuses.length && !statuses.includes(normalized.status)) return null;
+    return normalized;
   }
 
   async getInboundMessagesByIds(ids: string[]) {
