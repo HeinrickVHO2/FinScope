@@ -869,6 +869,102 @@ test("WhatsAppAgentService creates invoice suggestion from media and stores evid
   assert.match(messenger.sentMessages.at(-1)?.text || "", /Recebi sua nota/i);
 });
 
+test("WhatsAppAgentService ignores non-receipt OCR results instead of hallucinating invoice data", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const ocrProvider = {
+    async extractText() {
+      return {
+        text: "JFIF ICC_PROFILE random bytes",
+        confidence: 0.18,
+        receiptDetected: false,
+        structuredReceipt: null,
+      };
+    },
+  };
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    messenger: messenger as any,
+    ocrProvider: ocrProvider as any,
+    mediaService: new FakeMediaService() as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-non-receipt-image",
+    type: "image",
+    text: "",
+    media: [
+      {
+        id: "media-2",
+        mimeType: "image/jpeg",
+        base64: "aGVsbG8=",
+      },
+    ],
+  }));
+
+  assert.equal(result.status, "needs_clarification");
+  assert.equal(repository.candidates.size, 0);
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /nao consegui interpretar/i);
+});
+
+test("WhatsAppAgentService uses structured receipt OCR when invoice text is sparse", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const ocrProvider = {
+    async extractText() {
+      return {
+        text: "",
+        confidence: 0.89,
+        receiptDetected: true,
+        structuredReceipt: {
+          merchant: "SUPERMERCADO TRIUNFO LTDA",
+          total: 52.52,
+          date: "14/03/2026",
+          items: [
+            { description: "File de Peito", quantity: 0.341, unitPrice: 19.99, totalPrice: 6.81 },
+            { description: "Acougue Bovino", quantity: 1, unitPrice: 9.99, totalPrice: 9.99 },
+          ],
+        },
+      };
+    },
+  };
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    messenger: messenger as any,
+    ocrProvider: ocrProvider as any,
+    mediaService: new FakeMediaService() as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-structured-invoice",
+    type: "image",
+    text: "",
+    media: [
+      {
+        id: "media-3",
+        mimeType: "image/jpeg",
+        base64: "aGVsbG8=",
+      },
+    ],
+  }));
+
+  assert.equal(result.status, "awaiting_user_confirmation");
+  assert.equal(repository.candidates.size, 1);
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /52,52/i);
+});
+
 test("WhatsAppAgentService does not trap a new standalone transaction behind an older pending candidate", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();

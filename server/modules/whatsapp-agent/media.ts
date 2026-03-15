@@ -21,7 +21,12 @@ function toBase64(buffer: ArrayBuffer) {
   return Buffer.from(buffer).toString("base64");
 }
 
-function guessTextFromBinary(buffer: Buffer) {
+function guessTextFromBinary(buffer: Buffer, mimeType?: string) {
+  const normalizedMimeType = String(mimeType || "").toLowerCase();
+  if (normalizedMimeType.startsWith("image/")) {
+    return "";
+  }
+
   const text = buffer.toString("utf8");
   const printable = text.replace(/[^\x20-\x7EÀ-ÿ\r\n\t]/g, "");
   if (!printable.trim()) {
@@ -59,14 +64,14 @@ export class WhatsAppMediaService {
         base64: media.base64,
         storagePath: media.fileName || `inline://${media.id}`,
         fileSizeBytes: buffer.byteLength,
-        textHint: guessTextFromBinary(buffer),
+        textHint: guessTextFromBinary(buffer, mimeType),
       };
     }
 
     if (media.url && isAllowedHost(media.url)) {
       const response = await fetch(media.url, { method: "GET" });
       if (!response.ok) {
-        throw new Error(`Falha ao baixar mídia do host permitido (${response.status})`);
+        throw new Error(`Falha ao baixar midia do host permitido (${response.status})`);
       }
 
       const buffer = Buffer.from(await response.arrayBuffer());
@@ -75,12 +80,14 @@ export class WhatsAppMediaService {
         return null;
       }
 
+      const resolvedMimeType = mimeType || response.headers.get("content-type") || undefined;
+
       return {
-        mimeType: mimeType || response.headers.get("content-type") || undefined,
+        mimeType: resolvedMimeType,
         base64: buffer.toString("base64"),
         storagePath: media.url,
         fileSizeBytes: buffer.byteLength,
-        textHint: guessTextFromBinary(buffer),
+        textHint: guessTextFromBinary(buffer, resolvedMimeType),
       };
     }
 
@@ -104,12 +111,12 @@ export class WhatsAppMediaService {
     });
 
     if (!metadataResponse.ok) {
-      throw new Error(`Falha ao consultar metadata da mídia (${metadataResponse.status})`);
+      throw new Error(`Falha ao consultar metadata da midia (${metadataResponse.status})`);
     }
 
     const metadata = await metadataResponse.json() as { url?: string; mime_type?: string; file_size?: number };
     if (!metadata.url || !isAllowedHost(metadata.url)) {
-      throw new Error("URL da mídia rejeitada por segurança");
+      throw new Error("URL da midia rejeitada por seguranca");
     }
 
     if (metadata.file_size && metadata.file_size > WHATSAPP_MAX_MEDIA_BYTES) {
@@ -124,7 +131,7 @@ export class WhatsAppMediaService {
     });
 
     if (!contentResponse.ok) {
-      throw new Error(`Falha ao baixar mídia da Meta (${contentResponse.status})`);
+      throw new Error(`Falha ao baixar midia da Meta (${contentResponse.status})`);
     }
 
     const contentType = metadata.mime_type || contentResponse.headers.get("content-type") || media.mimeType || undefined;
@@ -144,7 +151,7 @@ export class WhatsAppMediaService {
       base64: toBase64(buffer),
       storagePath: metadata.url,
       fileSizeBytes: buffer.byteLength,
-      textHint: guessTextFromBinary(buffer),
+      textHint: guessTextFromBinary(buffer, contentType),
     };
   }
 }

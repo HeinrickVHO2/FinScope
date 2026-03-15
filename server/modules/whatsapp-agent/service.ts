@@ -123,6 +123,49 @@ function textPreview(text?: string) {
   return sanitizeIncomingText(text).slice(0, 120);
 }
 
+function buildStructuredReceiptText(structuredReceipt?: {
+  merchant?: string | null;
+  total?: number | null;
+  date?: string | null;
+  items?: Array<{
+    description: string;
+    quantity?: number | null;
+    unitPrice?: number | null;
+    totalPrice?: number | null;
+  }>;
+} | null) {
+  if (!structuredReceipt) return "";
+
+  const lines: string[] = [];
+  if (structuredReceipt.merchant) lines.push(structuredReceipt.merchant);
+  if (structuredReceipt.date) lines.push(structuredReceipt.date);
+
+  for (const item of structuredReceipt.items || []) {
+    if (!item?.description) continue;
+    const quantity = item.quantity != null ? String(item.quantity) : "1";
+    const unitPrice = item.unitPrice != null ? item.unitPrice.toFixed(2).replace(".", ",") : null;
+    const totalPrice = item.totalPrice != null ? item.totalPrice.toFixed(2).replace(".", ",") : null;
+
+    if (unitPrice && totalPrice) {
+      lines.push(`${item.description} ${quantity} x ${unitPrice} ${totalPrice}`);
+      continue;
+    }
+
+    if (totalPrice) {
+      lines.push(`${item.description} ${totalPrice}`);
+      continue;
+    }
+
+    lines.push(item.description);
+  }
+
+  if (structuredReceipt.total != null) {
+    lines.push(`Valor pago ${structuredReceipt.total.toFixed(2).replace(".", ",")}`);
+  }
+
+  return lines.join("\n").trim();
+}
+
 export class WhatsAppAgentService {
   private readonly parser: FinancialIntentParser;
   private readonly ocrProvider: OcrProvider;
@@ -725,6 +768,7 @@ export class WhatsAppAgentService {
   private async handleMediaMessage(inbound: InboundMessageRecord, user: User, event: WhatsAppInboundEvent) {
     const preparedTexts: string[] = [];
     const mediaSummary: Array<Record<string, unknown>> = [];
+    const ocrSignals: Array<Record<string, unknown>> = [];
 
     this.logInternal("info", "media_processing_started", "Iniciando processamento de midia recebida.", {
       inboundMessageId: inbound.id,
@@ -751,9 +795,22 @@ export class WhatsAppAgentService {
         base64: prepared.base64,
         url: prepared.storagePath,
       });
+      const structuredReceiptText = buildStructuredReceiptText(ocr.structuredReceipt);
 
-      const combinedText = [prepared.textHint, ocr.text].filter(Boolean).join("\n").trim();
+      const combinedText = [
+        prepared.textHint,
+        ocr.receiptDetected === false ? "" : (ocr.text || structuredReceiptText),
+      ].filter(Boolean).join("\n").trim();
       if (combinedText) preparedTexts.push(combinedText);
+
+      ocrSignals.push({
+        mediaId: media.id,
+        confidence: ocr.confidence,
+        receiptDetected: ocr.receiptDetected ?? null,
+        structuredTotal: ocr.structuredReceipt?.total ?? null,
+        structuredMerchant: ocr.structuredReceipt?.merchant ?? null,
+        extractedTextLength: combinedText.length,
+      });
 
       await this.repository.createMediaEvidence({
         inboundMessageId: inbound.id,
@@ -773,6 +830,9 @@ export class WhatsAppAgentService {
         mimeType: prepared.mimeType ?? null,
         storagePath: prepared.storagePath,
         fileSizeBytes: prepared.fileSizeBytes,
+        receiptDetected: ocr.receiptDetected ?? null,
+        ocrConfidence: ocr.confidence,
+        structuredTotal: ocr.structuredReceipt?.total ?? null,
       });
     }
 
@@ -783,6 +843,7 @@ export class WhatsAppAgentService {
       total: invoice?.total ?? null,
       confidence: invoice?.confidence ?? null,
       itemCount: invoice?.items.length ?? 0,
+      ocrSignals,
     });
     if (!invoice || invoice.total === null) {
       await this.repository.updateInboundMessage({
@@ -796,7 +857,7 @@ export class WhatsAppAgentService {
         level: "warn",
         event: "invoice_not_understood",
         message: "Nao foi possivel interpretar a nota fiscal com seguranca.",
-        metadata: { mediaItems: mediaSummary.length },
+        metadata: { mediaItems: mediaSummary.length, ocrSignals },
       });
       await this.sendReplyToInbound(inbound, "Recebi sua nota, mas nao consegui interpretar tudo com seguranca. Se quiser, me mande o valor total em texto.");
       return { status: "needs_clarification" };

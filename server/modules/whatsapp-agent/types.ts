@@ -23,6 +23,18 @@ export interface WhatsAppInboundEvent {
 export interface OcrResult {
   text: string;
   confidence: number;
+  receiptDetected?: boolean;
+  structuredReceipt?: {
+    merchant?: string | null;
+    total?: number | null;
+    date?: string | null;
+    items?: Array<{
+      description: string;
+      quantity?: number | null;
+      unitPrice?: number | null;
+      totalPrice?: number | null;
+    }>;
+  } | null;
 }
 
 export interface FinancialIntent {
