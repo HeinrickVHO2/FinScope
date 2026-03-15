@@ -363,6 +363,7 @@ export class SupabaseStorage implements IStorage {
       date: new Date(data.date),
       accountType: data.account_type ?? "PF",
       autoRuleApplied: data.auto_rule_applied,
+      source: data.source ?? "manual",
       createdAt: new Date(data.created_at),
     };
   }

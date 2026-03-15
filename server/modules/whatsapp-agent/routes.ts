@@ -19,6 +19,17 @@ const confirmCandidateSchema = z.object({
   accountId: z.string().min(1).optional(),
 });
 
+const reviewTransactionPatchSchema = z.object({
+  description: z.string().min(1).optional(),
+  amount: z.coerce.number().positive().optional(),
+  category: z.string().min(1).optional(),
+  date: z.coerce.date().optional(),
+  type: z.enum(["entrada", "saida"]).optional(),
+  accountType: z.enum(["PF", "PJ"]).optional(),
+}).refine((value) => Object.keys(value).length > 0, {
+  message: "Informe ao menos um campo para atualizar.",
+});
+
 const normalizedMockSchema = z.object({
   provider: z.string().default("mock"),
   providerMessageId: z.string().min(1).optional(),
@@ -26,14 +37,14 @@ const normalizedMockSchema = z.object({
   toPhone: z.string().optional(),
   timestamp: z.string().optional(),
   type: z.enum(["text", "image", "document", "audio", "unknown"]).default("text"),
-  text: z.string().optional(),
+  text: z.string().max(1500).optional(),
   media: z.array(z.object({
     id: z.string().min(1),
     mimeType: z.string().optional(),
     url: z.string().optional(),
     fileName: z.string().optional(),
     base64: z.string().optional(),
-  })).optional(),
+  })).max(4).optional(),
 }).passthrough();
 
 function signatureIsValid(req: any, secret: string): boolean {
@@ -151,6 +162,17 @@ export function registerWhatsAppAgentRoutes(params: {
     }
   });
 
+  app.get("/api/whatsapp/review-items", requireAuth, async (req: any, res) => {
+    try {
+      const items = await service.listReviewItems(req.session.userId);
+      return res.json(items);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel carregar os lancamentos do WhatsApp.";
+      const status = message === "Disponivel para assinantes ativos." ? 403 : 400;
+      return res.status(status).json({ error: message });
+    }
+  });
+
   app.post("/api/whatsapp/candidates/:candidateId/confirm", requireAuth, async (req: any, res) => {
     try {
       const payload = confirmCandidateSchema.parse(req.body || {});
@@ -190,6 +212,67 @@ export function registerWhatsAppAgentRoutes(params: {
     }
   });
 
+  app.post("/api/whatsapp/review-items/:candidateId/approve", requireAuth, async (req: any, res) => {
+    try {
+      const result = await service.approveReviewItem({
+        userId: req.session.userId,
+        candidateId: req.params.candidateId,
+      });
+      return res.json(result);
+    } catch (error) {
+      return res.status(400).json({
+        error: error instanceof Error ? error.message : "Nao foi possivel aprovar esse lancamento.",
+      });
+    }
+  });
+
+  app.patch("/api/whatsapp/review-items/:candidateId/transaction", requireAuth, async (req: any, res) => {
+    try {
+      const patch = reviewTransactionPatchSchema.parse(req.body || {});
+      const result = await service.updateReviewTransaction({
+        userId: req.session.userId,
+        candidateId: req.params.candidateId,
+        patch,
+      });
+      return res.json(result);
+    } catch (error) {
+      const message = error instanceof z.ZodError
+        ? "Dados invalidos para atualizar o lancamento."
+        : error instanceof Error
+          ? error.message
+          : "Nao foi possivel atualizar o lancamento.";
+      return res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete("/api/whatsapp/review-items/:candidateId/transaction", requireAuth, async (req: any, res) => {
+    try {
+      const result = await service.removeReviewTransaction({
+        userId: req.session.userId,
+        candidateId: req.params.candidateId,
+      });
+      return res.json(result);
+    } catch (error) {
+      return res.status(400).json({
+        error: error instanceof Error ? error.message : "Nao foi possivel remover o lancamento.",
+      });
+    }
+  });
+
+  app.post("/api/whatsapp/review-items/:candidateId/ignore-similar", requireAuth, async (req: any, res) => {
+    try {
+      const result = await service.suppressSimilarSuggestions({
+        userId: req.session.userId,
+        candidateId: req.params.candidateId,
+      });
+      return res.json(result);
+    } catch (error) {
+      return res.status(400).json({
+        error: error instanceof Error ? error.message : "Nao foi possivel ignorar sugestoes parecidas.",
+      });
+    }
+  });
+
   app.get("/api/whatsapp/webhook/meta", (req: any, res) => {
     console.log("[WHATSAPP] iniciando validacao do webhook Meta");
     const metaConfig = getWhatsAppMetaConfig();
@@ -222,6 +305,9 @@ export function registerWhatsAppAgentRoutes(params: {
       }
 
       const events = parseMetaWebhookPayload(req.body || {});
+      if (events.length > 20) {
+        return res.status(413).json({ error: "Quantidade de eventos acima do limite permitido." });
+      }
       console.log("[WHATSAPP] eventos normalizados", { count: events.length });
 
       for (const event of events) {

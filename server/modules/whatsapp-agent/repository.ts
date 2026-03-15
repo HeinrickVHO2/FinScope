@@ -23,7 +23,24 @@ export interface InboundMessageRecord {
   fromPhone: string;
   type: string;
   status: string;
+  textBody?: string | null;
   extractedPayload: Record<string, unknown> | null;
+  receivedAt?: string | null;
+}
+
+export interface MediaEvidenceRecord {
+  id: string;
+  inbound_message_id: string;
+  user_id: string | null;
+  media_type: string;
+  mime_type: string | null;
+  storage_path: string;
+  sha256: string;
+  file_size_bytes: number | null;
+  ocr_text: string | null;
+  ocr_confidence: number | null;
+  status: string;
+  created_at?: string | null;
 }
 
 function mapInboundRow(data: any): InboundMessageRecord {
@@ -34,7 +51,9 @@ function mapInboundRow(data: any): InboundMessageRecord {
     fromPhone: data.from_phone,
     type: data.message_type,
     status: data.status,
+    textBody: data.text_body ?? null,
     extractedPayload: data.extracted_payload,
+    receivedAt: data.received_at ?? null,
   };
 }
 
@@ -150,7 +169,7 @@ export class WhatsAppRepository {
   async findInboundByProviderMessageId(providerMessageId: string): Promise<InboundMessageRecord | null> {
     const { data, error } = await supabase
       .from("inbound_messages")
-      .select("id, provider_message_id, user_id, from_phone, message_type, status, extracted_payload")
+      .select("id, provider_message_id, user_id, from_phone, message_type, status, text_body, extracted_payload, received_at")
       .eq("provider_message_id", providerMessageId)
       .maybeSingle();
 
@@ -183,7 +202,7 @@ export class WhatsAppRepository {
         error_message: params.errorMessage ?? null,
         received_at: params.event.timestamp ? new Date(params.event.timestamp).toISOString() : nowIso(),
       })
-      .select("id, provider_message_id, user_id, from_phone, message_type, status, extracted_payload")
+      .select("id, provider_message_id, user_id, from_phone, message_type, status, text_body, extracted_payload, received_at")
       .single();
 
     if (error || !data) {
@@ -278,6 +297,23 @@ export class WhatsAppRepository {
     return data;
   }
 
+  async listCandidatesByStatuses(userId: string, statuses: string[]) {
+    let query = supabase
+      .from("agent_transaction_candidates")
+      .select("*")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (statuses.length) {
+      query = query.in("status", statuses);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) return [];
+    return data;
+  }
+
   async getCandidateById(candidateId: string, userId: string) {
     const { data, error } = await supabase
       .from("agent_transaction_candidates")
@@ -293,17 +329,32 @@ export class WhatsAppRepository {
   async updateCandidate(params: {
     candidateId: string;
     userId: string;
-    status: string;
+    status?: string;
     persistedTransactionId?: string | null;
+    evidence?: Record<string, unknown> | null;
+    categorySuggestion?: string | null;
+    description?: string;
+    amount?: number;
+    merchantName?: string | null;
+    transactionDate?: Date;
+    confidenceScore?: number;
   }) {
-    const patch: Record<string, unknown> = {
-      status: params.status,
-      updated_at: nowIso(),
-    };
+    const patch: Record<string, unknown> = { updated_at: nowIso() };
+
+    if (params.status !== undefined) {
+      patch.status = params.status;
+    }
 
     if (params.persistedTransactionId !== undefined) {
       patch.persisted_transaction_id = params.persistedTransactionId;
     }
+    if (params.evidence !== undefined) patch.evidence = params.evidence;
+    if (params.categorySuggestion !== undefined) patch.category_suggestion = params.categorySuggestion;
+    if (params.description !== undefined) patch.description = params.description;
+    if (params.amount !== undefined) patch.amount = params.amount;
+    if (params.merchantName !== undefined) patch.merchant_name = params.merchantName;
+    if (params.transactionDate !== undefined) patch.transaction_date = params.transactionDate.toISOString();
+    if (params.confidenceScore !== undefined) patch.confidence_score = params.confidenceScore;
 
     const { error } = await supabase
       .from("agent_transaction_candidates")
@@ -314,6 +365,49 @@ export class WhatsAppRepository {
     if (error) {
       throw new Error(error.message || "Erro ao atualizar candidato");
     }
+  }
+
+  async getLatestCandidateByUser(userId: string, statuses: string[]) {
+    let query = supabase
+      .from("agent_transaction_candidates")
+      .select("*")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (statuses.length) {
+      query = query.in("status", statuses);
+    }
+
+    const { data, error } = await query.maybeSingle();
+    if (error || !data) return null;
+    return data;
+  }
+
+  async getInboundMessagesByIds(ids: string[]) {
+    if (!ids.length) return [];
+
+    const { data, error } = await supabase
+      .from("inbound_messages")
+      .select("id, provider_message_id, user_id, from_phone, message_type, status, text_body, extracted_payload, received_at")
+      .in("id", ids);
+
+    if (error || !data) return [];
+    return data.map(mapInboundRow);
+  }
+
+  async listMediaEvidenceByInboundIds(ids: string[]): Promise<MediaEvidenceRecord[]> {
+    if (!ids.length) return [];
+
+    const { data, error } = await supabase
+      .from("media_evidence")
+      .select("*")
+      .in("inbound_message_id", ids)
+      .order("created_at", { ascending: false });
+
+    if (error || !data) return [];
+    return data as MediaEvidenceRecord[];
   }
 
   async createMediaEvidence(params: {

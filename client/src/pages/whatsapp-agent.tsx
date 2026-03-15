@@ -34,17 +34,46 @@ type WhatsAppSession = {
   } | null;
 };
 
-type Candidate = {
-  id: string;
+type ReviewItem = {
+  candidateId: string;
+  status: string;
+  confidenceScore: number | null;
   proposedType: "income" | "expense";
   amount: number;
   currency: string;
   description: string;
-  merchantName: string | null;
   categorySuggestion: string | null;
+  merchantName: string | null;
   transactionDate: string;
-  confidenceScore: number | null;
-  status: string;
+  persistedTransactionId: string | null;
+  evidence: Record<string, any> | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  inboundMessage: {
+    id: string;
+    textBody: string | null;
+    fromPhone: string;
+    receivedAt: string | null;
+    status: string;
+  } | null;
+  mediaEvidence: Array<{
+    id: string;
+    mimeType: string | null;
+    storagePath: string;
+    status: string;
+    ocrText: string | null;
+  }>;
+  transaction: {
+    id: string;
+    accountId: string;
+    description: string;
+    amount: string;
+    type: string;
+    category: string;
+    date: string;
+    accountType: string;
+    source: string;
+  } | null;
 };
 
 function formatCurrency(value: number) {
@@ -60,6 +89,14 @@ export default function WhatsAppAgentPage() {
   const { user } = useAuth();
   const [phone, setPhone] = useState("");
   const [accountByCandidate, setAccountByCandidate] = useState<Record<string, string>>({});
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [confidenceFilter, setConfidenceFilter] = useState("all");
+  const [draftByCandidate, setDraftByCandidate] = useState<Record<string, {
+    description: string;
+    amount: string;
+    category: string;
+    date: string;
+  }>>({});
 
   const sessionQuery = useQuery<WhatsAppSession>({
     queryKey: ["/api/whatsapp/session"],
@@ -70,8 +107,8 @@ export default function WhatsAppAgentPage() {
     enabled: Boolean(sessionQuery.data?.eligible),
   });
 
-  const candidatesQuery = useQuery<Candidate[]>({
-    queryKey: ["/api/whatsapp/candidates"],
+  const reviewItemsQuery = useQuery<ReviewItem[]>({
+    queryKey: ["/api/whatsapp/review-items"],
     enabled: Boolean(sessionQuery.data?.eligible && sessionQuery.data?.binding.isLinked),
   });
 
@@ -79,6 +116,7 @@ export default function WhatsAppAgentPage() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/session"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/candidates"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/review-items"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/transactions?type=PF"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/transactions?type=PJ"] }),
@@ -189,9 +227,127 @@ export default function WhatsAppAgentPage() {
     },
   });
 
-  const pendingCandidates = useMemo(
-    () => (candidatesQuery.data || []).filter((candidate) => candidate.status === "pending_review"),
-    [candidatesQuery.data],
+  const approveReviewMutation = useMutation({
+    mutationFn: async (candidateId: string) => {
+      const response = await apiRequest("POST", `/api/whatsapp/review-items/${candidateId}/approve`);
+      return response.json();
+    },
+    onSuccess: async () => {
+      await refreshWhatsAppData();
+      toast({
+        title: "Revisao concluida",
+        description: "O lancamento automatico foi marcado como revisado.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Nao foi possivel concluir a revisao",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveEditMutation = useMutation({
+    mutationFn: async (candidateId: string) => {
+      const draft = draftByCandidate[candidateId];
+      const response = await apiRequest("PATCH", `/api/whatsapp/review-items/${candidateId}/transaction`, {
+        description: draft.description,
+        amount: Number(draft.amount),
+        category: draft.category,
+        date: draft.date,
+      });
+      return response.json();
+    },
+    onSuccess: async () => {
+      await refreshWhatsAppData();
+      toast({
+        title: "Lancamento atualizado",
+        description: "As correcoes do WhatsApp foram salvas.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Nao foi possivel salvar",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removeReviewMutation = useMutation({
+    mutationFn: async (candidateId: string) => {
+      const response = await apiRequest("DELETE", `/api/whatsapp/review-items/${candidateId}/transaction`);
+      return response.json();
+    },
+    onSuccess: async () => {
+      await refreshWhatsAppData();
+      toast({
+        title: "Lancamento removido",
+        description: "O item foi removido e continua rastreavel no historico do WhatsApp.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Nao foi possivel remover",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const ignoreSimilarMutation = useMutation({
+    mutationFn: async (candidateId: string) => {
+      const response = await apiRequest("POST", `/api/whatsapp/review-items/${candidateId}/ignore-similar`);
+      return response.json();
+    },
+    onSuccess: async () => {
+      await refreshWhatsAppData();
+      toast({
+        title: "Sugestoes parecidas serao evitadas",
+        description: "O agente vai parar de automatizar lancamentos muito parecidos com este.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Nao foi possivel atualizar a regra",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const reviewItems = reviewItemsQuery.data || [];
+  const filteredReviewItems = useMemo(
+    () => reviewItems.filter((item) => {
+      const confidence = item.confidenceScore ?? 0;
+      const matchesStatus = statusFilter === "all"
+        || (statusFilter === "auto_created" && item.status === "auto_created_pending_review")
+        || (statusFilter === "needs_attention" && ["awaiting_user_confirmation", "awaiting_account_selection", "needs_clarification"].includes(item.status))
+        || (statusFilter === "history" && ["reviewed_confirmed", "reviewed_corrected", "reviewed_removed", "confirmed", "ignored", "ignored_pattern"].includes(item.status));
+
+      const matchesConfidence = confidenceFilter === "all"
+        || (confidenceFilter === "high" && confidence >= 0.86)
+        || (confidenceFilter === "medium" && confidence >= 0.7 && confidence < 0.86)
+        || (confidenceFilter === "low" && confidence < 0.7);
+
+      return matchesStatus && matchesConfidence;
+    }),
+    [confidenceFilter, reviewItems, statusFilter],
+  );
+  const autoCreatedItems = useMemo(
+    () => filteredReviewItems.filter((item) => item.status === "auto_created_pending_review"),
+    [filteredReviewItems],
+  );
+
+  const needsAttentionItems = useMemo(
+    () => filteredReviewItems.filter((item) => ["awaiting_user_confirmation", "awaiting_account_selection", "needs_clarification"].includes(item.status)),
+    [filteredReviewItems],
+  );
+
+  const historyItems = useMemo(
+    () => filteredReviewItems.filter((item) => !autoCreatedItems.includes(item) && !needsAttentionItems.includes(item)),
+    [filteredReviewItems, autoCreatedItems, needsAttentionItems],
   );
 
   const session = sessionQuery.data;
@@ -206,6 +362,39 @@ export default function WhatsAppAgentPage() {
       "client_pending_binding_conversation_link",
     );
   }, [session?.businessPhone, session?.pendingBinding?.code]);
+
+  const getDraftForItem = (item: ReviewItem) => (
+    draftByCandidate[item.candidateId] || {
+      description: item.transaction?.description || item.description,
+      amount: item.transaction?.amount || item.amount.toString(),
+      category: item.transaction?.category || item.categorySuggestion || "",
+      date: (item.transaction?.date || item.transactionDate).slice(0, 10),
+    }
+  );
+
+  const updateDraftField = (candidateId: string, field: "description" | "amount" | "category" | "date", value: string) => {
+    setDraftByCandidate((current) => ({
+      ...current,
+      [candidateId]: {
+        ...(current[candidateId] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const statusLabel = (status: string) => {
+    if (status === "auto_created_pending_review") return "Criada automaticamente";
+    if (status === "awaiting_user_confirmation") return "Precisa de confirmacao";
+    if (status === "awaiting_account_selection") return "Precisa escolher conta";
+    if (status === "needs_clarification") return "Precisa de detalhes";
+    if (status === "reviewed_confirmed") return "Revisada";
+    if (status === "reviewed_corrected") return "Corrigida";
+    if (status === "reviewed_removed") return "Removida";
+    if (status === "confirmed") return "Confirmada no chat";
+    if (status === "ignored_pattern") return "Ignorar parecidas";
+    if (status === "ignored") return "Ignorada";
+    return status;
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -379,84 +568,192 @@ export default function WhatsAppAgentPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageCircle className="h-5 w-5" />
-                Aguardando revisão
+                Lancamentos do WhatsApp
               </CardTitle>
-              <CardDescription>Revise cada sugestão antes de salvar como transação.</CardDescription>
+              <CardDescription>Veja o que foi criado automaticamente, o que ainda precisa de voce e o historico de revisao.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex flex-col gap-3 rounded-2xl border bg-slate-50 p-4 sm:flex-row">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Status</p>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full sm:w-[220px]">
+                      <SelectValue placeholder="Todos os status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os status</SelectItem>
+                      <SelectItem value="auto_created">Criadas automaticamente</SelectItem>
+                      <SelectItem value="needs_attention">Precisa de revisao</SelectItem>
+                      <SelectItem value="history">Historico e corrigidos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Confianca</p>
+                  <Select value={confidenceFilter} onValueChange={setConfidenceFilter}>
+                    <SelectTrigger className="w-full sm:w-[220px]">
+                      <SelectValue placeholder="Todas as faixas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as faixas</SelectItem>
+                      <SelectItem value="high">Alta confianca</SelectItem>
+                      <SelectItem value="medium">Media confianca</SelectItem>
+                      <SelectItem value="low">Baixa confianca</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {!session.eligible ? (
                 <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
-                  Este espaço fica liberado assim que sua assinatura estiver ativa.
+                  Este espaco fica liberado assim que sua assinatura estiver ativa.
                 </div>
               ) : null}
 
               {session.eligible && !session.binding.isLinked ? (
                 <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
-                  Conecte seu número para começar a receber sugestões.
+                  Conecte seu numero para comecar a receber lancamentos e respostas no WhatsApp.
                 </div>
               ) : null}
 
-              {session.eligible && session.binding.isLinked && candidatesQuery.isLoading ? (
+              {session.eligible && session.binding.isLinked && reviewItemsQuery.isLoading ? (
                 <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
-                  Carregando sugestões...
+                  Carregando lancamentos do WhatsApp...
                 </div>
               ) : null}
 
-              {session.eligible && session.binding.isLinked && !pendingCandidates.length && !candidatesQuery.isLoading ? (
+              {session.eligible && session.binding.isLinked && !filteredReviewItems.length && !reviewItemsQuery.isLoading ? (
                 <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
-                  Nenhuma sugestão aguardando revisão.
+                  Nenhum lancamento encontrado com os filtros atuais.
                 </div>
               ) : null}
 
-              {pendingCandidates.map((candidate) => (
-                <div key={candidate.id} className="rounded-2xl border p-4">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">{candidate.description}</p>
-                      <Badge variant="secondary">
-                        {candidate.proposedType === "income" ? "Recebimento" : "Gasto"}
-                      </Badge>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground">
-                      {formatDate(candidate.transactionDate)} · {formatCurrency(candidate.amount)}
-                      {candidate.confidenceScore !== null ? ` · confiança ${Math.round(candidate.confidenceScore * 100)}%` : ""}
-                    </p>
-
-                    {candidate.merchantName ? (
-                      <p className="text-sm text-muted-foreground">Local: {candidate.merchantName}</p>
-                    ) : null}
-
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <Select
-                        value={accountByCandidate[candidate.id] || ""}
-                        onValueChange={(value) => {
-                          console.log("[WHATSAPP UI] atualização de estado da conta", { candidateId: candidate.id, value });
-                          setAccountByCandidate((current) => ({ ...current, [candidate.id]: value }));
-                        }}
-                      >
-                        <SelectTrigger className="w-full sm:w-[220px]">
-                          <SelectValue placeholder="Escolha a conta" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {accounts.map((account) => (
-                            <SelectItem key={account.id} value={account.id}>
-                              {account.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Button onClick={() => confirmMutation.mutate(candidate.id)} disabled={confirmMutation.isPending}>
-                        Confirmar
-                      </Button>
-                      <Button variant="outline" onClick={() => ignoreMutation.mutate(candidate.id)} disabled={ignoreMutation.isPending}>
-                        Ignorar
-                      </Button>
-                    </div>
-                  </div>
+              {autoCreatedItems.length ? (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-slate-700">Criadas automaticamente</p>
+                  {autoCreatedItems.map((item) => {
+                    const draft = getDraftForItem(item);
+                    return (
+                      <div key={item.candidateId} className="rounded-2xl border p-4">
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">{item.transaction?.description || item.description}</p>
+                            <Badge variant="secondary">{statusLabel(item.status)}</Badge>
+                            <Badge variant="outline">{item.proposedType === "income" ? "Recebimento" : "Gasto"}</Badge>
+                            <Badge variant="outline">Origem WhatsApp/IA</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {formatDate(item.transaction?.date || item.transactionDate)} · {formatCurrency(Number(item.transaction?.amount || item.amount))}
+                            {item.confidenceScore !== null ? ` · confianca ${Math.round(item.confidenceScore * 100)}%` : ""}
+                          </p>
+                          <p className="text-sm text-muted-foreground">Conta usada: {item.evidence?.selectedAccountLabel || "Nao informada"}</p>
+                          {item.inboundMessage?.textBody ? (
+                            <p className="text-sm text-muted-foreground">Mensagem original: {item.inboundMessage.textBody}</p>
+                          ) : null}
+                          {item.mediaEvidence.length ? (
+                            <p className="text-sm text-muted-foreground">
+                              Midia associada: {item.mediaEvidence.length} arquivo(s)
+                              {item.mediaEvidence[0]?.ocrText ? ` · OCR: ${item.mediaEvidence[0].ocrText.slice(0, 120)}` : ""}
+                            </p>
+                          ) : null}
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <Input value={draft.description} onChange={(event) => updateDraftField(item.candidateId, "description", event.target.value)} />
+                            <Input value={draft.category} onChange={(event) => updateDraftField(item.candidateId, "category", event.target.value)} placeholder="Categoria" />
+                            <Input value={draft.amount} onChange={(event) => updateDraftField(item.candidateId, "amount", event.target.value)} placeholder="Valor" />
+                            <Input type="date" value={draft.date} onChange={(event) => updateDraftField(item.candidateId, "date", event.target.value)} />
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button variant="secondary" onClick={() => approveReviewMutation.mutate(item.candidateId)} disabled={approveReviewMutation.isPending}>
+                              Marcar como revisado
+                            </Button>
+                            <Button variant="outline" onClick={() => saveEditMutation.mutate(item.candidateId)} disabled={saveEditMutation.isPending}>
+                              Salvar correcoes
+                            </Button>
+                            <Button variant="outline" onClick={() => removeReviewMutation.mutate(item.candidateId)} disabled={removeReviewMutation.isPending}>
+                              Remover lancamento
+                            </Button>
+                            <Button variant="ghost" onClick={() => ignoreSimilarMutation.mutate(item.candidateId)} disabled={ignoreSimilarMutation.isPending}>
+                              Ignorar parecidas
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              ) : null}
+
+              {needsAttentionItems.length ? (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-slate-700">Precisa de revisao</p>
+                  {needsAttentionItems.map((item) => (
+                    <div key={item.candidateId} className="rounded-2xl border p-4">
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{item.description}</p>
+                          <Badge variant="secondary">{statusLabel(item.status)}</Badge>
+                          <Badge variant="outline">Origem WhatsApp/IA</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(item.transactionDate)} · {formatCurrency(item.amount)}
+                          {item.confidenceScore !== null ? ` · confianca ${Math.round(item.confidenceScore * 100)}%` : ""}
+                        </p>
+                        {item.inboundMessage?.textBody ? (
+                          <p className="text-sm text-muted-foreground">Mensagem original: {item.inboundMessage.textBody}</p>
+                        ) : null}
+                        {item.status === "awaiting_account_selection" ? (
+                          <Select
+                            value={accountByCandidate[item.candidateId] || ""}
+                            onValueChange={(value) => setAccountByCandidate((current) => ({ ...current, [item.candidateId]: value }))}
+                          >
+                            <SelectTrigger className="w-full sm:w-[240px]">
+                              <SelectValue placeholder="Escolha a conta" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {accounts.map((account) => (
+                                <SelectItem key={account.id} value={account.id}>
+                                  {account.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : null}
+                        <div className="flex flex-wrap gap-2">
+                          <Button onClick={() => confirmMutation.mutate(item.candidateId)} disabled={confirmMutation.isPending}>
+                            Confirmar
+                          </Button>
+                          <Button variant="outline" onClick={() => ignoreMutation.mutate(item.candidateId)} disabled={ignoreMutation.isPending}>
+                            Ignorar
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {historyItems.length ? (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-slate-700">Historico e corrigidos</p>
+                  {historyItems.slice(0, 8).map((item) => (
+                    <div key={item.candidateId} className="rounded-2xl border p-4">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{item.transaction?.description || item.description}</p>
+                          <Badge variant="outline">{statusLabel(item.status)}</Badge>
+                          <Badge variant="outline">Origem WhatsApp/IA</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(item.transaction?.date || item.transactionDate)} · {formatCurrency(Number(item.transaction?.amount || item.amount))}
+                        </p>
+                        {item.inboundMessage?.textBody ? (
+                          <p className="text-sm text-muted-foreground">Mensagem original: {item.inboundMessage.textBody}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </div>

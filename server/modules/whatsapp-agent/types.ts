@@ -36,6 +36,18 @@ export interface FinancialIntent {
   missingFields: string[];
 }
 
+export interface ParsedWhatsAppIntent {
+  proposedType: "income" | "expense";
+  amount: number;
+  currency: string;
+  description: string;
+  merchantName: string | null;
+  categorySuggestion: string | null;
+  transactionDate: string;
+  confidenceScore: number;
+  evidence: Record<string, unknown>;
+}
+
 export interface PendingPhoneBinding {
   userId: string;
   phone: string;
@@ -58,4 +70,46 @@ export interface WhatsAppSessionState {
     verified: boolean;
   };
   pendingBinding: PendingPhoneBinding | null;
+}
+
+export interface WhatsAppReviewItem {
+  candidateId: string;
+  status: string;
+  confidenceScore: number | null;
+  proposedType: "income" | "expense";
+  amount: number;
+  currency: string;
+  description: string;
+  categorySuggestion: string | null;
+  merchantName: string | null;
+  transactionDate: string;
+  persistedTransactionId: string | null;
+  evidence: Record<string, unknown> | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  inboundMessage: {
+    id: string;
+    textBody: string | null;
+    fromPhone: string;
+    receivedAt: string | null;
+    status: string;
+  } | null;
+  mediaEvidence: Array<{
+    id: string;
+    mimeType: string | null;
+    storagePath: string;
+    status: string;
+    ocrText: string | null;
+  }>;
+  transaction: {
+    id: string;
+    accountId: string;
+    description: string;
+    amount: string;
+    type: string;
+    category: string;
+    date: string;
+    accountType: string;
+    source: string;
+  } | null;
 }
