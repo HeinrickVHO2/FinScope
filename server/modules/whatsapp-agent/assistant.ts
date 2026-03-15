@@ -134,6 +134,10 @@ function classifyAssistantIntent(text: string): AssistantIntent | null {
     return { type: "guidance", scope };
   }
 
+  if (/como posso economizar mais durante a semana|economizar mais durante a semana|gastar menos durante a semana/.test(normalized)) {
+    return { type: "guidance", scope };
+  }
+
   if ((normalized.includes("?") && includesFinanceTopic(normalized)) || /quanto|qual|como|resumo|mostra|me mostra/.test(normalized)) {
     return { type: "help" };
   }
@@ -288,6 +292,14 @@ export async function buildFinanceAssistantReply(storage: IStorage, userId: stri
 
     const topCategories = getTopExpenseCategories(monthTransactions);
     const topCategory = topCategories[0];
+    const normalizedText = normalize(text);
+
+    if (/durante a semana|na semana/.test(normalizedText)) {
+      if (topCategory) {
+        return `Para economizar mais durante a semana${scopeLabel(intent.scope)}, vale definir um teto curto para ${topCategory[0]}, evitar compras por impulso no dia a dia e revisar pequenos gastos recorrentes antes do fim da semana.`;
+      }
+      return `Para economizar mais durante a semana${scopeLabel(intent.scope)}, vale definir um limite para gastos variaveis, planejar alimentacao e acompanhar pequenas despesas antes que elas se acumulem.`;
+    }
 
     if (net <= 0) {
       return topCategory

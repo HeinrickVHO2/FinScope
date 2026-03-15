@@ -172,6 +172,7 @@ class FakeStorage {
   public createTransactionCalls = 0;
   public updateTransactionCalls = 0;
   public deleteTransactionCalls = 0;
+  public failCreateTransaction = false;
   public transactions = new Map<string, any>();
   public accounts = [
     {
@@ -221,6 +222,9 @@ class FakeStorage {
   }
 
   async createTransaction(payload: any) {
+    if (this.failCreateTransaction) {
+      throw new Error("create_transaction_failed_for_test");
+    }
     this.createTransactionCalls += 1;
     const transaction = {
       id: `tx-${this.createTransactionCalls}`,
@@ -426,6 +430,31 @@ test("WhatsAppAgentService processes the real whatsapp phrases used in the curre
   assert.equal(storage.createTransactionCalls, 3);
 });
 
+test("WhatsAppAgentService auto creates and replies for a direct market expense phrase", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-market-expense",
+    text: "Gastei 20 reais no mercado hoje!",
+  }));
+
+  assert.equal(result.status, "auto_created_pending_review");
+  assert.equal(storage.createTransactionCalls, 1);
+  assert.equal(storage.transactions.get("tx-1")?.source, "whatsapp_agent");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /Registrei/i);
+});
+
 test("WhatsAppAgentService asks for confirmation for medium confidence messages and confirms in chat", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();
@@ -468,6 +497,46 @@ test("WhatsAppAgentService asks for confirmation for medium confidence messages 
   assert.equal(second.status, "confirmed_via_whatsapp");
   assert.equal(storage.createTransactionCalls, 1);
   assert.equal(repository.candidates.get("candidate-1")?.status, "confirmed");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /Confirmado/i);
+});
+
+test("WhatsAppAgentService treats 'registre' as a confirmation reply", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const parser = buildParser([{
+    kind: "expense",
+    amount: 18,
+    description: "Lanche",
+    merchant: "Padaria",
+    categorySuggestion: "Alimentacao",
+    transactionDate: new Date("2026-03-15T00:00:00.000Z"),
+    confidence: 0.78,
+    missingFields: [],
+  }]);
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    parser: parser as any,
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const first = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-registre-1",
+    text: "paguei 18 no lanche",
+  }));
+  const second = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-registre-2",
+    text: "registre",
+  }));
+
+  assert.equal(first.status, "awaiting_user_confirmation");
+  assert.equal(second.status, "confirmed_via_whatsapp");
+  assert.equal(storage.createTransactionCalls, 1);
   assert.match(messenger.sentMessages.at(-1)?.text || "", /Confirmado/i);
 });
 
@@ -545,6 +614,40 @@ test("WhatsAppAgentService answers finance assistant questions in chat", async (
 
   assert.equal(result.status, "assistant_answered");
   assert.match(messenger.sentMessages.at(-1)?.text || "", /Reserva de emerg/i);
+});
+
+test("WhatsAppAgentService gives a practical answer for weekly saving guidance", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, { messenger: messenger as any });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  await storage.createTransaction({
+    userId: "user-1",
+    accountId: "acc-1",
+    description: "Mercado",
+    type: "saida",
+    amount: 120,
+    category: "Alimentacao",
+    date: new Date(),
+    accountType: "PF",
+    source: "manual",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-week-guidance",
+    text: "Como posso economizar mais durante a semana?",
+  }));
+
+  assert.equal(result.status, "assistant_answered");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /durante a semana/i);
+  assert.doesNotMatch(messenger.sentMessages.at(-1)?.text || "", /Posso ajudar com resumo do mes/i);
 });
 
 test("WhatsAppAgentService answers monthly summary questions with real user data", async () => {
@@ -863,6 +966,43 @@ test("WhatsAppAgentService auto creates transaction with multiple accounts when 
   assert.equal(storage.createTransactionCalls, 2);
   assert.equal(storage.transactions.get("tx-2")?.accountId, "acc-2");
   assert.equal(repository.candidates.get("candidate-1")?.evidence?.accountSelectionReason, "recent_history_default");
+});
+
+test("WhatsAppAgentService falls back to pending confirmation when auto transaction persistence fails", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  storage.failCreateTransaction = true;
+  const messenger = new FakeMessenger();
+  const parser = buildParser([{
+    kind: "expense",
+    amount: 50,
+    description: "Gasolina",
+    merchant: "Posto",
+    categorySuggestion: "Transporte",
+    transactionDate: new Date("2026-03-15T00:00:00.000Z"),
+    confidence: 0.95,
+    missingFields: [],
+  }]);
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    parser: parser as any,
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-create-failure",
+    text: "gastei 50 reais de gasolina",
+  }));
+
+  assert.equal(result.status, "awaiting_user_confirmation");
+  assert.equal(storage.createTransactionCalls, 0);
+  assert.equal(repository.candidates.get("candidate-1")?.status, "awaiting_user_confirmation");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /nao consegui registrar automaticamente agora/i);
 });
 
 test("WhatsAppAgentService updates and removes auto created review transactions", async () => {

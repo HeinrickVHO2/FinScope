@@ -73,7 +73,7 @@ function detectConfirmationIntent(text?: string): "confirm" | "cancel" | null {
 
   if (!normalized) return null;
 
-  const confirms = ["sim", "ok", "confirmo", "pode confirmar", "pode registrar", "salva", "registrar", "confirma"];
+  const confirms = ["sim", "ok", "confirmo", "pode confirmar", "pode registrar", "salva", "registrar", "registre", "registra", "confirma"];
   const cancels = ["nao", "não", "cancela", "cancelar", "desconsidera", "descarta"];
 
   if (confirms.some((item) => normalized === item || normalized.includes(item))) return "confirm";
@@ -1026,16 +1026,21 @@ export class WhatsAppAgentService {
     }
 
     if (intent.confidence >= WHATSAPP_AUTO_CREATE_THRESHOLD && !suppressed) {
-      await this.ensureTransactionForCandidate(candidate, user.id, resolution.selectedAccount.id, {
+      const autoCreateResult = await this.tryPersistCandidateTransaction({
+        candidate,
+        inbound,
+        userId: user.id,
+        accountId: resolution.selectedAccount.id,
         finalStatus: WHATSAPP_CANDIDATE_STATUS.AUTO_CREATED_PENDING_REVIEW,
         inboundStatus: "auto_created_pending_review",
         reviewNote: "auto_created",
+        successReply: `Registrei ${this.describeIntent(intent)} na conta ${accountLabel(resolution.selectedAccount)}. Voce pode revisar depois em Lancamentos do WhatsApp.`,
+        fallbackReply: `Entendi ${this.describeIntent(intent)}, mas nao consegui registrar automaticamente agora. Posso deixar isso pendente para sua confirmacao na conta ${accountLabel(resolution.selectedAccount)}.`,
       });
-      await this.sendReplyToInbound(
-        inbound,
-        `Registrei ${this.describeIntent(intent)} na conta ${accountLabel(resolution.selectedAccount)}. Voce pode revisar depois em Lancamentos do WhatsApp.`,
-      );
-      return { status: "auto_created_pending_review" };
+      if (autoCreateResult) {
+        return { status: "auto_created_pending_review" };
+      }
+      return { status: "awaiting_user_confirmation" };
     }
 
     await this.repository.updateCandidate({
@@ -1128,13 +1133,17 @@ export class WhatsAppAgentService {
       }
 
       if (confirmation === "confirm") {
-        await this.ensureTransactionForCandidate(candidate, user.id, undefined, {
+        const confirmed = await this.tryPersistCandidateTransaction({
+          candidate,
+          inbound,
+          userId: user.id,
           finalStatus: WHATSAPP_CANDIDATE_STATUS.CONFIRMED,
           inboundStatus: "confirmed_via_whatsapp",
           reviewNote: "confirmed_in_chat",
+          successReply: `Confirmado. Registrei ${this.describeCandidate(candidate)} com origem WhatsApp.`,
+          fallbackReply: "Entendi a confirmacao, mas nao consegui concluir o registro agora. Vou manter esse lancamento pendente para revisar sem perder o contexto.",
         });
-        await this.sendReplyToInbound(inbound, `Confirmado. Registrei ${this.describeCandidate(candidate)} com origem WhatsApp.`);
-        return { status: "confirmed_via_whatsapp" };
+        return { status: confirmed ? "confirmed_via_whatsapp" : "awaiting_user_confirmation" };
       }
 
       await this.sendReplyToInbound(inbound, "Se estiver certo, responda 'sim'. Se quiser cancelar, responda 'nao'.");
@@ -1299,6 +1308,65 @@ export class WhatsAppAgentService {
     return transaction;
   }
 
+  private async tryPersistCandidateTransaction(params: {
+    candidate: CandidateRecord;
+    inbound: InboundMessageRecord;
+    userId: string;
+    accountId?: string;
+    finalStatus: string;
+    inboundStatus: string;
+    reviewNote: string;
+    successReply: string;
+    fallbackReply: string;
+  }) {
+    try {
+      await this.ensureTransactionForCandidate(params.candidate, params.userId, params.accountId, {
+        finalStatus: params.finalStatus,
+        inboundStatus: params.inboundStatus,
+        reviewNote: params.reviewNote,
+      });
+      await this.sendReplyToInbound(params.inbound, params.successReply);
+      return true;
+    } catch (error) {
+      await this.repository.updateCandidate({
+        candidateId: params.candidate.id,
+        userId: params.userId,
+        status: WHATSAPP_CANDIDATE_STATUS.AWAITING_USER_CONFIRMATION,
+        evidence: this.mergeCandidateEvidence(params.candidate, {
+          reviewStatus: WHATSAPP_CANDIDATE_STATUS.AWAITING_USER_CONFIRMATION,
+          autoCreateFailedAt: new Date().toISOString(),
+          autoCreateFailure: error instanceof Error ? error.message : String(error),
+        }),
+      });
+      if (params.candidate.inbound_message_id) {
+        await this.repository.updateInboundMessage({
+          id: params.candidate.inbound_message_id,
+          status: "awaiting_user_confirmation",
+          errorMessage: error instanceof Error ? error.message : String(error),
+          extractedPayload: {
+            ...(params.candidate.evidence || {}),
+            candidateId: params.candidate.id,
+            autoCreateFailure: error instanceof Error ? error.message : String(error),
+          },
+        });
+      }
+      await this.appendInboundProcessingLog({
+        inboundMessageId: params.candidate.inbound_message_id,
+        userId: params.userId,
+        level: "error",
+        event: "transaction_persist_fallback",
+        message: "Falha na persistencia automatica; candidate mantido para confirmacao/revisao.",
+        metadata: {
+          candidateId: params.candidate.id,
+          finalStatus: params.finalStatus,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+      await this.sendReplyToInbound(params.inbound, params.fallbackReply);
+      return false;
+    }
+  }
+
   private async resolveAccountForMessage(userId: string, text: string): Promise<AccountResolution> {
     const accounts = await this.storage.getAccountsByUserId(userId);
     if (!accounts.length) throw new Error("Cadastre uma conta antes de usar o WhatsApp.");
@@ -1417,7 +1485,7 @@ export class WhatsAppAgentService {
     const action = intent.kind === "income" ? "uma entrada" : "um gasto";
     const amount = intent.amount === null ? 0 : intent.amount;
     const kind = intent.kind === "income" ? "income" : "expense";
-    return `Entendi ${action} de ${formatCurrencyBRL(amount)} em ${categoryFromIntent(kind, intent.categorySuggestion)}`;
+    return `${action} de ${formatCurrencyBRL(amount)} em ${categoryFromIntent(kind, intent.categorySuggestion)}`;
   }
 
   private describeCandidate(candidate: CandidateRecord) {
