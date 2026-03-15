@@ -24,12 +24,12 @@ export default function OnboardingSuccessPage() {
             Pagamento confirmado!
           </CardTitle>
           <CardDescription>
-            Sua assinatura foi ativada com sucesso. Clique abaixo para acessar o dashboard.
+            Sua assinatura foi ativada com sucesso. Clique abaixo para acessar sua área principal.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Button className="w-full" onClick={() => setLocation("/dashboard")}>
-            Ir para o dashboard
+            Ir para o início
           </Button>
           <Button variant="ghost" className="w-full" onClick={() => setLocation("/")}>
             Voltar para a página inicial

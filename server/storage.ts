@@ -67,7 +67,7 @@ export interface IStorage {
   getTransactionsByUserId(userId: string, scope?: AccountScope): Promise<Transaction[]>;
   getTransactionsByAccountId(accountId: string): Promise<Transaction[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
-  updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ"; source?: "manual" | "ai" }): Promise<Transaction | undefined>;
+  updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ"; source?: string }): Promise<Transaction | undefined>;
   deleteTransaction(id: string): Promise<boolean>;
 
   // Rule operations
@@ -357,7 +357,7 @@ export class MemStorage {
     return this.toApiTransaction(transaction);
   }
 
-  async updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ"; source?: "manual" | "ai" }): Promise<Transaction | undefined> {
+  async updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ"; source?: string }): Promise<Transaction | undefined> {
     const transaction = this.transactions.get(id);
     if (!transaction) return undefined;
 

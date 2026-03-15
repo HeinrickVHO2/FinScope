@@ -30,7 +30,7 @@ export default function ContatoPage() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "Nao foi possivel enviar sua mensagem.");
+        throw new Error(data.error || "Não foi possível enviar sua mensagem.");
       }
 
       setStatus("success");
@@ -55,7 +55,7 @@ export default function ContatoPage() {
         >
           <h1 className="text-4xl font-poppins font-bold">Fale com a gente</h1>
           <p className="text-slate-600 max-w-lg mx-auto">
-            Tem duvidas, sugestoes ou precisa de ajuda? Nosso time esta pronto para te ouvir.
+            Tem dúvidas, sugestões ou precisa de ajuda? Nosso time está pronto para te ouvir.
           </p>
         </motion.div>
 
@@ -115,7 +115,7 @@ export default function ContatoPage() {
             </div>
             <div className="p-4 rounded-xl border bg-muted/40">
               <p className="text-sm text-muted-foreground">Tempo de resposta</p>
-              <p className="font-semibold">Ate 6 horas uteis</p>
+              <p className="font-semibold">Até 6 horas úteis</p>
             </div>
             <p className="text-sm">
               Quer sugerir melhorias? Fale com a gente. O produto evolui com base no que os clientes mais precisam.

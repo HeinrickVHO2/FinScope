@@ -17,7 +17,7 @@ export default function OnboardingErrorPage() {
             Não foi possível confirmar o pagamento
           </CardTitle>
           <CardDescription>
-            Ocorreu um erro ao processar a assinatura. Tente novamente ou volte para o dashboard.
+            Ocorreu um problema ao confirmar sua assinatura. Tente novamente ou volte para o início.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -25,7 +25,7 @@ export default function OnboardingErrorPage() {
             Tentar novamente
           </Button>
           <Button variant="ghost" className="w-full" onClick={() => setLocation("/dashboard")}>
-            Voltar ao dashboard
+            Voltar ao início
           </Button>
         </CardContent>
       </Card>

@@ -3701,7 +3701,7 @@ function resolvePuppeteerExecutable() {
   console.error("[PDF EXPORT] Para corrigir em deployment:");
   console.error("[PDF EXPORT] 1. Adicione 'chromium' como dependência do sistema via Nix");
   console.error("[PDF EXPORT] 2. OU defina PUPPETEER_EXECUTABLE_PATH com caminho do Chrome");
-  console.error("[PDF EXPORT] PDF exports NÃO funcionarão até que Chrome/Chromium esteja disponível.");
+  console.error("[PDF EXPORT] A exportação em PDF não vai funcionar até que Chrome/Chromium esteja disponível.");
   return null;
 }
 

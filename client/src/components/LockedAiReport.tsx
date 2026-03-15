@@ -14,10 +14,10 @@ export function LockedAiReport({ onUpgrade }: LockedAiReportProps) {
         <div>
           <CardTitle className="text-2xl font-semibold flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-indigo-500" />
-            Resumo Inteligente do seu Mês
+            Resumo inteligente do mês
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Visualize insights gerados pela FinScope AI ao destravar o plano Premium.
+            Veja análises geradas com IA ao ativar o plano Premium.
           </p>
         </div>
         <Badge className="bg-slate-900 text-white">FinScope Premium</Badge>
@@ -28,7 +28,7 @@ export function LockedAiReport({ onUpgrade }: LockedAiReportProps) {
             <Lock className="h-8 w-8 text-slate-500 mb-3" />
             <p className="text-base font-semibold text-slate-800">Prévia bloqueada</p>
             <p className="text-sm text-muted-foreground">
-              Gere previsões e alertas com ajuda da IA exclusiva para clientes Premium.
+              Receba previsões e alertas com ajuda da IA exclusiva do Premium.
             </p>
           </div>
           <div className="space-y-4 opacity-50 pointer-events-none select-none">
@@ -56,7 +56,7 @@ export function LockedAiReport({ onUpgrade }: LockedAiReportProps) {
           </div>
           <div className="flex flex-wrap gap-3">
             <Button onClick={onUpgrade} className="bg-indigo-600 hover:bg-indigo-700">
-              Fazer upgrade para Premium
+              Ver plano Premium
             </Button>
             <Button variant="outline" onClick={onUpgrade}>
               Conhecer benefícios

@@ -109,7 +109,7 @@ export default function InvestmentsPage() {
       setIsCreateDialogOpen(false);
       toast({
         title: "Investimento criado",
-        description: "Seu investimento foi criado com sucesso",
+        description: "Seu investimento já está disponível na lista.",
       });
     },
     onError: (error: Error) => {
@@ -136,8 +136,8 @@ export default function InvestmentsPage() {
       setIsTransactionDialogOpen(false);
       setSelectedInvestment(null);
       toast({
-        title: "Transação registrada",
-        description: "Sua transação de investimento foi registrada com sucesso",
+        title: "Movimentação registrada",
+        description: "A movimentação do investimento foi salva com sucesso.",
       });
     },
     onError: (error: Error) => {
@@ -165,8 +165,8 @@ export default function InvestmentsPage() {
       setIsGoalDialogOpen(false);
       setSelectedInvestment(null);
       toast({
-        title: "Meta atualizada",
-        description: "Meta de investimento atualizada com sucesso",
+        title: "Meta salva",
+        description: "A meta do investimento foi atualizada.",
       });
     },
     onError: (error: Error) => {
@@ -187,8 +187,8 @@ export default function InvestmentsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/investments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/investments"] });
       toast({
-        title: "Investimento deletado",
-        description: "Seu investimento foi removido com sucesso",
+        title: "Investimento removido",
+        description: "O investimento foi removido da sua lista.",
       });
     },
     onError: (error: Error) => {
@@ -221,7 +221,7 @@ export default function InvestmentsPage() {
   const goalsMap = new Map(goals?.map(g => [g.investmentId, g]) || []);
 
   function handleDelete(id: string) {
-    if (confirm("Tem certeza que deseja deletar este investimento?")) {
+    if (confirm("Deseja remover este investimento?")) {
       deleteMutation.mutate(id);
     }
   }
@@ -260,7 +260,7 @@ export default function InvestmentsPage() {
         <div>
           <h1 className="text-3xl font-poppins font-bold" data-testid="text-investments-title">Investimentos</h1>
           <p className="text-muted-foreground" data-testid="text-investments-subtitle">
-            Gerencie seus investimentos e acompanhe suas metas
+            Acompanhe seus investimentos e veja sua evolução com clareza
           </p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
@@ -277,9 +277,9 @@ export default function InvestmentsPage() {
           </DialogTrigger>
           <DialogContent data-testid="dialog-create-investment">
             <DialogHeader>
-              <DialogTitle className="font-poppins">Criar Investimento</DialogTitle>
+              <DialogTitle className="font-poppins">Novo investimento</DialogTitle>
               <DialogDescription>
-                Adicione um novo investimento ao seu portfólio
+                Cadastre um investimento para acompanhar saldo e meta.
               </DialogDescription>
             </DialogHeader>
             <Form {...createForm}>
@@ -350,12 +350,12 @@ export default function InvestmentsPage() {
           ))}
         </div>
       ) : investments?.length === 0 ? (
-        <Card>
+          <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <TrendingUp className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Nenhum investimento cadastrado</h3>
+            <h3 className="text-lg font-semibold mb-2">Você ainda não cadastrou investimentos</h3>
             <p className="text-muted-foreground text-center mb-4">
-              Comece criando seu primeiro investimento para acompanhar seu patrimônio
+              Crie o primeiro para acompanhar seu patrimônio com mais clareza.
             </p>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
@@ -382,7 +382,7 @@ export default function InvestmentsPage() {
                       {investment.name}
                     </CardTitle>
                     <CardDescription>
-                      {investmentType?.label || investment.type} · {goal ? "Com meta definida" : "Sem meta"}
+                      {investmentType?.label || investment.type} · {goal ? "Com meta" : "Sem meta definida"}
                     </CardDescription>
                   </div>
                   {goal && <Target className="h-5 w-5 text-primary" />}
@@ -415,7 +415,7 @@ export default function InvestmentsPage() {
                       data-testid={`button-add-transaction-${investment.id}`}
                     >
                       <Plus className="mr-1 h-3 w-3" />
-                      Transação
+                      Movimentar
                     </Button>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -444,7 +444,7 @@ export default function InvestmentsPage() {
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Deletar investimento</p>
+                        <p>Remover investimento</p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -459,9 +459,9 @@ export default function InvestmentsPage() {
       <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
         <DialogContent data-testid="dialog-investment-transaction">
           <DialogHeader>
-            <DialogTitle className="font-poppins">Nova Transação de Investimento</DialogTitle>
+            <DialogTitle className="font-poppins">Registrar movimentação</DialogTitle>
             <DialogDescription>
-              Registre um aporte ou resgate do investimento
+              Informe um aporte ou resgate deste investimento.
             </DialogDescription>
           </DialogHeader>
           <Form {...transactionForm}>
@@ -469,9 +469,9 @@ export default function InvestmentsPage() {
               <FormField
                 control={transactionForm.control}
                 name="sourceAccountId"
-                render={({ field }) => (
+                  render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Conta de Origem/Destino</FormLabel>
+                    <FormLabel>Conta usada</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-account">
@@ -493,9 +493,9 @@ export default function InvestmentsPage() {
               <FormField
                 control={transactionForm.control}
                 name="type"
-                render={({ field }) => (
+                  render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo de Transação</FormLabel>
+                    <FormLabel>Movimento</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-transaction-type">
@@ -504,10 +504,10 @@ export default function InvestmentsPage() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="deposit">
-                          Depósito (Adicionar dinheiro)
+                          Aporte (adicionar dinheiro)
                         </SelectItem>
                         <SelectItem value="withdrawal">
-                          Saque (Retirar dinheiro)
+                          Resgate (retirar dinheiro)
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -556,7 +556,7 @@ export default function InvestmentsPage() {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={transactionMutation.isPending} data-testid="button-submit-transaction">
-                  {transactionMutation.isPending ? "Registrando..." : "Registrar"}
+                  {transactionMutation.isPending ? "Salvando..." : "Salvar movimentação"}
                 </Button>
               </div>
             </form>
@@ -575,11 +575,11 @@ export default function InvestmentsPage() {
         <DialogContent data-testid="dialog-investment-goal">
           <DialogHeader>
             <DialogTitle className="font-poppins">
-              {selectedInvestment && goalsMap.get(selectedInvestment.id) ? "Editar Meta de Investimento" : "Definir Meta de Investimento"}
+              {selectedInvestment && goalsMap.get(selectedInvestment.id) ? "Editar meta" : "Definir meta"}
             </DialogTitle>
             <DialogDescription>
               {selectedInvestment && (
-                <>Estabeleça uma meta financeira para <strong>{selectedInvestment.name}</strong></>
+                <>Escolha o valor que você quer alcançar em <strong>{selectedInvestment.name}</strong>.</>
               )}
             </DialogDescription>
           </DialogHeader>
@@ -609,7 +609,7 @@ export default function InvestmentsPage() {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={updateGoalMutation.isPending} data-testid="button-submit-goal">
-                  {updateGoalMutation.isPending ? "Salvando..." : "Salvar Meta"}
+                  {updateGoalMutation.isPending ? "Salvando..." : "Salvar meta"}
                 </Button>
               </div>
             </form>

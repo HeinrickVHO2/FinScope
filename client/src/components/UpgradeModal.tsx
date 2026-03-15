@@ -13,10 +13,10 @@ interface UpgradeModalProps {
 }
 
 const PREMIUM_BENEFITS = [
-  "Gestão completa de contas PJ e MEI",
-  "Relatórios PDF executivos com insights",
-  "Automação e categorização avançada",
-  "Suporte prioritário e onboarding guiado",
+  "Gestão completa para contas PJ e MEI",
+  "Relatórios em PDF com visão detalhada",
+  "Organização automática das categorias",
+  "Atendimento prioritário e ajuda na configuração",
 ];
 
 export default function UpgradeModal({ open, onOpenChange, featureName, targetPlan = "premium" }: UpgradeModalProps) {
@@ -53,8 +53,8 @@ export default function UpgradeModal({ open, onOpenChange, featureName, targetPl
             </DialogTitle>
             <DialogDescription>
               {featureName
-                ? `Desbloqueie ${featureName} e finalize seu upgrade na tela de planos.`
-                : "Desbloqueie funcionalidades avançadas ao migrar para o plano Premium."}
+                ? `Ative ${featureName} no plano Premium e veja os detalhes na área de planos.`
+                : "Ative recursos avançados ao mudar para o plano Premium."}
             </DialogDescription>
           </DialogHeader>
 
@@ -80,7 +80,7 @@ export default function UpgradeModal({ open, onOpenChange, featureName, targetPl
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button className="flex-1" onClick={handleUpgradeNow}>
-              Ir para os planos
+              Ver planos
             </Button>
             <Button variant="outline" className="flex-1" onClick={handleLearnMore}>
               Entenda os diferenciais

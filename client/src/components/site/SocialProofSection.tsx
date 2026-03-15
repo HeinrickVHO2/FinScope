@@ -8,23 +8,23 @@ import JulianaImage from "@/Juliana.png";
 
 const testimonials = [
   {
-    name: "Juliana, autonoma",
+    name: "Juliana, autônoma",
     quote:
-      "Agora eu sei para onde meu dinheiro estava indo. No fim do mes, fico mais tranquila para decidir.",
+      "Agora eu sei para onde meu dinheiro estava indo. No fim do mês, fico mais tranquila para decidir.",
     focus: "Mais clareza no dia a dia",
     image: JulianaImage,
   },
   {
     name: "Rafael, MEI",
     quote:
-      "Consegui enxergar meus gastos do mes com clareza e separar melhor o que e pessoal e o que e do negocio.",
-    focus: "Organizacao entre PF e negocio",
+      "Consegui enxergar meus gastos do mês com clareza e separar melhor o que é pessoal e o que é do negócio.",
+    focus: "Organização entre PF e negócio",
     image: RafaelImage,
   },
   {
     name: "Camila, marketing",
     quote:
-      "Passei a planejar melhor e gastar com mais consciencia. Minhas contas ficaram muito mais organizadas.",
+      "Passei a planejar melhor e gastar com mais consciência. Minhas contas ficaram muito mais organizadas.",
     focus: "Planejamento mais leve",
     image: CamilaImage,
   },
@@ -39,7 +39,7 @@ export function SocialProofSection() {
             <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Resultados reais</p>
             <h2 className="text-3xl md:text-4xl font-poppins font-bold">Quem usa, aprova</h2>
             <p className="text-slate-600 max-w-2xl">
-              Historias de quem ganhou mais clareza para acompanhar o mes e tomar decisoes com calma.
+              Histórias de quem ganhou mais clareza para acompanhar o mês e tomar decisões com calma.
             </p>
           </div>
           <Link href="/signup">
@@ -59,18 +59,18 @@ export function SocialProofSection() {
                     <Star key={index} className="h-5 w-5 fill-current" />
                   ))}
                 </div>
-                <p className="text-lg font-semibold text-slate-900">Feedback positivo de usuarios</p>
+                <p className="text-lg font-semibold text-slate-900">Feedback positivo de usuários</p>
               </div>
               <p className="text-sm text-slate-600 leading-relaxed">
-                O retorno mais comum e simples: mais controle da rotina e menos duvidas sobre o dinheiro no fim do mes.
+                O retorno mais comum é simples: mais controle da rotina e menos dúvidas sobre o dinheiro no fim do mês.
               </p>
               <div className="grid sm:grid-cols-2 gap-3 text-sm text-slate-700">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-base font-semibold text-slate-900">Mais clareza</p>
-                  <p className="text-slate-600">Visao do que entrou, saiu e do que ainda precisa pagar.</p>
+                  <p className="text-slate-600">Visão do que entrou, saiu e do que ainda precisa pagar.</p>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-base font-semibold text-slate-900">Mais organizacao</p>
+                  <p className="text-base font-semibold text-slate-900">Mais organização</p>
                   <p className="text-slate-600">Planejamento mensal com prioridades mais definidas.</p>
                 </div>
               </div>

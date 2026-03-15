@@ -23,8 +23,8 @@ export default function SobrePage() {
               Criado para quem quer mais clareza com o dinheiro
             </h1>
             <p className="text-slate-600">
-              O FinScope nasceu para ajudar pessoas e pequenos negocios a organizar as financas
-              de forma simples, pratica e sem complicacao.
+              O FinScope nasceu para ajudar pessoas e pequenos negócios a organizar as finanças
+              de forma simples, prática e sem complicação.
             </p>
           </motion.div>
 
@@ -41,15 +41,15 @@ export default function SobrePage() {
               <Users className="h-10 w-10 text-primary mx-auto" />
               <h3 className="font-semibold text-lg">Feito para pessoas reais</h3>
               <p className="text-slate-600 text-sm">
-                Do comeco ao avancado, com uma experiencia facil de usar.
+                Do começo ao avançado, com uma experiência fácil de usar.
               </p>
             </div>
 
             <div className="text-center space-y-3">
               <Shield className="h-10 w-10 text-primary mx-auto" />
-              <h3 className="font-semibold text-lg">Privacidade e seguranca</h3>
+              <h3 className="font-semibold text-lg">Privacidade e segurança</h3>
               <p className="text-slate-600 text-sm">
-                Seus dados sao tratados com cuidado e privacidade desde o inicio.
+                Seus dados são tratados com cuidado e privacidade desde o início.
               </p>
             </div>
 
@@ -57,15 +57,15 @@ export default function SobrePage() {
               <CalendarClock className="h-10 w-10 text-primary mx-auto" />
               <h3 className="font-semibold text-lg">Planejamento real</h3>
               <p className="text-slate-600 text-sm">
-                Organize contas futuras e acompanhe melhor os proximos passos.
+                Organize contas futuras e acompanhe melhor os próximos passos.
               </p>
             </div>
 
             <div className="text-center space-y-3">
               <BarChart3 className="h-10 w-10 text-primary mx-auto" />
-              <h3 className="font-semibold text-lg">Visao de longo prazo</h3>
+              <h3 className="font-semibold text-lg">Visão de longo prazo</h3>
               <p className="text-slate-600 text-sm">
-                Acompanhe sua evolucao financeira ao longo do tempo com mais controle.
+                Acompanhe sua evolução financeira ao longo do tempo com mais controle.
               </p>
             </div>
           </div>

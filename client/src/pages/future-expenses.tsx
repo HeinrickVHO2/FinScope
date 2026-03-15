@@ -128,7 +128,7 @@ export default function FutureExpensesPage() {
     },
     onSuccess: () => {
       invalidateExpenses();
-      toast({ title: "Conta a pagar criada!", description: "Ela aparecerá na lista automaticamente." });
+      toast({ title: "Conta salva", description: "Ela já apareceu na sua lista." });
       form.reset({
         title: "",
         category: "Outros",
@@ -141,7 +141,7 @@ export default function FutureExpensesPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Erro ao cadastrar",
+        title: "Não foi possível salvar",
         description: error.message || "Tente novamente em instantes.",
         variant: "destructive",
       });
@@ -178,7 +178,7 @@ export default function FutureExpensesPage() {
     if (scope === "PJ" && !isPremium) {
       toast({
         title: "Disponível no Premium",
-        description: "Faça upgrade para controlar contas PJ.",
+        description: "As contas empresariais ficam disponíveis no plano Premium.",
       });
       return;
     }
@@ -195,7 +195,7 @@ export default function FutureExpensesPage() {
           </p>
           <h1 className="text-3xl font-poppins font-bold">Contas a Pagar</h1>
           <p className="text-muted-foreground">
-            Antecipe gastos futuros e mantenha seus boletos sob controle.
+            Organize contas futuras e acompanhe o que ainda precisa ser pago.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -220,9 +220,9 @@ export default function FutureExpensesPage() {
           <CardHeader className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Contas previstas</CardTitle>
+                <CardTitle>Próximos pagamentos</CardTitle>
                 <CardDescription>
-                  Visualize e atualize pagamentos pendentes, pagos e atrasados.
+                  Veja o que está em aberto, pago ou atrasado.
                 </CardDescription>
               </div>
               <div className="flex gap-2">
@@ -240,10 +240,10 @@ export default function FutureExpensesPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {expensesQuery.isLoading ? (
-              <p className="text-muted-foreground text-sm">Carregando contas...</p>
+              <p className="text-muted-foreground text-sm">Carregando lançamentos...</p>
             ) : expenses.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                Nenhuma conta {STATUS_META[statusFilter].label.toLowerCase()} para o filtro atual.
+                Não há contas {STATUS_META[statusFilter].label.toLowerCase()} neste momento.
               </div>
             ) : (
               <div className="space-y-3">
@@ -284,7 +284,7 @@ export default function FutureExpensesPage() {
                             variant="outline"
                             onClick={() => updateStatusMutation.mutate({ id: expense.id, status: "paid" })}
                           >
-                            Aqui já foi pago
+                            Já paguei
                           </Button>
                         )}
                         {expense.status === "pending" && (
@@ -307,8 +307,8 @@ export default function FutureExpensesPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Nova conta a pagar</CardTitle>
-            <CardDescription>Registre boletos, assinaturas ou impostos futuros.</CardDescription>
+            <CardTitle>Adicionar conta a pagar</CardTitle>
+            <CardDescription>Registre boletos, assinaturas e impostos que ainda vão vencer.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -319,11 +319,11 @@ export default function FutureExpensesPage() {
                 <FormField
                   control={form.control}
                   name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Título</FormLabel>
+                    render={({ field }) => (
+                      <FormItem>
+                      <FormLabel>Descrição</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: Aluguel escritório" {...field} />
+                        <Input placeholder="Ex.: aluguel do escritório" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -398,7 +398,7 @@ export default function FutureExpensesPage() {
                             if (value === "PJ" && !isPremium) {
                               toast({
                                 title: "Exclusivo do Premium",
-                                description: "Faça upgrade para registrar contas PJ.",
+                                description: "As contas empresariais ficam disponíveis no plano Premium.",
                               });
                               return;
                             }
@@ -431,7 +431,7 @@ export default function FutureExpensesPage() {
                       <FormItem className="flex items-center justify-between rounded-lg border bg-muted/30 p-3">
                         <div>
                           <FormLabel>Conta recorrente</FormLabel>
-                          <CardDescription>Repete automaticamente todo mês ou ano.</CardDescription>
+                          <CardDescription>Repete automaticamente todo mês ou todo ano.</CardDescription>
                         </div>
                         <FormControl>
                           <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -465,7 +465,7 @@ export default function FutureExpensesPage() {
                 </div>
 
                 <Button type="submit" className="w-full" disabled={createExpenseMutation.isPending}>
-                  {createExpenseMutation.isPending ? "Salvando..." : "Adicionar conta a pagar"}
+                  {createExpenseMutation.isPending ? "Salvando..." : "Salvar conta"}
                 </Button>
               </form>
             </Form>

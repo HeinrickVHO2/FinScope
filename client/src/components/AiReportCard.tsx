@@ -71,7 +71,7 @@ export function AiReportCard() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Não foi possível gerar o relatório AI.");
+        throw new Error(errorData.error || "Não foi possível gerar o resumo com IA.");
       }
 
       const payload = await response.json();
@@ -232,7 +232,7 @@ export function AiReportCard() {
         <UpgradeModal
           open={isUpgradeModalOpen}
           onOpenChange={setIsUpgradeModalOpen}
-          featureName="Relatório IA Premium"
+          featureName="Resumo com IA"
         />
       </>
     );
@@ -245,10 +245,10 @@ export function AiReportCard() {
           <div>
             <CardTitle className="text-2xl font-poppins text-slate-900 flex items-center gap-2">
               <Sparkles className="h-6 w-6 text-indigo-500" />
-              Resumo Inteligente do seu Mês
+              Resumo inteligente do mês
             </CardTitle>
             <CardDescription className="text-slate-600">
-              Visão personalizada do período de {readablePeriod}. Geração automática pelo FinScope AI.
+              Visão personalizada do período de {readablePeriod}, gerada automaticamente com ajuda da IA.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -307,7 +307,7 @@ export function AiReportCard() {
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            FinScope AI
+            FinScope IA
           </div>
           <p className="text-sm text-slate-600 mt-2 whitespace-pre-line">
             {isLoading ? "Gerando resumo personalizado..." : summaryMessage}
@@ -343,7 +343,7 @@ export function AiReportCard() {
             <div className="rounded-2xl border border-slate-100 bg-white/90 p-4 space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <Lightbulb className="h-4 w-4 text-amber-500" />
-                Dicas de economia
+                Dicas para economizar
               </div>
               {tips.length ? (
                 <ul className="space-y-2 text-sm text-slate-600">
@@ -361,7 +361,7 @@ export function AiReportCard() {
             <div className="rounded-2xl border border-slate-100 bg-white/90 p-4 space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <AlertTriangle className="h-4 w-4 text-rose-500" />
-                Alertas e riscos
+                Alertas e cuidados
               </div>
               {warnings.length ? (
                 <ul className="space-y-2 text-sm text-slate-600">

@@ -106,7 +106,7 @@ export default function AIClientPage() {
       const tempBotMessage: ChatMessage = {
         id: `temp-bot-${Date.now()}`,
         role: "assistant",
-        content: "FinScope AI está digitando...",
+        content: "Estou organizando isso para você...",
         createdAt: new Date().toISOString(),
         status: "pending",
       };
@@ -196,9 +196,9 @@ export default function AIClientPage() {
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       <div className="space-y-4">
         <div>
-          <h1 className="text-3xl font-bold font-poppins">Assistente Inteligente</h1>
+          <h1 className="text-3xl font-bold font-poppins">Assistente com IA</h1>
           <p className="text-muted-foreground mt-2 max-w-2xl">
-            Fale comigo sobre suas transações, e vou registrá-las automaticamente. Gasto no mercado? Meta de investimento? Conta futura? Eu cuido!
+            Me conte suas movimentações e eu ajudo a registrar tudo. Posso anotar gastos, metas e contas futuras para você.
           </p>
         </div>
 
@@ -209,7 +209,7 @@ export default function AIClientPage() {
             onClick={() => setInsightFocus(insightFocus === "economy" ? null : "economy")}
             data-testid="button-focus-economy"
           >
-            Foco em economia
+            Economizar
           </Button>
           <Button
             variant={insightFocus === "debt" ? "default" : "outline"}
@@ -217,7 +217,7 @@ export default function AIClientPage() {
             onClick={() => setInsightFocus(insightFocus === "debt" ? null : "debt")}
             data-testid="button-focus-debt"
           >
-            Foco em dívidas
+            Quitar dívidas
           </Button>
           <Button
             variant={insightFocus === "investments" ? "default" : "outline"}
@@ -225,7 +225,7 @@ export default function AIClientPage() {
             onClick={() => setInsightFocus(insightFocus === "investments" ? null : "investments")}
             data-testid="button-focus-investments"
           >
-            Foco em investimentos
+            Investir melhor
           </Button>
         </div>
       </div>
@@ -247,7 +247,7 @@ export default function AIClientPage() {
               <div>
                 <p className="font-medium">Converse comigo</p>
                 <p className="text-sm">
-                  Exemplos: “Gastei 50 reais no mercado hoje” ou “Preciso pagar 120 de luz dia 10”.
+                  Exemplos: “Gastei 50 reais no mercado hoje” ou “Preciso pagar 120 de luz no dia 10”.
                 </p>
               </div>
             </div>
@@ -266,7 +266,7 @@ export default function AIClientPage() {
                   )}
                 >
                   <div className="flex items-center gap-2 text-xs uppercase tracking-wide mb-1 opacity-70">
-                    {message.role === "user" ? "Você" : "FinScope AI"}
+                    {message.role === "user" ? "Você" : "FinScope IA"}
                     <span>·</span>
                     <span>{formatTime(message.createdAt)}</span>
                     {message.status === "pending" && (

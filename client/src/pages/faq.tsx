@@ -8,7 +8,7 @@ export default function FAQPage() {
   const faqs = [
     {
       q: "Tenho garantia ao contratar o FinScope?",
-      a: "Sim! Você paga agora, usa sem limitações e tem 10 dias para pedir reembolso total caso não curta a experiência.",
+      a: "Sim. Você paga, usa sem limitações e tem 10 dias para pedir reembolso total se achar que o FinScope não faz sentido para você.",
     },
     {
       q: "Posso usar tanto para vida pessoal quanto para minha PJ?",
@@ -16,7 +16,7 @@ export default function FAQPage() {
     },
     {
       q: "Como funciona o planejamento de contas futuras?",
-      a: "Você cadastra cada despesa prevista (boletos, assinaturas, impostos) e o FinScope calcula o impacto no saldo. As ações “Aqui já foi pago” e “Marcar como atrasada” mantêm o planejamento atualizado.",
+      a: "Você cadastra cada despesa prevista, como boletos, assinaturas e impostos, e o FinScope mostra o impacto disso no saldo. Depois, basta marcar o que já foi pago ou o que atrasou para manter tudo em dia.",
     },
     {
       q: "O sistema calcula quanto dinheiro vai sobrar?",
@@ -36,7 +36,7 @@ export default function FAQPage() {
     },
     {
       q: "Consigo testar os recursos antes de contratar?",
-      a: "Todo novo cliente tem 10 dias de garantia. Aproveite esse período para explorar dashboards, cadastrar contas e testar o controle empresarial sem risco.",
+      a: "Todo novo cliente tem 10 dias de garantia. Nesse período, você pode explorar o painel, cadastrar contas e testar o controle empresarial sem risco.",
     },
     {
       q: "Como o suporte funciona na prática?",
@@ -44,7 +44,7 @@ export default function FAQPage() {
     },
     {
       q: "O plano Premium vale a pena se eu já uso o Pro?",
-      a: "Sim, especialmente se você precisa de automações, relatórios e controles empresariais completos. O upgrade é instantâneo e basta acessar as configurações para abrir o checkout novamente.",
+      a: "Sim, principalmente se você precisa de mais automações, relatórios e controle empresarial completo. Para mudar de plano, basta abrir a área de configurações e seguir para o pagamento.",
     },
   ];
 

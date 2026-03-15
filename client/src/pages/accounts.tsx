@@ -111,8 +111,8 @@ export default function AccountsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       toast({
-        title: "Conta deletada!",
-        description: "A conta e suas transações foram removidas.",
+        title: "Conta removida",
+        description: "A conta e as movimentações ligadas a ela foram removidas.",
       });
     },
     onError: (error: Error) => {
@@ -134,7 +134,7 @@ export default function AccountsPage() {
   }
 
   function handleDelete(id: string) {
-    if (confirm("Tem certeza que deseja deletar esta conta? Todas as transações serão removidas.")) {
+    if (confirm("Deseja remover esta conta? As movimentações ligadas a ela também serão apagadas.")) {
       deleteMutation.mutate(id);
     }
   }
@@ -162,10 +162,10 @@ export default function AccountsPage() {
         <div>
           <h1 className="text-3xl font-poppins font-bold" data-testid="text-accounts-title">Contas</h1>
           <p className="text-muted-foreground" data-testid="text-accounts-subtitle">
-            Gerencie suas contas financeiras
+            Organize suas contas pessoais e empresariais em um só lugar
             {planLimit !== Infinity && (
               <span className="ml-2">
-                ({accounts.length}/{planLimit} contas usadas)
+                ({accounts.length}/{planLimit} em uso)
               </span>
             )}
           </p>
@@ -179,9 +179,9 @@ export default function AccountsPage() {
           </DialogTrigger>
           <DialogContent data-testid="dialog-add-account">
             <DialogHeader>
-              <DialogTitle className="font-poppins">Adicionar Nova Conta</DialogTitle>
+              <DialogTitle className="font-poppins">Nova conta</DialogTitle>
               <DialogDescription>
-                Crie uma nova conta para organizar suas finanças
+                Crie uma conta para separar melhor suas finanças
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -233,7 +233,7 @@ export default function AccountsPage() {
                       </Select>
                       {currentPlan !== "premium" && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          Disponível no plano Premium com gestão empresarial completa.
+                          Contas empresariais ficam disponíveis no plano Premium.
                         </p>
                       )}
                       <FormMessage />
@@ -249,9 +249,9 @@ export default function AccountsPage() {
                         <FormLabel>Categoria dentro da PJ</FormLabel>
                         <div className="flex items-center justify-between rounded-xl border border-muted p-4">
                           <div>
-                            <p className="text-sm font-medium">Tratar esta conta como MEI</p>
+                            <p className="text-sm font-medium">Marcar esta conta como MEI</p>
                             <p className="text-xs text-muted-foreground">
-                              As contas MEI agora vivem dentro da estrutura PJ.
+                              Use esta opção se a conta faz parte do seu MEI.
                             </p>
                           </div>
                           <Switch
@@ -306,11 +306,11 @@ export default function AccountsPage() {
             <div>
               <h3 className="font-semibold mb-1">Limite de contas atingido</h3>
               <p className="text-sm text-muted-foreground">
-                Faça upgrade para criar mais contas
+                Você chegou ao limite de contas do seu plano
               </p>
             </div>
-            <Button variant="default">
-              Fazer Upgrade
+            <Button variant="default" onClick={() => setIsUpgradeModalOpen(true)}>
+              Ver planos
             </Button>
           </CardContent>
         </Card>
@@ -326,9 +326,9 @@ export default function AccountsPage() {
       ) : accounts.length === 0 ? (
         <Card className="text-center p-12">
           <Wallet className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="font-semibold text-lg mb-2">Nenhuma conta cadastrada</h3>
+          <h3 className="font-semibold text-lg mb-2">Você ainda não cadastrou nenhuma conta</h3>
           <p className="text-muted-foreground mb-4">
-            Crie sua primeira conta para começar a gerenciar suas finanças
+            Crie a primeira para começar a organizar seu dinheiro.
           </p>
           <Button onClick={() => setIsDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -374,7 +374,7 @@ export default function AccountsPage() {
                       data-testid={`menu-item-delete-${account.id}`}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      Deletar
+                      Remover
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -382,7 +382,7 @@ export default function AccountsPage() {
               <CardContent>
                 <div className="space-y-2">
                   <div>
-                    <p className="text-xs text-muted-foreground">Saldo Atual</p>
+                    <p className="text-xs text-muted-foreground">Saldo de hoje</p>
                     <p className="text-2xl font-bold font-poppins text-primary" data-testid={`text-balance-${account.id}`}>
                       R$ {getCurrentBalance(account).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>

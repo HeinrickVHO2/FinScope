@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, ArrowUpRight, ArrowDownRight, Download, Trash2, Lock } from "lucide-react";
+import { Plus, Search, ArrowUpRight, ArrowDownRight, Download, Trash2, Lock, FileUp } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { Link } from "wouter";
 import { subscribeToUserTransactions, supabaseClient } from "@/lib/realtime";
+import StatementImportsPage from "@/pages/statement-imports";
 
 type Scope = "PF" | "PJ" | "ALL";
 
@@ -80,6 +81,7 @@ export default function TransactionsPage() {
   const [scopeFilter, setScopeFilter] = useState<Scope>(selectedView);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isPremiumPdfModalOpen, setIsPremiumPdfModalOpen] = useState(false);
+  const [isStatementImportOpen, setIsStatementImportOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const { toast } = useToast();
@@ -169,16 +171,16 @@ export default function TransactionsPage() {
     onSuccess: () => {
       invalidateFinanceQueries();
       toast({
-        title: "Transação criada!",
-        description: "A transação foi adicionada com sucesso.",
+        title: "Lançamento adicionado",
+        description: "A movimentação já apareceu na sua lista.",
       });
       setIsDialogOpen(false);
       form.reset();
     },
     onError: (error: Error) => {
       toast({
-        title: "Erro ao criar transação",
-        description: error.message || "Tente novamente mais tarde",
+        title: "Não foi possível salvar o lançamento",
+        description: error.message || "Tente novamente em instantes.",
         variant: "destructive",
       });
     },
@@ -192,14 +194,14 @@ export default function TransactionsPage() {
     onSuccess: () => {
       invalidateFinanceQueries();
       toast({
-        title: "Transação deletada!",
-        description: "A transação foi removida.",
+        title: "Lançamento removido",
+        description: "A movimentação foi removida da sua lista.",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Erro ao deletar transação",
-        description: error.message || "Tente novamente mais tarde",
+        title: "Não foi possível remover o lançamento",
+        description: error.message || "Tente novamente em instantes.",
         variant: "destructive",
       });
     },
@@ -239,7 +241,7 @@ export default function TransactionsPage() {
     if (!targetAccount?.id) {
       toast({
         title: "Conta indisponível",
-        description: "Configure seu perfil financeiro antes de registrar a transação.",
+        description: "Escolha uma conta válida antes de salvar a movimentação.",
         variant: "destructive",
       });
       return;
@@ -253,7 +255,7 @@ export default function TransactionsPage() {
   }
 
   function handleDelete(id: string) {
-    if (confirm("Tem certeza que deseja deletar esta transação?")) {
+    if (confirm("Deseja remover esta movimentação?")) {
       deleteMutation.mutate(id);
     }
   }
@@ -286,7 +288,7 @@ export default function TransactionsPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Erro ao gerar PDF");
+        throw new Error("Não foi possível gerar o PDF.");
       }
 
       const blob = await response.blob();
@@ -300,12 +302,12 @@ export default function TransactionsPage() {
       document.body.removeChild(anchor);
 
       toast({
-        title: "PDF exportado",
-        description: "Seu relatório foi gerado com sucesso.",
+        title: "Relatório pronto",
+        description: "O download do PDF começou automaticamente.",
       });
     } catch (error) {
       toast({
-        title: "Erro ao gerar PDF",
+        title: "Não foi possível gerar o PDF",
         description: (error as Error).message || "Não foi possível gerar o relatório agora.",
         variant: "destructive",
       });
@@ -362,7 +364,7 @@ export default function TransactionsPage() {
         <div>
           <h1 className="text-3xl font-poppins font-bold" data-testid="text-transactions-title">Transações</h1>
           <p className="text-muted-foreground" data-testid="text-transactions-subtitle">
-            Gerencie todas as suas movimentações financeiras
+            Acompanhe entradas e saídas das suas contas em um só lugar
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -411,14 +413,14 @@ export default function TransactionsPage() {
               <DialogTrigger asChild>
                 <Button data-testid="button-add-transaction">
                   <Plus className="mr-2 h-4 w-4" />
-                  Nova Transação
+                  Novo lançamento
                 </Button>
               </DialogTrigger>
             <DialogContent data-testid="dialog-add-transaction">
               <DialogHeader>
-                <DialogTitle className="font-poppins">Adicionar Transação</DialogTitle>
+                <DialogTitle className="font-poppins">Novo lançamento</DialogTitle>
                 <DialogDescription>
-                  Registre uma nova entrada ou saída
+                  Preencha os dados para registrar uma entrada ou saída.
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
@@ -428,7 +430,7 @@ export default function TransactionsPage() {
                     name="accountType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Tipo de conta</FormLabel>
+                        <FormLabel>Conta</FormLabel>
                         <Select
                           onValueChange={(value) => {
                             if (value === "PJ" && !isPremiumUser) {
@@ -453,7 +455,7 @@ export default function TransactionsPage() {
                         </Select>
                         {!isPremiumUser && (
                           <p className="text-xs text-muted-foreground">
-                            Ganhe acesso à conta empresarial no plano Premium.
+                            A conta empresarial fica disponível no plano Premium.
                           </p>
                         )}
                         <FormMessage />
@@ -468,7 +470,7 @@ export default function TransactionsPage() {
                         <FormLabel>Descrição</FormLabel>
                         <FormControl>
                           <Input 
-                            placeholder="Ex: Salário, Supermercado..." 
+                            placeholder="Ex.: salário, mercado, aluguel" 
                             data-testid="input-description"
                             {...field} 
                           />
@@ -498,17 +500,17 @@ export default function TransactionsPage() {
                           <FormMessage />
                           {accountType === "PJ" && !isPremiumUser && (
                             <p className="text-xs text-muted-foreground mt-1">
-                              Disponível apenas para assinantes Premium.
+                              Disponível apenas no plano Premium.
                             </p>
                           )}
                           {accountType === "PJ" && isPremiumUser && !businessAccount && !accountsLoading && (
                             <p className="text-xs text-destructive mt-1">
-                              Configure seu perfil empresarial para registrar lançamentos PJ.
+                              Crie uma conta empresarial antes de registrar lançamentos PJ.
                             </p>
                           )}
                           {accountType === "PF" && !personalAccount && !accountsLoading && (
                             <p className="text-xs text-destructive mt-1">
-                              Nenhuma estrutura de conta pessoal encontrada.
+                              Você ainda não tem uma conta pessoal cadastrada.
                             </p>
                           )}
                       </FormItem>
@@ -582,7 +584,7 @@ export default function TransactionsPage() {
                       disabled={createMutation.isPending || !canSubmit}
                       data-testid="button-create-transaction"
                     >
-                      {createMutation.isPending ? "Criando..." : "Criar Transação"}
+                      {createMutation.isPending ? "Salvando..." : "Salvar lançamento"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -591,32 +593,65 @@ export default function TransactionsPage() {
           </Dialog>
         </div>
       </div>
+      </div>
       <Card className="border-dashed border-indigo-200 bg-indigo-50/40">
         <CardContent className="flex flex-col gap-4 pt-6 md:flex-row md:items-center md:justify-between">
           <div className="space-y-2">
             <Badge variant="secondary" className="bg-indigo-600/10 text-indigo-700">Novo</Badge>
-            <h2 className="text-xl font-semibold text-slate-900">Registre gastos pelo chat inteligente</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Registre movimentações pelo assistente</h2>
             <p className="text-sm text-slate-600 max-w-2xl">
-              Descreva suas movimentações no Assistente AI e deixe o FinScope criar transações e valores previstos automaticamente.
-              O fluxo manual continua disponível no botão “Nova Transação”.
+              Conte o que aconteceu na sua conta e o assistente com IA ajuda a registrar transações e compromissos futuros.
+              Se preferir, você também pode preencher tudo manualmente.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Link href="/ai">
               <Button className="bg-indigo-600 hover:bg-indigo-500 text-white">
-                Abrir AI Client
+                Abrir assistente
                 <Badge variant="secondary" className="ml-2 bg-emerald-600/10 text-emerald-700">
-                  Recomendado
+                  Mais rápido
                 </Badge>
               </Button>
             </Link>
             <div className="text-xs text-muted-foreground text-center sm:text-left">
-              Prefere digitar? Use o formulário “Nova Transação” abaixo.
+              Prefere preencher na mão? Use o botão "Novo lançamento".
             </div>
           </div>
         </CardContent>
       </Card>
-      </div>
+      <Card className="border-dashed border-emerald-200 bg-emerald-50/40">
+        <CardContent className="flex flex-col gap-4 pt-6 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <Badge variant="secondary" className="bg-emerald-600/10 text-emerald-700">Extrato bancário</Badge>
+            <h2 className="text-xl font-semibold text-slate-900">Importe seu extrato por aqui</h2>
+            <p className="text-sm text-slate-600 max-w-2xl">
+              Envie o arquivo, revise os itens encontrados e confirme o que deve entrar na plataforma.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Dialog open={isStatementImportOpen} onOpenChange={setIsStatementImportOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-emerald-600 hover:bg-emerald-500 text-white">
+                  <FileUp className="mr-2 h-4 w-4" />
+                  Importar extrato
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Importar extrato</DialogTitle>
+                  <DialogDescription>
+                    Envie o arquivo e revise os lançamentos antes de concluir.
+                  </DialogDescription>
+                </DialogHeader>
+                <StatementImportsPage />
+              </DialogContent>
+            </Dialog>
+            <div className="text-xs text-muted-foreground text-center sm:text-left">
+              Dica: arquivos CSV e OFX costumam ser lidos com mais precisão.
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <Card>
@@ -661,8 +696,8 @@ export default function TransactionsPage() {
           <h3 className="font-semibold text-lg mb-2">Nenhuma transação encontrada</h3>
           <p className="text-muted-foreground mb-4">
             {searchTerm || filterType !== "all" 
-              ? "Tente ajustar os filtros de busca"
-              : "Comece adicionando sua primeira transação"
+              ? "Tente mudar a busca ou os filtros."
+              : "Adicione seu primeiro lançamento para começar."
             }
           </p>
           {!searchTerm && filterType === "all" && accounts.length > 0 && (
@@ -698,7 +733,7 @@ export default function TransactionsPage() {
                           </p>
                           {transaction.autoRuleApplied && (
                             <Badge variant="secondary" className="text-xs">
-                              Auto
+                              Automático
                             </Badge>
                           )}
                         </div>
@@ -747,3 +782,5 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
+

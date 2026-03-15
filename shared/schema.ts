@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, decimal, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, decimal, boolean, integer, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { uuid, numeric } from "drizzle-orm/pg-core";
@@ -41,7 +41,7 @@ export const transactions = pgTable("transactions", {
   date: timestamp("date").notNull(),
   accountType: text("account_type").notNull().default("PF"),
   autoRuleApplied: boolean("auto_rule_applied").default(false),
-  source: text("source").notNull().default("manual"),
+  source: text("source").notNull().default("manual"), // 'manual' | 'ai' | 'statement_import' | 'whatsapp_agent'
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -207,7 +207,7 @@ export const insertTransactionSchema = createInsertSchema(transactions, {
   category: z.string().min(1, "Categoria é obrigatória"),
   date: z.coerce.date(),
   accountType: z.enum(["PF", "PJ"]).default("PF"),
-  source: z.enum(["manual", "ai"]).default("manual"),
+  source: z.enum(["manual", "ai", "statement_import", "whatsapp_agent"]).default("manual"),
 }).omit({
   id: true,
   createdAt: true,
@@ -294,7 +294,7 @@ export const updateTransactionSchema = z.object({
   category: z.string().min(1, "Categoria é obrigatória").optional(),
   date: z.coerce.date().optional(),
   accountType: z.enum(["PF", "PJ"]).optional(),
-  source: z.enum(["manual", "ai"]).optional(),
+  source: z.enum(["manual", "ai", "statement_import", "whatsapp_agent"]).optional(),
 }).strict();
 
 export const insertRuleSchema = createInsertSchema(rules, {
@@ -467,4 +467,63 @@ export const goals = pgTable("goals", {
   title: text("title").notNull(),
   targetValue: numeric("target_value").notNull(),
   createdAt: timestamp("created_at").defaultNow()
+});
+
+export const bankStatementUploads = pgTable("bank_statement_uploads", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  accountId: text("account_id").notNull(),
+  fileName: text("file_name").notNull(),
+  fileType: text("file_type").notNull(),
+  fileSizeBytes: integer("file_size_bytes").notNull(),
+  uploadStatus: text("upload_status").notNull().default("received"),
+  processingStatus: text("processing_status").notNull().default("queued"),
+  dateToleranceDays: integer("date_tolerance_days").notNull().default(3),
+  summary: jsonb("summary"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const bankStatementEntries = pgTable("bank_statement_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  uploadId: uuid("upload_id").notNull(),
+  userId: text("user_id").notNull(),
+  lineNumber: integer("line_number").notNull(),
+  rawPayload: jsonb("raw_payload"),
+  rawText: text("raw_text"),
+  originalDescription: text("original_description").notNull(),
+  normalizedDescription: text("normalized_description").notNull(),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  transactionDate: timestamp("transaction_date").notNull(),
+  direction: text("direction").notNull(),
+  currency: text("currency").notNull().default("BRL"),
+  fingerprint: text("fingerprint").notNull(),
+  reconciliationStatus: text("reconciliation_status").notNull().default("pending_review"),
+  matchedTransactionId: text("matched_transaction_id"),
+  confidenceScore: decimal("confidence_score", { precision: 5, scale: 4 }),
+  reconciliationReason: text("reconciliation_reason"),
+  createdTransactionId: text("created_transaction_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const inboundMessages = pgTable("inbound_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  provider: text("provider").notNull(),
+  providerMessageId: text("provider_message_id").notNull(),
+  userId: text("user_id"),
+  fromPhone: text("from_phone").notNull(),
+  toPhone: text("to_phone"),
+  messageType: text("message_type").notNull(),
+  textBody: text("text_body"),
+  rawPayload: jsonb("raw_payload").notNull(),
+  status: text("status").notNull().default("received"),
+  confidenceScore: decimal("confidence_score", { precision: 5, scale: 4 }),
+  extractedPayload: jsonb("extracted_payload"),
+  errorMessage: text("error_message"),
+  receivedAt: timestamp("received_at").defaultNow().notNull(),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

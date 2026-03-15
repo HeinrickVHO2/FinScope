@@ -10,7 +10,7 @@ export function FinalCTASection() {
           Organize sua vida financeira com mais clareza.
         </h2>
         <p className="text-lg text-slate-600">
-          Cadastre-se e acompanhe seu mes com mais controle e menos correria.
+          Cadastre-se e acompanhe seu mês com mais controle e menos correria.
         </p>
         <div className="flex flex-col sm:flex-row justify-center gap-3">
           <Link href="/signup">
@@ -20,7 +20,7 @@ export function FinalCTASection() {
             </Button>
           </Link>
         </div>
-        <p className="text-sm text-slate-500">Cadastro rapido e simples.</p>
+        <p className="text-sm text-slate-500">Cadastro rápido e simples.</p>
       </div>
     </section>
   );

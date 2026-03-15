@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState, type ComponentType } from "react";
 import { Home, ArrowLeftRight, Settings, PiggyBank, Building2, Lock, CalendarClock, Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -16,22 +16,29 @@ import {
 } from "@/components/ui/sidebar";
 
 const baseMenuItems = [
-  { title: "Dashboard", url: "/dashboard", icon: Home },
+  { title: "Início", url: "/dashboard", icon: Home },
   { title: "Transações", url: "/transactions", icon: ArrowLeftRight },
   { title: "Investimentos", url: "/investments", icon: PiggyBank },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
+
+type MenuItem = {
+  title: string;
+  url: string;
+  icon: ComponentType<{ className?: string }>;
+  requiresPremium?: boolean;
+};
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const isPremium = user?.plan === "premium";
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     baseMenuItems[0],
-    { title: "Gestão PJ/MEI", url: "/mei", icon: Building2, requiresPremium: true },
+    { title: "Gestão PJ e MEI", url: "/mei", icon: Building2, requiresPremium: true },
     { title: "Contas a Pagar", url: "/future-expenses", icon: CalendarClock, requiresPremium: false },
-    { title: "Assistente AI", url: "/ai", icon: Sparkles },
+    { title: "Assistente com IA", url: "/ai", icon: Sparkles },
     ...baseMenuItems.slice(1),
   ];
 
@@ -41,7 +48,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <a href="/dashboard" className="flex items-center gap-2">
           
-          {/* 🔵 SUA LOGO NO SIDEBAR */}
+          {/* Logo no sidebar */}
           <img
             src="/logo.png"
             alt="FinScope"
@@ -92,7 +99,10 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>
-    <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Gestão PJ/MEI" />
+    <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Gestão PJ e MEI" />
     </>
   );
 }
+
+
+

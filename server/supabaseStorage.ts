@@ -478,7 +478,7 @@ export class SupabaseStorage implements IStorage {
     };
   }
 
-  async updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ"; source?: "manual" | "ai" }): Promise<Transaction | undefined> {
+  async updateTransaction(id: string, updates: { description?: string; type?: string; amount?: number; category?: string; date?: Date; accountType?: "PF" | "PJ"; source?: string }): Promise<Transaction | undefined> {
     const updateData: any = {};
     if (updates.description !== undefined) updateData.description = updates.description;
     if (updates.type !== undefined) updateData.type = updates.type;

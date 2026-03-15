@@ -4,33 +4,33 @@ import { Sparkles, Zap, BellRing, Goal, LayoutDashboard, Briefcase } from "lucid
 
 const differentiators = [
   {
-    title: "Visao clara do mes",
+    title: "Visão clara do mês",
     description: "Entenda rapidamente o que entrou, o que saiu e o que ainda falta pagar.",
     icon: Sparkles,
   },
   {
     title: "Uso simples no dia a dia",
-    description: "Uma experiencia direta para voce organizar as financas sem complicacao.",
+    description: "Uma experiência direta para você organizar as finanças sem complicação.",
     icon: Zap,
   },
   {
     title: "Lembretes importantes",
-    description: "Acompanhe vencimentos e tarefas para nao esquecer contas essenciais.",
+    description: "Acompanhe vencimentos e tarefas para não esquecer contas essenciais.",
     icon: BellRing,
   },
   {
     title: "Metas mais conscientes",
-    description: "Defina objetivos e acompanhe sua evolucao ao longo do mes.",
+    description: "Defina objetivos e acompanhe sua evolução ao longo do mês.",
     icon: Goal,
   },
   {
     title: "Painel facil de acompanhar",
-    description: "Tudo em um lugar para voce tomar decisoes com mais seguranca.",
+    description: "Tudo em um lugar para você tomar decisões com mais segurança.",
     icon: LayoutDashboard,
   },
   {
-    title: "Pessoal e negocio no mesmo app",
-    description: "Organize as duas rotinas sem perder contexto e sem confusao.",
+    title: "Pessoal e negócio no mesmo app",
+    description: "Organize as duas rotinas sem perder contexto e sem confusão.",
     icon: Briefcase,
   },
 ];
@@ -42,10 +42,10 @@ export function DifferentialsSection() {
         <div className="space-y-3 text-center">
           <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">Por que o FinScope</Badge>
           <h2 className="text-3xl md:text-4xl font-poppins font-bold">
-            Mais clareza, menos confusao no dia a dia.
+            Mais clareza, menos confusão no dia a dia.
           </h2>
           <p className="text-slate-600 max-w-3xl mx-auto">
-            O FinScope foi feito para ajudar voce a manter o controle financeiro com uma rotina leve e organizada.
+            O FinScope foi feito para ajudar você a manter o controle financeiro com uma rotina leve e organizada.
           </p>
         </div>
 

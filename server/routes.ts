@@ -18,6 +18,8 @@ import { buildProTransactionsPdf } from "./pdf/proReport";
 import { generateAiFinancialReport } from "./aiReports";
 import { generateAiInsights } from "./aiInsights";
 import type { AiInsightResult } from "./aiInsights";
+import { registerStatementImportRoutes } from "./modules/statement-import/routes";
+import { registerWhatsAppAgentRoutes } from "./modules/whatsapp-agent/routes";
 import { 
   insertUserSchema, 
   loginSchema,
@@ -71,8 +73,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("[PDF EXPORT] using browser executable:", puppeteerExecutable);
   }
 
-  app.use(express.json());      // 👈 OBRIGATÓRIO
-  app.use(express.urlencoded({ extended: true }));  // (opcional, mas recomendado)
+  app.use(express.json({ limit: "12mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "12mb" }));
   const GUARANTEE_DAYS = Number(process.env.BILLING_GUARANTEE_DAYS || "10");
   const GUARANTEE_WINDOW_MS = GUARANTEE_DAYS * 24 * 60 * 60 * 1000;
 
@@ -1558,6 +1560,20 @@ type AiInterpretationResult =
     next();
   }
 
+
+  registerStatementImportRoutes({
+    app,
+    storage,
+    requireAuth,
+    requireActiveBilling,
+  });
+
+  registerWhatsAppAgentRoutes({
+    app,
+    storage,
+    requireAuth,
+    requireActiveBilling,
+  });
 
   // ===== AUTH ROUTES =====
 
@@ -3182,7 +3198,7 @@ function resolvePuppeteerExecutable() {
   console.error("[PDF EXPORT] Para corrigir em deployment:");
   console.error("[PDF EXPORT] 1. Adicione 'chromium' como dependência do sistema via Nix");
   console.error("[PDF EXPORT] 2. OU defina PUPPETEER_EXECUTABLE_PATH com caminho do Chrome");
-  console.error("[PDF EXPORT] PDF exports NÃO funcionarão até que Chrome/Chromium esteja disponível.");
+  console.error("[PDF EXPORT] A exportação em PDF não vai funcionar até que Chrome/Chromium esteja disponível.");
   return null;
 }
 

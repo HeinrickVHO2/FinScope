@@ -49,8 +49,8 @@ export default function SignupPage() {
       await refetchUser();
       
       toast({
-        title: "Conta criada com sucesso!",
-        description: "Complete o checkout para liberar o dashboard. Você tem 10 dias para testar com direito a reembolso.",
+        title: "Conta criada com sucesso",
+        description: "Agora falta só escolher seu plano para liberar a plataforma. Você tem 10 dias de garantia.",
       });
       
       setIsCheckoutOpen(true);
@@ -89,7 +89,7 @@ export default function SignupPage() {
             </div>
           </Link>
           <p className="text-muted-foreground text-center">
-            Crie sua conta e ative sua assinatura com 10 dias de garantia
+            Crie sua conta e comece a organizar suas finanças
           </p>
         </div>
 
@@ -97,7 +97,7 @@ export default function SignupPage() {
           <CardHeader>
             <CardTitle className="font-poppins" data-testid="text-signup-title">Criar sua conta</CardTitle>
             <CardDescription data-testid="text-signup-description">
-              Preencha os dados abaixo para começar
+              Preencha seus dados para continuar
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -125,7 +125,7 @@ export default function SignupPage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>E-mail</FormLabel>
                       <FormControl>
                         <Input 
                           type="email" 
@@ -162,7 +162,7 @@ export default function SignupPage() {
                   disabled={isLoading}
                   data-testid="button-submit"
                 >
-                  {isLoading ? "Criando conta..." : "Criar conta e abrir checkout"}
+                  {isLoading ? "Criando conta..." : "Criar conta e continuar"}
                 </Button>
               </form>
             </Form>
@@ -170,11 +170,11 @@ export default function SignupPage() {
           <CardFooter className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground text-center">
               Ao criar uma conta, você concorda com nossos{" "}
-              <a href="#" className="text-primary hover:underline">
+              <a href="/termos" className="text-primary hover:underline">
                 Termos de Uso
               </a>{" "}
               e{" "}
-              <a href="#" className="text-primary hover:underline">
+              <a href="/privacidade" className="text-primary hover:underline">
                 Política de Privacidade
               </a>
             </p>
@@ -191,10 +191,10 @@ export default function SignupPage() {
         {checkoutDismissed && !isCheckoutOpen && (
           <div className="space-y-3 rounded-lg border border-dashed border-primary/30 bg-white/60 p-4 text-center">
             <p className="text-sm text-muted-foreground">
-              Precisa concluir depois? Clique no botão abaixo para reabrir o checkout quando estiver pronto.
+              Se preferir terminar depois, use o botão abaixo para abrir o pagamento novamente quando quiser.
             </p>
             <Button variant="outline" onClick={() => setIsCheckoutOpen(true)}>
-              Reabrir checkout
+              Abrir pagamento novamente
             </Button>
           </div>
         )}

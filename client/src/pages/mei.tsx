@@ -112,7 +112,7 @@ export default function MEIPage() {
           <div>
             <h1 className="text-3xl font-poppins font-bold">Gestão Empresarial</h1>
             <p className="text-muted-foreground">
-              Consolide suas contas PJ/MEI, acompanhe fluxo de caixa e gere relatórios dedicados.
+              Reúna suas contas PJ e MEI em um só lugar e acompanhe o caixa da empresa com mais clareza.
             </p>
           </div>
           <Card className="border-primary/40 bg-primary/5">
@@ -122,7 +122,7 @@ export default function MEIPage() {
               </div>
               <h3 className="text-2xl font-semibold font-poppins">Recurso exclusivo do Premium</h3>
               <p className="max-w-xl text-muted-foreground">
-                Faça upgrade para acessar dashboards empresariais, insights por CNPJ e relatórios executivos.
+                Ative o Premium para acompanhar as finanças da empresa com mais detalhes e relatórios dedicados.
               </p>
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => setLocation("/settings")} data-testid="button-learn-more">
@@ -151,7 +151,7 @@ export default function MEIPage() {
         <div>
           <h1 className="text-3xl font-poppins font-bold">Gestão PJ & MEI</h1>
           <p className="text-muted-foreground">
-            Acompanhe fluxo de caixa empresarial e destaque contas marcadas como MEI.
+            Acompanhe o caixa da empresa e destaque as contas marcadas como MEI.
           </p>
         </div>
         <div className="flex gap-2">

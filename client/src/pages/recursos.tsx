@@ -7,15 +7,15 @@ export default function RecursosPage() {
   const recursos = [
     {
       icon: BarChart3,
-      title: "Painel do mes",
+      title: "Painel do mês",
       description:
-        "Veja entradas, saidas e saldo em um unico lugar para acompanhar sua rotina com clareza.",
+        "Veja entradas, saídas e saldo em um único lugar para acompanhar sua rotina com clareza.",
     },
     {
       icon: Wallet,
-      title: "Controle pessoal e do negocio",
+      title: "Controle pessoal e do negócio",
       description:
-        "Organize suas contas sem misturar contextos e acompanhe melhor cada decisao.",
+        "Organize suas contas sem misturar contextos e acompanhe melhor cada decisão.",
     },
     {
       icon: CalendarClock,
@@ -27,25 +27,25 @@ export default function RecursosPage() {
       icon: Zap,
       title: "Lembretes importantes",
       description:
-        "Receba avisos para nao esquecer contas e manter o mes sob controle.",
+        "Receba avisos para não esquecer contas e manter o mês sob controle.",
     },
     {
       icon: TrendingUp,
-      title: "Visao do que sobra",
+      title: "Visão do que sobra",
       description:
-        "Acompanhe quanto ainda esta disponivel para planejar melhor seus proximos passos.",
+        "Acompanhe quanto ainda está disponível para planejar melhor seus próximos passos.",
     },
     {
       icon: FileText,
-      title: "Relatorios para acompanhar",
+      title: "Relatórios para acompanhar",
       description:
-        "Use relatorios para revisar seu mes e entender sua evolucao.",
+        "Use relatórios para revisar seu mês e entender sua evolução.",
     },
     {
       icon: Shield,
-      title: "Privacidade e seguranca",
+      title: "Privacidade e segurança",
       description:
-        "Seus dados sao tratados com cuidado para voce usar o FinScope com tranquilidade.",
+        "Seus dados são tratados com cuidado para você usar o FinScope com tranquilidade.",
     },
   ];
 
@@ -63,7 +63,7 @@ export default function RecursosPage() {
             Recursos para organizar sua vida financeira
           </h1>
           <p className="text-slate-600 max-w-2xl mx-auto">
-            O FinScope foi feito para voce acompanhar seu dinheiro com mais clareza, controle e tranquilidade.
+            O FinScope foi feito para você acompanhar seu dinheiro com mais clareza, controle e tranquilidade.
           </p>
         </motion.div>
 

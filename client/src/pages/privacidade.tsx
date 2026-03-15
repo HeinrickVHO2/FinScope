@@ -24,10 +24,10 @@ export default function PrivacidadePage() {
           >
             <Shield className="h-14 w-14 text-primary mx-auto mb-4" />
             <h1 className="text-4xl md:text-5xl font-poppins font-bold text-slate-900">
-              Politica de Privacidade
+              Política de Privacidade
             </h1>
             <p className="mt-4 text-slate-600 max-w-2xl mx-auto">
-              Suas informacoes sao tratadas com cuidado, privacidade e responsabilidade.
+              Suas informações são tratadas com cuidado, privacidade e responsabilidade.
             </p>
           </motion.div>
 
@@ -38,12 +38,12 @@ export default function PrivacidadePage() {
                   Quais dados coletamos?
                 </AccordionTrigger>
                 <AccordionContent className="text-slate-600 leading-relaxed">
-                  Coletamos apenas informacoes essenciais:
+                  Coletamos apenas informações essenciais:
                   <ul className="list-disc ml-6 mt-3">
                     <li>Nome e e-mail</li>
-                    <li>Transacoes adicionadas por voce</li>
+                    <li>Transações adicionadas por você</li>
                     <li>Dados de login</li>
-                    <li>Metricas de uso para melhorias</li>
+                    <li>Métricas de uso para melhorias</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -53,10 +53,10 @@ export default function PrivacidadePage() {
                   Como protegemos seus dados?
                 </AccordionTrigger>
                 <AccordionContent className="text-slate-600 leading-relaxed">
-                  Mantemos medidas de protecao como:
+                  Mantemos medidas de proteção como:
                   <ul className="list-disc ml-6 mt-3">
                     <li>Acesso protegido por login</li>
-                    <li>Copias de seguranca regulares</li>
+                    <li>Cópias de segurança regulares</li>
                     <li>Monitoramento para evitar acessos indevidos</li>
                     <li>Cuidados de privacidade desde o desenvolvimento</li>
                   </ul>
@@ -68,12 +68,12 @@ export default function PrivacidadePage() {
                   Compartilhamento de dados
                 </AccordionTrigger>
                 <AccordionContent className="text-slate-600 leading-relaxed">
-                  Nao vendemos seus dados.
-                  Compartilhamos apenas quando necessario, como:
+                  Não vendemos seus dados.
+                  Compartilhamos apenas quando necessário, como:
                   <ul className="list-disc ml-6 mt-3">
-                    <li>Servicos essenciais para funcionamento da plataforma</li>
+                    <li>Serviços essenciais para o funcionamento da plataforma</li>
                     <li>Fornecedores contratados (como e-mail)</li>
-                    <li>Exigencias legais</li>
+                    <li>Exigências legais</li>
                   </ul>
                 </AccordionContent>
               </AccordionItem>
@@ -83,11 +83,11 @@ export default function PrivacidadePage() {
                   Seus direitos segundo a LGPD
                 </AccordionTrigger>
                 <AccordionContent className="text-slate-600 leading-relaxed">
-                  Voce pode:
+                  Você pode:
                   <ul className="list-disc ml-6 mt-3">
-                    <li>Solicitar remocao dos dados</li>
-                    <li>Solicitar copia/exportacao</li>
-                    <li>Corrigir informacoes</li>
+                    <li>Solicitar remoção dos dados</li>
+                    <li>Solicitar cópia ou exportação</li>
+                    <li>Corrigir informações</li>
                     <li>Encerrar conta a qualquer momento</li>
                   </ul>
                 </AccordionContent>

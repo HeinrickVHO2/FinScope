@@ -4,10 +4,10 @@ import { Card } from "@/components/ui/card";
 import { ArrowRight, AlertTriangle, Target } from "lucide-react";
 
 const pains = [
-  "No fim do mes, voce nao sabe para onde o dinheiro foi",
-  "Dificuldade para equilibrar contas pessoais e do negocio",
-  "Falta de rotina para planejar as proximas semanas",
-  "Sensacao de estar sempre apagando incendio",
+  "No fim do mês, você não sabe para onde o dinheiro foi",
+  "Dificuldade para equilibrar contas pessoais e do negócio",
+  "Falta de rotina para planejar as próximas semanas",
+  "Sensação de estar sempre apagando incêndio",
 ];
 
 export function PainSolutionSection() {
@@ -21,10 +21,10 @@ export function PainSolutionSection() {
               <span>Problemas que custam caro</span>
             </div>
             <h2 className="text-3xl md:text-4xl font-poppins font-bold leading-tight">
-              Se suas financas parecem um caos, nao e culpa sua.
+              Se suas finanças parecem um caos, não é culpa sua.
             </h2>
             <p className="text-slate-600 leading-relaxed">
-              Planilhas cansam. Apps complicados desanimam. O FinScope ajuda voce a organizar tudo de um jeito simples.
+              Planilhas cansam. Apps complicados desanimam. O FinScope ajuda você a organizar tudo de um jeito simples.
             </p>
           </div>
 
@@ -48,10 +48,10 @@ export function PainSolutionSection() {
         <div className="mt-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-2xl bg-gradient-to-r from-primary/5 via-white to-primary/5 border border-primary/10 p-6 shadow-sm">
           <div>
             <p className="text-lg font-semibold text-slate-900">
-              Pare de adivinhar. Tenha uma visao clara do seu mes.
+              Pare de adivinhar. Tenha uma visão clara do seu mês.
             </p>
             <p className="text-sm text-slate-600">
-              Registre suas contas, acompanhe seus gastos e planeje melhor cada decisao.
+              Registre suas contas, acompanhe seus gastos e planeje melhor cada decisão.
             </p>
           </div>
           <Link href="/signup">

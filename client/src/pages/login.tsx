@@ -46,8 +46,8 @@ export default function LoginPage() {
       await refetchUser();
       
       toast({
-        title: "Login realizado!",
-        description: "Redirecionando para o dashboard...",
+        title: "Tudo certo",
+        description: "Estamos abrindo sua área principal.",
       });
       
       // Small delay to ensure auth context is fully updated
@@ -87,7 +87,7 @@ export default function LoginPage() {
             </div>
           </Link>
           <p className="text-muted-foreground text-center">
-            Entre para gerenciar suas finanças
+            Entre para acompanhar sua vida financeira com clareza
           </p>
         </div>
 
@@ -95,7 +95,7 @@ export default function LoginPage() {
           <CardHeader>
             <CardTitle className="font-poppins" data-testid="text-login-title">Entrar na sua conta</CardTitle>
             <CardDescription data-testid="text-login-description">
-              Digite seu email e senha para acessar
+              Digite seu e-mail e sua senha para continuar
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -106,7 +106,7 @@ export default function LoginPage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>E-mail</FormLabel>
                       <FormControl>
                         <Input 
                           type="email" 

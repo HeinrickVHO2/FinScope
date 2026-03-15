@@ -69,19 +69,19 @@ type Scope = DashboardScope;
 const scopeLabels: Record<Scope, { title: string; description: string; accent: string; badge?: string }> = {
   PF: {
     title: "Finanças Pessoais",
-    description: "Tudo que envolve sua vida financeira pessoal.",
+    description: "Tudo o que acontece nas suas contas pessoais.",
     accent: "from-indigo-500/15 via-indigo-500/5 to-transparent",
     badge: "PF",
   },
   PJ: {
     title: "Finanças Empresariais",
-    description: "Fluxo de caixa do seu negócio.",
+    description: "Entradas, saídas e compromissos do seu negócio.",
     accent: "from-purple-500/15 via-purple-500/5 to-transparent",
     badge: "Premium",
   },
   ALL: {
     title: "Visão Consolidada",
-    description: "Pessoal + Empresarial combinados.",
+    description: "Resumo das contas pessoais e empresariais.",
     accent: "from-slate-500/10 via-slate-500/5 to-transparent",
     badge: "Total",
   },
@@ -218,8 +218,8 @@ export default function DashboardPage() {
     <div className="p-6 space-y-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
-          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Finanças integradas</p>
-          <h1 className="text-3xl font-poppins font-bold">Dashboard Unificado</h1>
+          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Suas finanças em um só lugar</p>
+          <h1 className="text-3xl font-poppins font-bold">Visão geral</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -266,7 +266,7 @@ export default function DashboardPage() {
       <section className="rounded-3xl border bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-sm text-muted-foreground">Resumo do contexto selecionado</p>
+            <p className="text-sm text-muted-foreground">Resumo do período</p>
             <h2 className="text-2xl font-semibold text-slate-900">
               {scopeLabels[selectedView].title}
             </h2>
@@ -302,7 +302,7 @@ export default function DashboardPage() {
             <p className="text-sm text-muted-foreground">Agenda financeira</p>
             <h2 className="text-2xl font-semibold text-slate-900">Valores previstos</h2>
             <p className="text-xs text-muted-foreground">
-              Tudo o que a IA e você cadastraram como pagamentos e recebimentos futuros.
+              Tudo o que foi registrado como pagamentos e recebimentos futuros.
             </p>
           </div>
         </div>
@@ -352,9 +352,9 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-6">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Planejado vs Realizado</p>
-            <h2 className="text-2xl font-semibold text-slate-900">Como você está seguindo o plano</h2>
+            <h2 className="text-2xl font-semibold text-slate-900">Como suas contas estão indo no mês</h2>
             <p className="text-sm text-muted-foreground max-w-2xl">
-              Cruzamos o que foi previsto pelo Assistente AI com as transações reais do mês atual para mostrar o quanto você acertou.
+              Comparamos o que estava previsto com o que realmente entrou e saiu neste mês.
             </p>
           </div>
         </div>
@@ -369,7 +369,7 @@ export default function DashboardPage() {
             <div className="grid gap-4 md:grid-cols-4">
               <Card className="border-none bg-slate-50">
                 <CardHeader className="pb-1">
-                  <p className="text-sm text-muted-foreground">Previsto gastar</p>
+                  <p className="text-sm text-muted-foreground">Previsto para sair</p>
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-semibold text-slate-900">{formatCurrency(plannedExpenses)}</p>
@@ -377,7 +377,7 @@ export default function DashboardPage() {
               </Card>
               <Card className="border-none bg-slate-50">
                 <CardHeader className="pb-1">
-                  <p className="text-sm text-muted-foreground">Gasto real</p>
+                  <p className="text-sm text-muted-foreground">Saiu de verdade</p>
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-semibold text-slate-900">{formatCurrency(actualExpenses)}</p>
@@ -393,7 +393,7 @@ export default function DashboardPage() {
               </Card>
               <Card className="border-none bg-slate-50">
                 <CardHeader className="pb-1">
-                  <p className="text-sm text-muted-foreground">Percentual de acerto</p>
+                  <p className="text-sm text-muted-foreground">Aderência ao plano</p>
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-semibold text-slate-900">{accuracyPercent.toFixed(0)}%</p>
@@ -484,7 +484,7 @@ export default function DashboardPage() {
             {projectionMetrics && (
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 <div className="rounded-2xl border bg-white p-4">
-                  <p className="text-sm text-muted-foreground">Saldo final estimado (AI)</p>
+                  <p className="text-sm text-muted-foreground">Saldo final estimado pela IA</p>
                   <p className="text-2xl font-semibold text-slate-900">{formatCurrency(projectionMetrics.expectedEndBalance)}</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Considerando receitas fixas e despesas recorrentes.

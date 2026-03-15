@@ -16,7 +16,7 @@ const REPORT_TYPES = [
   {
     value: "financeiro",
     label: "Financeiro completo",
-    description: "KPIs consolidados, tabela de movimentos e ranking de categorias.",
+    description: "Resumo completo com números do período e principais categorias.",
   },
   {
     value: "receitas_despesas",
@@ -26,7 +26,7 @@ const REPORT_TYPES = [
   {
     value: "empresarial",
     label: "Painel Empresarial",
-    description: "Versão com foco em contas PJ e tributos.",
+    description: "Versão com foco em contas PJ, entradas, saídas e tributos.",
   },
 ] as const;
 
@@ -147,12 +147,12 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
         <div>
           <p className="text-sm font-medium text-slate-900">Formato Premium A4</p>
           <p className="text-xs text-slate-500">
-            Exportação com KPIs consolidados, tabelas estilizadas, placeholders para gráficos base64 e insights automáticos.
+            Relatório em PDF com resumo do período, gráficos e observações automáticas.
           </p>
         </div>
         <div className="rounded-lg bg-white/80 p-3 border border-amber-200 text-amber-900 text-xs">
-          <strong>Atenção:</strong> o processo pode levar alguns minutos para carregar o engine de PDF no servidor. 
-          O download iniciará automaticamente assim que o processamento for concluído.
+          <strong>Atenção:</strong> esse relatório pode levar alguns minutos para ficar pronto.
+          O download começa automaticamente assim que ele for gerado.
         </div>
       </div>
 
@@ -198,14 +198,14 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-900">Incluir gráficos</p>
-              <p className="text-xs text-slate-500">Os gráficos utilizam imagens base64 já geradas no backend.</p>
+              <p className="text-xs text-slate-500">Adiciona gráficos para facilitar a leitura do relatório.</p>
             </div>
             <Switch checked={includeCharts} onCheckedChange={setIncludeCharts} />
           </div>
           <div className="flex items-center justify-between border-t border-slate-100 pt-4">
             <div>
-              <p className="text-sm font-medium text-slate-900">Incluir insights</p>
-              <p className="text-xs text-slate-500">Comentários automáticos baseados nos KPIs do período.</p>
+              <p className="text-sm font-medium text-slate-900">Incluir observações automáticas</p>
+              <p className="text-xs text-slate-500">Inclui comentários gerados a partir dos resultados do período.</p>
             </div>
             <Switch checked={includeInsights} onCheckedChange={setIncludeInsights} />
           </div>
@@ -215,7 +215,7 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
       <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
         <div>
           <p className="text-sm font-semibold text-emerald-900">Formato executivo</p>
-          <p className="text-xs text-emerald-700">Ideal para apresentar a investidores ou contabilidade.</p>
+          <p className="text-xs text-emerald-700">Ideal para compartilhar com sócios, contabilidade ou para seu próprio acompanhamento.</p>
         </div>
         <Badge variant="secondary" className="bg-white text-emerald-600">
           Premium
@@ -249,8 +249,7 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
       <div className="space-y-2">
         <p className="text-lg font-semibold text-slate-900">Exportação Premium bloqueada</p>
         <p className="text-sm text-slate-500">
-          Essa funcionalidade é exclusiva para clientes Premium. Faça o upgrade e libere PDFs executivos com KPIs,
-          gráficos base64 e insights automáticos.
+          Essa funcionalidade é exclusiva para clientes Premium. Ative o plano para gerar relatórios em PDF com gráficos e observações automáticas.
         </p>
       </div>
       <div className="rounded-2xl border border-primary/40 bg-primary/5 p-4 text-sm text-primary">
@@ -274,8 +273,7 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
               Exportar PDF Premium
             </DialogTitle>
             <DialogDescription>
-              Personalize o relatório FinScope Premium em formato A4 com placeholders para gráficos base64, KPIs e
-              insights.
+              Personalize seu relatório em PDF com o período, o tipo de visão e os detalhes que deseja incluir.
             </DialogDescription>
           </DialogHeader>
           {modalBody}

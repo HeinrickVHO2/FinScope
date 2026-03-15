@@ -81,14 +81,14 @@ export default function SettingsPage() {
       name: "Pro",
       price: "R$ 19,90/mês",
       current: currentPlan === "pro",
-      features: ["Até 3 contas", "Dashboard completo", "Alertas de pagamento", "Exportação PDF básico"],
+      features: ["Até 3 contas", "Painel completo", "Alertas de pagamento", "Exportação em PDF"],
     },
     {
       name: "Premium",
       price: "R$ 29,90/mês",
       current: currentPlan === "premium",
       recommended: true,
-      features: ["Contas ilimitadas", "Dashboard avançado", "Categorização automática", "Gestão empresarial completa", "Relatórios PDF"],
+      features: ["Contas ilimitadas", "Painel avançado", "Organização automática das categorias", "Gestão empresarial completa", "Relatórios em PDF"],
     },
   ];
 
@@ -175,7 +175,7 @@ export default function SettingsPage() {
           Configurações
         </h1>
         <p className="text-muted-foreground" data-testid="text-settings-subtitle">
-          Gerencie sua conta e preferências
+          Atualize seus dados e acompanhe sua assinatura
         </p>
       </div>
 
@@ -183,7 +183,7 @@ export default function SettingsPage() {
       <Card data-testid="card-profile">
         <CardHeader>
           <CardTitle className="font-poppins">Informações Pessoais</CardTitle>
-          <CardDescription>Atualize seus dados cadastrais</CardDescription>
+          <CardDescription>Mantenha seus dados sempre em dia</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
@@ -289,7 +289,7 @@ export default function SettingsPage() {
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {displayPlan === "pending"
-                    ? "Conclua o checkout para liberar todos os recursos"
+                    ? "Conclua o pagamento para liberar todos os recursos"
                     : "Assinatura confirmada"}
                 </p>
               </div>
@@ -322,16 +322,15 @@ export default function SettingsPage() {
           </div>
           <Separator className="my-4" />
           <div className="text-sm text-muted-foreground">
-            {displayPlan === "pending" && <p>Se já concluiu o pagamento, clique em &quot;Verificar pagamento&quot; abaixo.</p>}
-            {displayPlan !== "pending" && currentPlan === "pro" && <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 19,90</p>}
-            {displayPlan !== "pending" && currentPlan === "premium" && <p>Próxima cobrança em 25 de fevereiro de 2025 - R$ 29,90</p>}
+            {displayPlan === "pending" && <p>Se você já pagou, clique em &quot;Verificar pagamento&quot; abaixo.</p>}
+            {displayPlan !== "pending" && <p>Os detalhes da próxima cobrança aparecem aqui assim que sua assinatura estiver sincronizada.</p>}
           </div>
         </CardContent>
       </Card>
 
       <div className="space-y-4">
         <h2 className="text-2xl font-poppins font-bold" data-testid="text-plans-title">
-          Planos Disponíveis
+          Planos disponíveis
         </h2>
         <div className="grid md:grid-cols-3 gap-4">
           {plans.map((plan, index) => (
@@ -417,11 +416,11 @@ export default function SettingsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar atualização</DialogTitle>
+            <DialogTitle>Salvar alteração?</DialogTitle>
             <DialogDescription>
               {confirmField === "name"
                 ? "Tem certeza que deseja alterar seu nome completo?"
-                : "Tem certeza que deseja alterar seu email?"}
+                : "Tem certeza que deseja alterar seu e-mail?"}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex flex-col sm:flex-row sm:justify-end sm:space-x-2 space-y-2 sm:space-y-0">

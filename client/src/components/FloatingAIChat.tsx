@@ -108,7 +108,7 @@ export function FloatingAIChat() {
       const tempBotMessage: ChatMessage = {
         id: `temp-bot-${Date.now()}`,
         role: "assistant",
-        content: "Fluxo inteligente em processamento...",
+        content: "Estou organizando isso para você...",
         createdAt: new Date().toISOString(),
         status: "pending",
       };
@@ -180,13 +180,13 @@ export function FloatingAIChat() {
         <Card className="w-[320px] sm:w-[380px] h-[420px] shadow-2xl border border-slate-200 flex flex-col bg-background/95 backdrop-blur">
           <div className="flex items-center justify-between p-4 border-b">
             <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">FinScope AI</p>
+              <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">FinScope IA</p>
               <h3 className="text-xl font-semibold flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" />
-                Assistente inteligente
+                Assistente com IA
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Registre gastos, receitas e compromissos futuros.
+                Registre gastos, receitas e contas futuras sem sair da tela.
               </p>
             </div>
             <Button
@@ -194,7 +194,7 @@ export function FloatingAIChat() {
               size="icon"
               className="rounded-full"
               onClick={() => setIsOpen(false)}
-              aria-label="Fechar chat AI"
+              aria-label="Fechar assistente com IA"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -233,7 +233,7 @@ export function FloatingAIChat() {
                     )}
                   >
                     <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide mb-1 opacity-70">
-                      {message.role === "user" ? "Você" : "FinScope AI"}
+                      {message.role === "user" ? "Você" : "FinScope IA"}
                       <span>·</span>
                       <span>{formatTime(message.createdAt)}</span>
                       {message.status === "pending" && (
@@ -275,13 +275,13 @@ export function FloatingAIChat() {
             size="icon"
             className="h-14 w-14 rounded-full shadow-xl"
             onClick={handleToggle}
-            aria-label="Abrir chat com FinScope AI"
+            aria-label="Abrir assistente com IA"
           >
             <MessageSquareText className="h-6 w-6" />
           </Button>
         </TooltipTrigger>
         <TooltipContent side="left">
-          <span>Conversar com o FinScope AI</span>
+          <span>Conversar com o assistente com IA</span>
         </TooltipContent>
       </Tooltip>
     </div>

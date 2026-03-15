@@ -21,20 +21,20 @@ const plans = [
       "Controle de contas e gastos",
       "Planejamento mensal",
       "Lembretes importantes",
-      "Relatorios basicos",
+      "Relatórios básicos",
     ],
   },
   {
     name: "Premium",
     highlight: true,
-    description: "Para quem precisa de mais recursos de organizacao e acompanhamento.",
-    value: "Tudo do Pro + visao avancada",
+    description: "Para quem precisa de mais recursos de organização e acompanhamento.",
+    value: "Tudo do Pro + visão avançada",
     features: [
-      "Mais opcoes de acompanhamento",
-      "Mais recursos para rotina PF e negocio",
-      "Relatorios mais completos",
-      "Exportacao de dados",
-      "Atendimento prioritario",
+      "Mais opções de acompanhamento",
+      "Mais recursos para rotina PF e negócio",
+      "Relatórios mais completos",
+      "Exportação de dados",
+      "Atendimento prioritário",
     ],
   },
 ];
@@ -49,7 +49,7 @@ export function PricingSection() {
             Escolha o plano ideal para sua rotina
           </h2>
           <p className="text-slate-600 max-w-3xl mx-auto">
-            Voce pode se cadastrar primeiro e escolher o plano no app, com calma.
+            Você pode se cadastrar primeiro e escolher o plano no app, com calma.
           </p>
         </div>
 
@@ -84,10 +84,10 @@ export function PricingSection() {
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs text-slate-600">
                   <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/5 border border-primary/10">
-                    Cadastro rapido
+                    Cadastro rápido
                   </span>
                   <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/5 border border-primary/10">
-                    Seguranca e privacidade
+                    Segurança e privacidade
                   </span>
                 </div>
               </CardContent>

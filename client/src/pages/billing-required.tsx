@@ -18,7 +18,7 @@ export default function BillingRequiredPage() {
       <div className="flex items-center justify-center h-full w-full py-20">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-muted-foreground text-sm">Carregando seu status de cobrança...</p>
+          <p className="text-muted-foreground text-sm">Verificando seu pagamento...</p>
         </div>
       </div>
     );

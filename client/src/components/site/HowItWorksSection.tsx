@@ -6,17 +6,17 @@ import { Link } from "wouter";
 const steps = [
   {
     title: "Adicione suas contas e gastos",
-    description: "Registre suas movimentacoes em poucos passos e mantenha tudo no mesmo lugar.",
+    description: "Registre suas movimentações em poucos passos e mantenha tudo no mesmo lugar.",
     icon: Link2,
   },
   {
     title: "Organize por categorias",
-    description: "Veja com clareza quanto voce gastou em cada tipo de despesa no mes.",
+    description: "Veja com clareza quanto você gastou em cada tipo de despesa no mês.",
     icon: Sparkles,
   },
   {
-    title: "Acompanhe seu mes com clareza",
-    description: "Visualize saldo, metas e proximos compromissos para decidir melhor.",
+    title: "Acompanhe seu mês com clareza",
+    description: "Visualize saldo, metas e próximos compromissos para decidir melhor.",
     icon: Gauge,
   },
 ];
@@ -29,10 +29,10 @@ export function HowItWorksSection() {
           <div className="space-y-3">
             <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Como funciona</p>
             <h2 className="text-3xl md:text-4xl font-poppins font-bold">
-              Clareza total em tres passos simples
+              Clareza total em três passos simples
             </h2>
             <p className="text-slate-600 max-w-2xl">
-              Um fluxo simples para voce entender seu dinheiro e manter uma rotina financeira mais organizada.
+              Um fluxo simples para você entender seu dinheiro e manter uma rotina financeira mais organizada.
             </p>
           </div>
           <Link href="/signup">

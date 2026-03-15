@@ -25,16 +25,16 @@ const PLAN_OPTIONS = [
     description: "Para quem precisa organizar as finanças com mais controle.",
     features: [
       "Até 3 contas",
-      "Dashboard completo",
+      "Painel completo",
       "Alertas de pagamento",
-      "Exportação PDF básico",
+      "Exportação em PDF",
     ],
   },
   {
     id: "premium",
     name: "Plano Premium",
     price: "R$ 29,90/mês",
-    description: "Tudo do Pro + recursos avançados para contas PJ.",
+    description: "Tudo do Pro + recursos para contas PJ e MEI.",
     badge: "Mais popular",
     features: [
       "Contas ilimitadas",
@@ -69,9 +69,9 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
 
   const subtitle = useMemo(() => {
     if (intent === "signup") {
-      return "Escolha seu plano e finalize sem sair do FinScope. Pagamento confirmado na hora e com 10 dias de garantia total.";
+      return "Escolha seu plano e conclua o pagamento sem sair do FinScope. Assim que ele for aprovado, seu acesso é liberado.";
     }
-    return "Troque de plano em segundos. A garantia de 10 dias também vale para upgrades e downgrades.";
+    return "Mude de plano em poucos passos. A garantia de 10 dias também vale após a nova cobrança.";
   }, [intent]);
 
   useEffect(() => {
@@ -87,7 +87,7 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
   async function createCheckout() {
     if (!selectedPlan) {
       toast({
-        title: "Selecione um plano",
+        title: "Escolha um plano",
         description: "Escolha entre Pro ou Premium para continuar.",
         variant: "destructive",
       });
@@ -111,16 +111,16 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
       const data = await response.json();
 
       if (!response.ok || !data.checkoutUrl) {
-        throw new Error(data.error || "Não foi possível iniciar o checkout");
+        throw new Error(data.error || "Não foi possível abrir a tela de pagamento.");
       }
 
       setCheckoutUrl(data.checkoutUrl);
       await refetchUser();
     } catch (error) {
-      const message = (error as Error).message || "Erro inesperado ao criar checkout";
+      const message = (error as Error).message || "Não conseguimos abrir o pagamento agora.";
       setErrorMessage(message);
       toast({
-        title: "Erro ao iniciar checkout",
+        title: "Não foi possível abrir o pagamento",
         description: message,
         variant: "destructive",
       });
@@ -205,7 +205,7 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
             </div>
             {intent === "upgrade" && !hasSelectablePlan && (
               <p className="text-sm text-muted-foreground">
-                Você já está no plano Premium. Nenhum upgrade disponível no momento.
+                Você já está no plano mais completo disponível.
               </p>
             )}
             {errorMessage && (
@@ -219,7 +219,7 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
                 {isCreatingCheckout ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Iniciando checkout
+                    Preparando pagamento
                   </>
                 ) : (
                   <>
@@ -239,7 +239,7 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
               <p className="text-xs text-muted-foreground">
                 Se preferir,{" "}
                 <a href={checkoutUrl} target="_blank" rel="noreferrer" className="text-primary underline">
-                  abra o checkout em outra aba
+                  abra o pagamento em outra aba
                 </a>.
               </p>
             </div>
@@ -258,7 +258,7 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
                   <CreditCard className="h-5 w-5 text-primary" />
                 </div>
               <div>
-                <p className="font-medium">Finalize o pagamento no modal</p>
+                <p className="font-medium">Conclua o pagamento</p>
                 <p className="text-sm text-muted-foreground">
                   Após confirmar o pagamento, clique em &quot;Verificar pagamento&quot; ou feche esta janela para atualizar o status.
                 </p>

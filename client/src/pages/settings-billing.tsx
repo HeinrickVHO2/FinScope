@@ -35,7 +35,7 @@ export default function BillingSettingsPage() {
               Confirme seu pagamento
             </CardTitle>
             <CardDescription>
-              Revise os planos disponíveis e conclua o checkout diretamente nesta página.
+              Revise os planos disponíveis e conclua o pagamento nesta mesma página.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
