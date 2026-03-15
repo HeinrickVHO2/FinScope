@@ -1,7 +1,9 @@
-﻿import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Express } from "express";
 import { z } from "zod";
 import type { IStorage } from "../../storage";
+import { getWhatsAppMetaConfig } from "./config";
+import { parseMetaWebhookPayload, buildMetaVerificationResponse } from "./metaWebhook";
 import { normalizePhone } from "./phone";
 import { WhatsAppRepository } from "./repository";
 import { WhatsAppAgentService } from "./service";
@@ -9,53 +11,78 @@ import type { WhatsAppInboundEvent } from "./types";
 
 export type Middleware = (req: any, res: any, next: any) => void | Promise<void>;
 
-const bindPhoneSchema = z.object({
+const startBindingSchema = z.object({
   phone: z.string().min(8),
 });
 
-const webhookMediaSchema = z.object({
-  id: z.string().min(1),
-  mimeType: z.string().optional(),
-  url: z.string().optional(),
-  fileName: z.string().optional(),
-  base64: z.string().optional(),
+const confirmCandidateSchema = z.object({
+  accountId: z.string().min(1).optional(),
 });
 
-const webhookSchema = z.object({
-  provider: z.string().default("whatsapp_cloud_api"),
-  providerMessageId: z.string().min(1),
-  fromPhone: z.string().min(6),
+const normalizedMockSchema = z.object({
+  provider: z.string().default("mock"),
+  providerMessageId: z.string().min(1).optional(),
+  fromPhone: z.string().min(6).optional(),
   toPhone: z.string().optional(),
   timestamp: z.string().optional(),
   type: z.enum(["text", "image", "document", "audio", "unknown"]).default("text"),
   text: z.string().optional(),
-  media: z.array(webhookMediaSchema).optional(),
+  media: z.array(z.object({
+    id: z.string().min(1),
+    mimeType: z.string().optional(),
+    url: z.string().optional(),
+    fileName: z.string().optional(),
+    base64: z.string().optional(),
+  })).optional(),
 }).passthrough();
 
 function signatureIsValid(req: any, secret: string): boolean {
   if (!secret) return true;
 
-  const signature = String(req.headers["x-finscope-signature"] || req.headers["x-whatsapp-signature"] || "");
-  if (!signature) return false;
+  const header = String(req.headers["x-hub-signature-256"] || "");
+  if (!header.startsWith("sha256=")) {
+    return false;
+  }
 
+  const signature = header.slice("sha256=".length);
   const raw = Buffer.isBuffer(req.rawBody)
     ? req.rawBody
     : Buffer.from(JSON.stringify(req.body || {}), "utf8");
 
   const computed = createHmac("sha256", secret).update(raw).digest("hex");
+  const expected = Buffer.from(signature, "utf8");
+  const actual = Buffer.from(computed, "utf8");
+  if (expected.length !== actual.length) {
+    return false;
+  }
 
-  const sigBuffer = Buffer.from(signature);
-  const cmpBuffer = Buffer.from(computed);
-  if (sigBuffer.length !== cmpBuffer.length) return false;
-
-  return timingSafeEqual(sigBuffer, cmpBuffer);
+  return timingSafeEqual(expected, actual);
 }
 
-function toInboundEvent(payload: z.infer<typeof webhookSchema>): WhatsAppInboundEvent {
+function mapCandidate(candidate: any) {
+  return {
+    id: candidate.id,
+    inboundMessageId: candidate.inbound_message_id,
+    proposedType: candidate.proposed_type,
+    amount: Number(candidate.amount),
+    currency: candidate.currency,
+    description: candidate.description,
+    merchantName: candidate.merchant_name,
+    categorySuggestion: candidate.category_suggestion,
+    transactionDate: candidate.transaction_date,
+    confidenceScore: candidate.confidence_score === null ? null : Number(candidate.confidence_score),
+    status: candidate.status,
+    persistedTransactionId: candidate.persisted_transaction_id,
+    evidence: candidate.evidence ?? null,
+    createdAt: candidate.created_at,
+  };
+}
+
+function toInboundEvent(payload: z.infer<typeof normalizedMockSchema>): WhatsAppInboundEvent {
   return {
     provider: payload.provider,
-    providerMessageId: payload.providerMessageId,
-    fromPhone: normalizePhone(payload.fromPhone),
+    providerMessageId: payload.providerMessageId || `mock-${Date.now()}`,
+    fromPhone: normalizePhone(payload.fromPhone || ""),
     toPhone: payload.toPhone ? normalizePhone(payload.toPhone) : undefined,
     timestamp: payload.timestamp,
     type: payload.type,
@@ -71,110 +98,174 @@ export function registerWhatsAppAgentRoutes(params: {
   requireAuth: Middleware;
   requireActiveBilling: Middleware;
 }) {
-  const { app, storage, requireAuth, requireActiveBilling } = params;
+  const { app, storage, requireAuth } = params;
   const repository = new WhatsAppRepository();
   const service = new WhatsAppAgentService(repository, storage);
 
-  app.get("/api/whatsapp/phone-binding", requireAuth, requireActiveBilling, async (req: any, res) => {
+  app.get("/api/whatsapp/session", requireAuth, async (req: any, res) => {
     try {
-      const binding = await service.getBinding(req.session.userId);
-      return res.json(binding);
+      const session = await service.getSession(req.session.userId);
+      return res.json(session);
     } catch (error) {
       return res.status(500).json({
-        error: error instanceof Error ? error.message : "Falha ao consultar vínculo de telefone",
+        error: error instanceof Error ? error.message : "Não foi possível carregar o WhatsApp agora.",
       });
     }
   });
 
-  app.post("/api/whatsapp/phone-binding", requireAuth, requireActiveBilling, async (req: any, res) => {
+  app.post("/api/whatsapp/binding/start", requireAuth, async (req: any, res) => {
     try {
-      const payload = bindPhoneSchema.parse(req.body);
-      const binding = await service.bindPhone(req.session.userId, payload.phone);
+      const payload = startBindingSchema.parse(req.body);
+      const result = await service.startBinding(req.session.userId, payload.phone);
+      return res.json(result);
+    } catch (error) {
+      const message = error instanceof z.ZodError
+        ? "Informe um número válido."
+        : error instanceof Error
+          ? error.message
+          : "Não foi possível gerar o código agora.";
+      const status = message === "Disponível para assinantes ativos." ? 403 : 400;
+      return res.status(status).json({ error: message });
+    }
+  });
+
+  app.delete("/api/whatsapp/binding", requireAuth, async (req: any, res) => {
+    try {
+      const result = await service.disconnectPhone(req.session.userId);
+      return res.json(result);
+    } catch (error) {
+      return res.status(400).json({
+        error: error instanceof Error ? error.message : "Não foi possível remover o vínculo.",
+      });
+    }
+  });
+
+  app.get("/api/whatsapp/candidates", requireAuth, async (req: any, res) => {
+    try {
+      const candidates = await service.listPendingCandidates(req.session.userId);
+      return res.json(candidates.map(mapCandidate));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Não foi possível carregar as sugestões.";
+      const status = message === "Disponível para assinantes ativos." ? 403 : 400;
+      return res.status(status).json({ error: message });
+    }
+  });
+
+  app.post("/api/whatsapp/candidates/:candidateId/confirm", requireAuth, async (req: any, res) => {
+    try {
+      const payload = confirmCandidateSchema.parse(req.body || {});
+      const result = await service.confirmCandidate({
+        userId: req.session.userId,
+        candidateId: req.params.candidateId,
+        accountId: payload.accountId,
+      });
       return res.json({
-        id: binding.id,
-        phone: binding.phone_e164,
-        provider: binding.provider,
-        isVerified: binding.is_verified,
+        transactionId: result.transactionId,
+        message: "Transação confirmada.",
       });
     } catch (error) {
       const message = error instanceof z.ZodError
-        ? "Telefone inválido"
+        ? "Escolha uma conta válida."
         : error instanceof Error
           ? error.message
-          : "Falha ao vincular telefone";
+          : "Não foi possível confirmar essa sugestão.";
       return res.status(400).json({ error: message });
     }
   });
 
-  app.get("/api/whatsapp/candidates", requireAuth, requireActiveBilling, async (req: any, res) => {
+  app.post("/api/whatsapp/candidates/:candidateId/ignore", requireAuth, async (req: any, res) => {
     try {
-      const candidates = await service.listPendingCandidates(req.session.userId);
-      return res.json(candidates);
-    } catch (error) {
-      return res.status(500).json({
-        error: error instanceof Error ? error.message : "Falha ao listar pendências",
-      });
-    }
-  });
-
-  app.post("/api/whatsapp/candidates/:candidateId/confirm", requireAuth, requireActiveBilling, async (req: any, res) => {
-    try {
-      const result = await service.confirmCandidate({
+      await service.ignoreCandidate({
         userId: req.session.userId,
         candidateId: req.params.candidateId,
       });
       return res.json({
-        transactionId: result.transactionId,
-        message: "Transação confirmada",
+        ignored: true,
+        message: "Sugestão ignorada.",
       });
     } catch (error) {
       return res.status(400).json({
-        error: error instanceof Error ? error.message : "Falha ao confirmar candidato",
+        error: error instanceof Error ? error.message : "Não foi possível ignorar essa sugestão.",
+      });
+    }
+  });
+
+  app.get("/api/whatsapp/webhook/meta", (req: any, res) => {
+    console.log("[WHATSAPP] iniciando validacao do webhook Meta");
+    const metaConfig = getWhatsAppMetaConfig();
+
+    const verification = buildMetaVerificationResponse({
+      mode: req.query["hub.mode"]?.toString(),
+      token: req.query["hub.verify_token"]?.toString(),
+      challenge: req.query["hub.challenge"]?.toString(),
+      expectedToken: metaConfig.verifyToken,
+    });
+
+    if (!verification.ok) {
+      console.warn("[WHATSAPP] falha na validacao do webhook Meta");
+      return res.status(403).send("verification_failed");
+    }
+
+    console.log("[WHATSAPP] webhook Meta validado");
+    return res.status(200).send(verification.challenge);
+  });
+
+  app.post("/api/whatsapp/webhook/meta", async (req: any, res) => {
+    console.log("[WHATSAPP] evento Meta recebido");
+
+    try {
+      const metaConfig = getWhatsAppMetaConfig();
+      const appSecret = metaConfig.appSecret;
+      if (appSecret && !signatureIsValid(req, appSecret)) {
+        console.warn("[WHATSAPP] assinatura Meta invalida");
+        return res.status(401).json({ error: "Assinatura inválida" });
+      }
+
+      const events = parseMetaWebhookPayload(req.body || {});
+      console.log("[WHATSAPP] eventos normalizados", { count: events.length });
+
+      for (const event of events) {
+        await service.processInboundEvent(event);
+      }
+
+      return res.json({ received: true, count: events.length });
+    } catch (error) {
+      console.error("[WHATSAPP] erro ao processar webhook Meta", error);
+      return res.status(400).json({
+        error: error instanceof Error ? error.message : "Não foi possível processar a mensagem.",
       });
     }
   });
 
   app.post("/api/integrations/whatsapp/webhook", async (req: any, res) => {
     try {
-      const secret = process.env.WHATSAPP_WEBHOOK_SECRET || "";
-      if (!signatureIsValid(req, secret)) {
-        return res.status(401).json({ error: "Assinatura inválida" });
+      const events = parseMetaWebhookPayload(req.body || {});
+      for (const event of events) {
+        await service.processInboundEvent(event);
       }
-
-      const payload = webhookSchema.parse(req.body);
-      const event = toInboundEvent(payload);
-
-      const result = await service.processInboundEvent(event);
-      return res.json({ received: true, status: result.status });
+      return res.json({ received: true, count: events.length });
     } catch (error) {
-      const message = error instanceof z.ZodError
-        ? "Payload de webhook inválido"
-        : error instanceof Error
-          ? error.message
-          : "Falha ao processar webhook";
-      return res.status(400).json({ error: message });
+      return res.status(400).json({
+        error: error instanceof Error ? error.message : "Não foi possível processar a mensagem.",
+      });
     }
   });
 
-  app.post("/api/whatsapp/mock-event", requireAuth, requireActiveBilling, async (req: any, res) => {
+  app.post("/api/whatsapp/mock-event", requireAuth, async (req: any, res) => {
     try {
-      const payload = webhookSchema.parse({
-        ...req.body,
-        provider: "mock",
-      });
-
-      const binding = await service.getBinding(req.session.userId);
-      if (!binding) {
-        return res.status(400).json({
-          error: "Vincule um telefone antes de simular eventos do WhatsApp",
-        });
-      }
-
+      const payload = normalizedMockSchema.parse(req.body);
+      const session = await service.getSession(req.session.userId);
       const event = toInboundEvent({
         ...payload,
-        fromPhone: binding.phone_e164,
-        providerMessageId: payload.providerMessageId || `mock-${Date.now()}`,
+        provider: "mock",
+        fromPhone: payload.fromPhone || session.binding.phone || payload.fromPhone,
       });
+
+      if (!event.fromPhone) {
+        return res.status(400).json({
+          error: "Conecte um número antes de simular mensagens.",
+        });
+      }
 
       const result = await service.processInboundEvent(event);
       return res.json({
@@ -183,9 +274,8 @@ export function registerWhatsAppAgentRoutes(params: {
       });
     } catch (error) {
       return res.status(400).json({
-        error: error instanceof Error ? error.message : "Falha ao simular evento",
+        error: error instanceof Error ? error.message : "Não foi possível simular a mensagem.",
       });
     }
   });
 }
-

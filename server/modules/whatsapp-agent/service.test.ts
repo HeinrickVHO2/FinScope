@@ -1,39 +1,58 @@
-﻿import test from "node:test";
+import test from "node:test";
 import assert from "node:assert/strict";
 import { WhatsAppAgentService } from "./service";
 import type { WhatsAppInboundEvent } from "./types";
 
 class FakeRepository {
   public inboundCounter = 0;
-  public candidates: any[] = [];
+  public candidateCounter = 0;
+  public bindings = new Map<string, any>();
+  public candidates = new Map<string, any>();
   public inboundStatus: string | null = null;
 
-  async bindPhone() {
-    return { id: "bind-1", phone_e164: "+5511999999999", provider: "mock", is_verified: true };
+  async getBindingByUser(userId: string) {
+    return this.bindings.get(userId) || null;
   }
 
-  async getBindingByUser() {
-    return { id: "bind-1", phone_e164: "+5511999999999", provider: "mock", is_verified: true };
+  async getBindingByPhone(phone: string) {
+    return Array.from(this.bindings.values()).find((binding) => binding.phone_e164 === phone) || null;
+  }
+
+  async saveVerifiedBinding(params: { userId: string; phone: string; provider?: string }) {
+    const binding = {
+      id: "bind-1",
+      user_id: params.userId,
+      phone_e164: params.phone,
+      provider: params.provider || "mock",
+      is_verified: true,
+    };
+    this.bindings.set(params.userId, binding);
+    return binding;
+  }
+
+  async deleteBindingByUser(userId: string) {
+    this.bindings.delete(userId);
   }
 
   async listCandidatesByUser() {
-    return [];
+    return Array.from(this.candidates.values());
   }
 
-  async getCandidateById() {
-    return null;
+  async getCandidateById(candidateId: string) {
+    return this.candidates.get(candidateId) || null;
   }
 
-  async updateCandidate() {
-    return;
+  async updateCandidate(payload: any) {
+    const current = this.candidates.get(payload.candidateId);
+    this.candidates.set(payload.candidateId, { ...current, status: payload.status, persisted_transaction_id: payload.persistedTransactionId ?? current?.persisted_transaction_id ?? null });
   }
 
   async findInboundByProviderMessageId() {
     return null;
   }
 
-  async findUserByPhone() {
-    return "user-1";
+  async findUserByPhone(phone: string) {
+    return Array.from(this.bindings.values()).find((binding) => binding.phone_e164 === phone)?.user_id || null;
   }
 
   async createInboundMessage(_: any) {
@@ -54,8 +73,21 @@ class FakeRepository {
   }
 
   async createCandidate(payload: any) {
-    this.candidates.push(payload);
-    return payload;
+    this.candidateCounter += 1;
+    const candidate = {
+      id: `candidate-${this.candidateCounter}`,
+      inbound_message_id: payload.inboundMessageId,
+      proposed_type: payload.kind,
+      amount: payload.amount,
+      description: payload.description,
+      category_suggestion: payload.categorySuggestion ?? null,
+      transaction_date: payload.transactionDate.toISOString(),
+      confidence_score: payload.confidenceScore,
+      status: payload.status,
+      persisted_transaction_id: payload.persistedTransactionId ?? null,
+    };
+    this.candidates.set(candidate.id, candidate);
+    return candidate;
   }
 
   async updateInboundMessage(payload: any) {
@@ -70,6 +102,33 @@ class FakeRepository {
 
 class FakeStorage {
   public createTransactionCalls = 0;
+
+  async getUser(userId: string) {
+    return {
+      id: userId,
+      email: "user@example.com",
+      password: "hashed",
+      fullName: "Teste",
+      plan: "pro",
+      trialStart: null,
+      trialEnd: null,
+      caktoSubscriptionId: "sub-1",
+      billingStatus: "active",
+      createdAt: new Date(),
+    };
+  }
+
+  async getAccount(accountId: string) {
+    return {
+      id: accountId,
+      userId: "user-1",
+      name: "Conta Principal",
+      type: "pf",
+      businessCategory: null,
+      initialBalance: "0",
+      createdAt: new Date(),
+    };
+  }
 
   async getAccountsByUserId() {
     return [
@@ -113,33 +172,65 @@ const baseEvent: WhatsAppInboundEvent = {
   rawPayload: {},
 };
 
-test("WhatsAppAgentService auto-confirms high confidence message", async () => {
+test("WhatsAppAgentService confirms binding when code arrives from the informed phone", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();
   const service = new WhatsAppAgentService(repository as any, storage as any);
 
-  const result = await service.processInboundEvent(baseEvent);
-
-  assert.equal(result.status, "auto_confirmed");
-  assert.equal(storage.createTransactionCalls, 1);
-  assert.equal(repository.inboundStatus, "auto_confirmed");
-  assert.equal(repository.candidates[0].status, "confirmed");
-});
-
-test("WhatsAppAgentService sends ambiguous message to pending review", async () => {
-  const repository = new FakeRepository();
-  const storage = new FakeStorage();
-  const service = new WhatsAppAgentService(repository as any, storage as any);
-
+  const binding = await service.startBinding("user-1", "+55 11 99999-9999");
   const result = await service.processInboundEvent({
     ...baseEvent,
-    providerMessageId: "provider-msg-2",
-    text: "essa nota é da farmácia",
+    providerMessageId: "provider-msg-binding",
+    text: binding.code,
   });
+
+  assert.equal(result.status, "binding_confirmed");
+  assert.equal(repository.bindings.get("user-1")?.phone_e164, "+5511999999999");
+});
+
+test("WhatsAppAgentService creates pending candidate for linked phone message", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const service = new WhatsAppAgentService(repository as any, storage as any);
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(baseEvent);
 
   assert.equal(result.status, "pending_review");
   assert.equal(storage.createTransactionCalls, 0);
   assert.equal(repository.inboundStatus, "pending_review");
-  assert.equal(repository.candidates[0].status, "pending_review");
+  assert.equal(Array.from(repository.candidates.values())[0]?.status, "pending_review");
 });
 
+test("WhatsAppAgentService confirms candidate into transaction", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const service = new WhatsAppAgentService(repository as any, storage as any);
+
+  repository.candidates.set("candidate-1", {
+    id: "candidate-1",
+    inbound_message_id: "in-1",
+    proposed_type: "expense",
+    amount: 89.9,
+    description: "gastei 89,90 no mercado",
+    category_suggestion: "Alimentação",
+    transaction_date: "2026-03-15T00:00:00.000Z",
+    status: "pending_review",
+    persisted_transaction_id: null,
+  });
+
+  const result = await service.confirmCandidate({
+    userId: "user-1",
+    candidateId: "candidate-1",
+    accountId: "acc-1",
+  });
+
+  assert.equal(result.transactionId, "tx-1");
+  assert.equal(storage.createTransactionCalls, 1);
+  assert.equal(repository.candidates.get("candidate-1")?.status, "confirmed");
+});

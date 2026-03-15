@@ -1,5 +1,5 @@
 ﻿import { useState, type ComponentType } from "react";
-import { Home, ArrowLeftRight, Settings, PiggyBank, Building2, Lock, CalendarClock, Sparkles } from "lucide-react";
+import { Home, ArrowLeftRight, Settings, PiggyBank, Building2, Lock, CalendarClock, Sparkles, MessageCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import UpgradeModal from "@/components/UpgradeModal";
@@ -38,6 +38,7 @@ export function AppSidebar() {
     baseMenuItems[0],
     { title: "Gestão PJ e MEI", url: "/mei", icon: Building2, requiresPremium: true },
     { title: "Contas a Pagar", url: "/future-expenses", icon: CalendarClock, requiresPremium: false },
+    { title: "WhatsApp", url: "/whatsapp-agent", icon: MessageCircle, requiresPremium: false },
     { title: "Assistente com IA", url: "/ai", icon: Sparkles },
     ...baseMenuItems.slice(1),
   ];

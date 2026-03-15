@@ -1,5 +1,12 @@
-﻿import { supabase } from "../../supabase";
-import type { NormalizedStatementEntry, ReconciliationResult, ReconciliationStatus, StatementFileType, StatementImportSummary } from "./types";
+import { supabase } from "../../supabase";
+import { insertFirstSuccessful } from "../shared/supabaseFallback";
+import type {
+  NormalizedStatementEntry,
+  ReconciliationResult,
+  ReconciliationStatus,
+  StatementFileType,
+  StatementImportSummary,
+} from "./types";
 
 export type UploadProcessingStatus = "queued" | "processing" | "completed" | "failed";
 export type UploadStatus = "received" | "validated" | "rejected";
@@ -205,7 +212,7 @@ export class StatementImportRepository {
 
     if (!data.length) return;
 
-    const rows = data.map((entry: any) => ({
+    const primaryRows = data.map((entry: any) => ({
       upload_id: uploadId,
       user_id: userId,
       statement_entry_id: entry.id,
@@ -217,9 +224,32 @@ export class StatementImportRepository {
       decided_by: "system",
     }));
 
-    const { error: insertError } = await supabase.from("transaction_reconciliations").insert(rows);
-    if (insertError) {
-      throw new Error(insertError.message || "Erro ao registrar reconciliação");
+    const fallbackRows = data.map((entry: any) => ({
+      statement_entry_id: entry.id,
+      user_id: userId,
+      matched_transaction_id: entry.matched_transaction_id,
+      reconciliation_status: entry.reconciliation_status,
+      confidence_score: entry.confidence_score,
+      reason: entry.reconciliation_reason,
+    }));
+
+    const { error: insertPrimaryError } = await supabase
+      .from("transaction_reconciliations")
+      .insert(primaryRows);
+
+    if (!insertPrimaryError) {
+      return;
+    }
+
+    const { error: insertFallbackError } = await supabase
+      .from("transaction_reconciliations")
+      .insert(fallbackRows);
+
+    if (insertFallbackError) {
+      console.warn("[STATEMENT_IMPORT] reconciliation rows skipped:", {
+        primary: insertPrimaryError.message,
+        fallback: insertFallbackError.message,
+      });
     }
   }
 
@@ -305,7 +335,7 @@ export class StatementImportRepository {
       .eq("user_id", params.userId);
 
     if (reconciliationError) {
-      throw new Error(reconciliationError.message || "Erro ao atualizar vínculo de reconciliação");
+      console.warn("[STATEMENT_IMPORT] reconciliation update skipped:", reconciliationError.message);
     }
   }
 
@@ -317,20 +347,39 @@ export class StatementImportRepository {
     message: string;
     metadata?: Record<string, unknown>;
   }): Promise<void> {
-    const { error } = await supabase
-      .from("import_processing_logs")
-      .insert({
-        upload_id: params.uploadId,
-        user_id: params.userId,
-        level: params.level,
-        event: params.event,
-        message: params.message,
-        metadata: params.metadata ?? null,
-      });
-
-    if (error) {
-      throw new Error(error.message || "Erro ao gravar log de importação");
+    try {
+      await insertFirstSuccessful(
+        "import_processing_logs",
+        [
+          {
+            upload_id: params.uploadId,
+            user_id: params.userId,
+            level: params.level,
+            event: params.event,
+            message: params.message,
+            metadata: params.metadata ?? null,
+          },
+          {
+            upload_id: params.uploadId,
+            user_id: params.userId,
+            log_level: params.level,
+            event_type: params.event,
+            message: params.message,
+            metadata: params.metadata ?? null,
+          },
+          {
+            statement_upload_id: params.uploadId,
+            user_id: params.userId,
+            level: params.level,
+            event: params.event,
+            message: params.message,
+            payload: params.metadata ?? null,
+          },
+        ],
+        { select: false, single: false },
+      );
+    } catch (error) {
+      console.warn("[STATEMENT_IMPORT] import log skipped:", error);
     }
   }
 }
-

@@ -11,7 +11,6 @@ const createUploadSchema = z.object({
   fileType: z.enum(["csv", "ofx", "pdf"]),
   contentBase64: z.string().min(1),
   accountId: z.string().min(1),
-  dateToleranceDays: z.number().int().min(0).max(10).optional(),
 });
 
 const updateEntryStatusSchema = z.object({
@@ -44,7 +43,6 @@ export function registerStatementImportRoutes(params: {
         fileName: parsed.fileName,
         fileType: parsed.fileType,
         contentBase64: parsed.contentBase64,
-        dateToleranceDays: parsed.dateToleranceDays,
       });
 
       return res.status(202).json({

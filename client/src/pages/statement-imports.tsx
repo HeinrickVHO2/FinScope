@@ -95,7 +95,6 @@ export default function StatementImportsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [accountId, setAccountId] = useState<string>("");
   const [fileType, setFileType] = useState<"pdf" | "csv" | "ofx">("csv");
-  const [dateToleranceDays, setDateToleranceDays] = useState<number>(3);
   const [selectedUploadId, setSelectedUploadId] = useState<string | null>(null);
 
   const { data: accounts = [] } = useQuery<Account[]>({
@@ -122,18 +121,24 @@ export default function StatementImportsPage() {
       if (!file) throw new Error("Selecione um arquivo");
       if (!accountId) throw new Error("Selecione a conta de destino");
 
+      console.log("[CSV UI] upload iniciado", {
+        fileName: file.name,
+        fileType,
+        accountId,
+      });
       const contentBase64 = await fileToBase64(file);
+      console.log("[CSV UI] conteúdo lido, enviando request");
       const response = await apiRequest("POST", "/api/statement-imports/uploads", {
         fileName: file.name,
         fileType,
         contentBase64,
         accountId,
-        dateToleranceDays,
       });
 
       return response.json();
     },
     onSuccess: async (result) => {
+      console.log("[CSV UI] response recebida", result);
       await queryClient.invalidateQueries({ queryKey: ["/api/statement-imports/uploads"] });
       setSelectedUploadId(result.uploadId);
       setFile(null);
@@ -143,6 +148,7 @@ export default function StatementImportsPage() {
       });
     },
     onError: (error: Error) => {
+      console.error("[CSV UI] falha de upload", error);
       toast({
         title: "Não foi possível importar o arquivo",
         description: error.message,
@@ -211,7 +217,7 @@ export default function StatementImportsPage() {
       <div>
         <h1 className="text-3xl font-poppins font-bold">Importação de extratos</h1>
         <p className="text-muted-foreground">
-          Envie seu extrato em PDF, CSV ou OFX para conferir as movimentações da conta.
+          Envie seu extrato para ler as movimentações da conta. Quando o arquivo tiver data, ela será usada como data da transação.
         </p>
       </div>
 
@@ -223,7 +229,7 @@ export default function StatementImportsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label>Conta</Label>
               <Select value={accountId} onValueChange={setAccountId}>
@@ -255,17 +261,6 @@ export default function StatementImportsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Diferença permitida na data (dias)</Label>
-              <Input
-                type="number"
-                min={0}
-                max={10}
-                value={dateToleranceDays}
-                onChange={(event) => setDateToleranceDays(Number(event.target.value) || 0)}
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label>Arquivo</Label>
               <Input
                 type="file"
@@ -273,6 +268,7 @@ export default function StatementImportsPage() {
                 onChange={(event) => {
                   const selected = event.target.files?.[0] || null;
                   setFile(selected);
+                  console.log("[CSV UI] arquivo selecionado", selected?.name || null);
                   if (selected) {
                     const extension = selected.name.split(".").pop()?.toLowerCase();
                     if (extension === "csv" || extension === "ofx" || extension === "pdf") {
@@ -286,7 +282,7 @@ export default function StatementImportsPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => uploadMutation.mutate()} disabled={uploadMutation.isPending}>
-              {uploadMutation.isPending ? "Enviando..." : "Importar extrato"}
+              {uploadMutation.isPending ? "Enviando..." : "Enviar extrato"}
             </Button>
             <span className="text-xs text-muted-foreground">
               Tamanho máximo: 8 MB. Arquivos suspeitos podem ser bloqueados por segurança.
@@ -362,13 +358,13 @@ export default function StatementImportsPage() {
               <div className="grid gap-3 md:grid-cols-5">
                 <Card className="border-dashed">
                   <CardContent className="pt-4">
-                    <p className="text-xs text-muted-foreground">Total encontrado</p>
+                    <p className="text-xs text-muted-foreground">Linhas encontradas</p>
                     <p className="text-lg font-semibold">{selectedSummary.totalFound}</p>
                   </CardContent>
                 </Card>
                 <Card className="border-amber-200 bg-amber-50">
                   <CardContent className="pt-4">
-                    <p className="text-xs text-muted-foreground">Novas movimentações</p>
+                    <p className="text-xs text-muted-foreground">Itens para revisar</p>
                     <p className="text-lg font-semibold">{selectedSummary.newItems}</p>
                   </CardContent>
                 </Card>

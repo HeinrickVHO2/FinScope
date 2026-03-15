@@ -19,6 +19,7 @@ import MEIPage from "@/pages/mei";
 import SettingsPage from "@/pages/settings";
 import FutureExpensesPage from "@/pages/future-expenses";
 import AIClientPage from "@/pages/ai";
+import WhatsAppAgentPage from "@/pages/whatsapp-agent";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
 import SobrePage from "@/pages/sobre";
@@ -42,7 +43,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useRequireAuth();
   const [location, setLocation] = useLocation();
   const currentPath = location.split("?")[0];
-  const allowedBillingPaths = ["/billing-required", "/settings/billing"];
+  const allowedBillingPaths = ["/billing-required", "/settings/billing", "/whatsapp-agent"];
 
   useEffect(() => {
     if (
@@ -70,7 +71,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
     return <Redirect to="/login" />;
   }
 
-  if (user.billingStatus !== "active") {
+  if (user.billingStatus !== "active" && !allowedBillingPaths.includes(currentPath)) {
     return <Redirect to="/billing-required" />;
   }
 
@@ -188,6 +189,11 @@ function Router() {
       <Route path="/ai">
         <DashboardLayout>
           <AIClientPage />
+        </DashboardLayout>
+      </Route>
+      <Route path="/whatsapp-agent">
+        <DashboardLayout>
+          <WhatsAppAgentPage />
         </DashboardLayout>
       </Route>
       <Route path="/investments">
