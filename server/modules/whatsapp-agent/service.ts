@@ -108,6 +108,11 @@ function sanitizeEvent(event: WhatsAppInboundEvent): WhatsAppInboundEvent {
   };
 }
 
+function textPreview(text?: string) {
+  if (!text) return null;
+  return sanitizeIncomingText(text).slice(0, 120);
+}
+
 export class WhatsAppAgentService {
   private readonly parser: FinancialIntentParser;
   private readonly ocrProvider: MockOcrProvider;
@@ -480,122 +485,214 @@ export class WhatsAppAgentService {
     this.cleanupExpiredBindings();
 
     const sanitizedEvent = sanitizeEvent(event);
-    const existing = await this.repository.findInboundByProviderMessageId(sanitizedEvent.providerMessageId);
-    if (existing) return { status: "already_processed" };
-
-    const fromPhone = normalizePhone(sanitizedEvent.fromPhone);
-    if (!fromPhone) throw new Error("Telefone de origem invalido.");
-
-    const bindingMatch = this.findPendingBindingByMessage(fromPhone, sanitizedEvent.text);
-    if (bindingMatch) {
-      return this.confirmPhoneBinding(bindingMatch, { ...sanitizedEvent, fromPhone });
-    }
-
-    const userId = await this.repository.findUserByPhone(fromPhone);
-    const inbound = await this.repository.createInboundMessage({
-      event: { ...sanitizedEvent, fromPhone },
-      userId,
-      status: userId ? "received" : "pending_user_link",
-    });
-    await this.appendInboundProcessingLog({
-      inboundMessageId: inbound.id,
-      userId,
-      level: "info",
-      event: "inbound_received",
-      message: "Mensagem recebida do WhatsApp.",
-      metadata: {
-        provider: sanitizedEvent.provider,
-        type: sanitizedEvent.type,
-        hasMedia: Boolean(sanitizedEvent.media?.length),
-      },
+    this.logInternal("info", "process_inbound_start", "Iniciando processamento do evento do WhatsApp.", {
+      providerMessageId: sanitizedEvent.providerMessageId,
+      fromPhone: sanitizedEvent.fromPhone,
+      type: sanitizedEvent.type,
+      textPreview: textPreview(sanitizedEvent.text),
+      mediaCount: sanitizedEvent.media?.length ?? 0,
     });
 
-    if (!userId) return { status: "pending_user_link" };
+    try {
+      const existing = await this.repository.findInboundByProviderMessageId(sanitizedEvent.providerMessageId);
+      if (existing) {
+        this.logInternal("info", "process_inbound_duplicate", "Evento duplicado detectado; ignorando reprocessamento.", {
+          providerMessageId: sanitizedEvent.providerMessageId,
+          existingInboundMessageId: existing.id,
+        });
+        return { status: "already_processed" };
+      }
 
-    const user = await this.storage.getUser(userId);
-    if (!user || user.billingStatus !== "active") {
-      await this.repository.updateInboundMessage({
-        id: inbound.id,
-        status: "blocked_inactive_subscription",
-        errorMessage: "Assinatura inativa para processamento do WhatsApp.",
+      const fromPhone = normalizePhone(sanitizedEvent.fromPhone);
+      if (!fromPhone) {
+        this.logInternal("warn", "process_inbound_invalid_phone", "Evento descartado por telefone de origem invalido.", {
+          providerMessageId: sanitizedEvent.providerMessageId,
+          rawFromPhone: sanitizedEvent.fromPhone,
+        });
+        throw new Error("Telefone de origem invalido.");
+      }
+
+      const bindingMatch = this.findPendingBindingByMessage(fromPhone, sanitizedEvent.text);
+      if (bindingMatch) {
+        this.logInternal("info", "binding_match_found", "Codigo de vinculacao reconhecido no chat.", {
+          providerMessageId: sanitizedEvent.providerMessageId,
+          userId: bindingMatch.userId,
+          phone: fromPhone,
+        });
+        return this.confirmPhoneBinding(bindingMatch, { ...sanitizedEvent, fromPhone });
+      }
+
+      const userId = await this.repository.findUserByPhone(fromPhone);
+      this.logInternal(userId ? "info" : "warn", "binding_lookup_completed", userId
+        ? "Vinculo de telefone localizado para a mensagem recebida."
+        : "Nenhum vinculo localizado para o telefone recebido.", {
+        providerMessageId: sanitizedEvent.providerMessageId,
+        fromPhone,
+        userId,
+      });
+
+      const inbound = await this.repository.createInboundMessage({
+        event: { ...sanitizedEvent, fromPhone },
+        userId,
+        status: userId ? "received" : "pending_user_link",
+      });
+      this.logInternal("info", "inbound_created", "Inbound message criado com sucesso.", {
+        inboundMessageId: inbound.id,
+        providerMessageId: sanitizedEvent.providerMessageId,
+        userId,
+        initialStatus: userId ? "received" : "pending_user_link",
       });
       await this.appendInboundProcessingLog({
         inboundMessageId: inbound.id,
         userId,
-        level: "warn",
-        event: "subscription_blocked",
-        message: "Mensagem bloqueada por assinatura inativa.",
+        level: "info",
+        event: "inbound_received",
+        message: "Mensagem recebida do WhatsApp.",
+        metadata: {
+          provider: sanitizedEvent.provider,
+          type: sanitizedEvent.type,
+          hasMedia: Boolean(sanitizedEvent.media?.length),
+        },
       });
-      await this.sendReplyToInbound(inbound, "Seu numero esta vinculado, mas o assistente so funciona com assinatura ativa.");
-      return { status: "blocked_inactive_subscription" };
-    }
 
-    const openCandidate = sanitizedEvent.media?.length
-      ? null
-      : await this.repository.getLatestCandidateByUser(userId, WHATSAPP_OPEN_CANDIDATE_STATUSES);
+      if (!userId) {
+        this.logInternal("warn", "process_inbound_pending_link", "Processamento encerrado porque o telefone ainda nao esta vinculado.", {
+          inboundMessageId: inbound.id,
+          fromPhone,
+        });
+        return { status: "pending_user_link" };
+      }
 
-    if (openCandidate && sanitizedEvent.text) {
-      if (this.shouldHandleAsReplyToOpenCandidate(openCandidate, sanitizedEvent.text)) {
-        const result = await this.handleOpenCandidateReply(openCandidate, inbound, user, sanitizedEvent.text);
-        if (result) return result;
-      } else {
-        await this.repository.updateCandidate({
-          candidateId: openCandidate.id,
-          userId: user.id,
-          status: WHATSAPP_CANDIDATE_STATUS.IGNORED,
-          evidence: this.mergeCandidateEvidence(openCandidate, {
-            reviewStatus: WHATSAPP_CANDIDATE_STATUS.IGNORED,
-            supersededAt: new Date().toISOString(),
-            supersededByMessage: sanitizedEvent.text,
-            supersededReason: "new_standalone_message",
-          }),
+      const user = await this.storage.getUser(userId);
+      if (!user || user.billingStatus !== "active") {
+        await this.repository.updateInboundMessage({
+          id: inbound.id,
+          status: "blocked_inactive_subscription",
+          errorMessage: "Assinatura inativa para processamento do WhatsApp.",
         });
         await this.appendInboundProcessingLog({
-          inboundMessageId: openCandidate.inbound_message_id,
+          inboundMessageId: inbound.id,
+          userId,
+          level: "warn",
+          event: "subscription_blocked",
+          message: "Mensagem bloqueada por assinatura inativa.",
+        });
+        this.logInternal("warn", "process_inbound_inactive_subscription", "Processamento encerrado por assinatura inativa.", {
+          inboundMessageId: inbound.id,
+          userId,
+          billingStatus: user?.billingStatus ?? null,
+        });
+        await this.sendReplyToInbound(inbound, "Seu numero esta vinculado, mas o assistente so funciona com assinatura ativa.");
+        return { status: "blocked_inactive_subscription" };
+      }
+
+      const openCandidate = sanitizedEvent.media?.length
+        ? null
+        : await this.repository.getLatestCandidateByUser(userId, WHATSAPP_OPEN_CANDIDATE_STATUSES);
+
+      if (openCandidate && sanitizedEvent.text) {
+        const shouldHandleAsReply = this.shouldHandleAsReplyToOpenCandidate(openCandidate, sanitizedEvent.text);
+        this.logInternal("info", "open_candidate_evaluated", "Mensagem recebida com candidate pendente aberto.", {
+          inboundMessageId: inbound.id,
+          openCandidateId: openCandidate.id,
+          openCandidateStatus: openCandidate.status,
+          shouldHandleAsReply,
+          textPreview: textPreview(sanitizedEvent.text),
+        });
+
+        if (shouldHandleAsReply) {
+          const result = await this.handleOpenCandidateReply(openCandidate, inbound, user, sanitizedEvent.text);
+          if (result) return result;
+        } else {
+          await this.repository.updateCandidate({
+            candidateId: openCandidate.id,
+            userId: user.id,
+            status: WHATSAPP_CANDIDATE_STATUS.IGNORED,
+            evidence: this.mergeCandidateEvidence(openCandidate, {
+              reviewStatus: WHATSAPP_CANDIDATE_STATUS.IGNORED,
+              supersededAt: new Date().toISOString(),
+              supersededByMessage: sanitizedEvent.text,
+              supersededReason: "new_standalone_message",
+            }),
+          });
+          await this.appendInboundProcessingLog({
+            inboundMessageId: openCandidate.inbound_message_id,
+            userId: user.id,
+            level: "info",
+            event: "candidate_superseded",
+            message: "Candidate pendente foi descartado porque o usuario enviou uma nova solicitacao independente.",
+            metadata: {
+              candidateId: openCandidate.id,
+              supersededByMessageId: inbound.id,
+            },
+          });
+        }
+      }
+
+      if (sanitizedEvent.media?.length) {
+        this.logInternal("info", "branch_media_message", "Mensagem encaminhada para o fluxo de midia/nota fiscal.", {
+          inboundMessageId: inbound.id,
+          mediaCount: sanitizedEvent.media.length,
+        });
+        return this.handleMediaMessage(inbound, user, sanitizedEvent);
+      }
+
+      if (looksLikeGreeting(sanitizedEvent.text || "")) {
+        this.logInternal("info", "branch_greeting_message", "Mensagem classificada como saudacao.", {
+          inboundMessageId: inbound.id,
+          textPreview: textPreview(sanitizedEvent.text),
+        });
+        await this.repository.updateInboundMessage({
+          id: inbound.id,
+          status: "assistant_answered",
+          extractedPayload: { mode: "greeting" },
+        });
+        await this.appendInboundProcessingLog({
+          inboundMessageId: inbound.id,
           userId: user.id,
           level: "info",
-          event: "candidate_superseded",
-          message: "Candidate pendente foi descartado porque o usuario enviou uma nova solicitacao independente.",
-          metadata: {
-            candidateId: openCandidate.id,
-            supersededByMessageId: inbound.id,
-          },
+          event: "greeting_answered",
+          message: "Saudacao respondida no chat.",
         });
+        await this.sendReplyToInbound(
+          inbound,
+          "Oi. Posso registrar gastos, recebimentos, notas e tambem responder duvidas simples sobre seu financeiro. Se quiser, me mande algo como 'paguei 50 de gasolina'.",
+        );
+        return { status: "assistant_answered" };
       }
-    }
 
-    if (sanitizedEvent.media?.length) {
-      return this.handleMediaMessage(inbound, user, sanitizedEvent);
-    }
+      if (looksLikeFinanceAssistantQuestion(sanitizedEvent.text || "")) {
+        this.logInternal("info", "branch_assistant_message", "Mensagem classificada como pergunta financeira.", {
+          inboundMessageId: inbound.id,
+          textPreview: textPreview(sanitizedEvent.text),
+        });
+        return this.handleFinanceAssistantMessage(inbound, user, sanitizedEvent.text || "");
+      }
 
-    if (looksLikeGreeting(sanitizedEvent.text || "")) {
-      await this.repository.updateInboundMessage({
-        id: inbound.id,
-        status: "assistant_answered",
-        extractedPayload: { mode: "greeting" },
-      });
-      await this.appendInboundProcessingLog({
+      this.logInternal("info", "branch_transaction_message", "Mensagem encaminhada para o fluxo transacional.", {
         inboundMessageId: inbound.id,
-        userId: user.id,
-        level: "info",
-        event: "greeting_answered",
-        message: "Saudacao respondida no chat.",
+        textPreview: textPreview(sanitizedEvent.text),
       });
-      await this.sendReplyToInbound(
-        inbound,
-        "Oi. Posso registrar gastos, recebimentos, notas e tambem responder duvidas simples sobre seu financeiro. Se quiser, me mande algo como 'paguei 50 de gasolina'.",
-      );
-      return { status: "assistant_answered" };
+      return this.handleTransactionMessage(inbound, user, sanitizedEvent);
+    } catch (error) {
+      this.logInternal("error", "process_inbound_failed", "Erro durante o processamento do evento do WhatsApp.", {
+        providerMessageId: sanitizedEvent.providerMessageId,
+        fromPhone: sanitizedEvent.fromPhone,
+        type: sanitizedEvent.type,
+        textPreview: textPreview(sanitizedEvent.text),
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
     }
-
-    if (looksLikeFinanceAssistantQuestion(sanitizedEvent.text || "")) {
-      return this.handleFinanceAssistantMessage(inbound, user, sanitizedEvent.text || "");
-    }
-
-    return this.handleTransactionMessage(inbound, user, sanitizedEvent);
   }
 
   private async handleFinanceAssistantMessage(inbound: InboundMessageRecord, user: User, text: string) {
+    this.logInternal("info", "assistant_message_started", "Gerando resposta para pergunta financeira.", {
+      inboundMessageId: inbound.id,
+      userId: user.id,
+      textPreview: textPreview(text),
+    });
     const reply = await buildFinanceAssistantReply(this.storage, user.id, text);
     await this.repository.updateInboundMessage({
       id: inbound.id,
@@ -617,11 +714,25 @@ export class WhatsAppAgentService {
     const preparedTexts: string[] = [];
     const mediaSummary: Array<Record<string, unknown>> = [];
 
+    this.logInternal("info", "media_processing_started", "Iniciando processamento de midia recebida.", {
+      inboundMessageId: inbound.id,
+      userId: user.id,
+      mediaCount: event.media?.length ?? 0,
+      textPreview: textPreview(event.text),
+    });
+
     for (const media of event.media || []) {
       const prepared = await this.mediaService.prepareMedia(media);
       const hash = createHash("sha256").update(prepared?.base64 || media.url || media.id).digest("hex");
 
-      if (!prepared) continue;
+      if (!prepared) {
+        this.logInternal("warn", "media_skipped", "Midia recebida foi descartada por validacao ou download.", {
+          inboundMessageId: inbound.id,
+          mediaId: media.id,
+          mimeType: media.mimeType ?? null,
+        });
+        continue;
+      }
 
       const ocr = await this.ocrProvider.extractText({
         mimeType: prepared.mimeType,
@@ -654,6 +765,13 @@ export class WhatsAppAgentService {
     }
 
     const invoice = parseInvoiceText([event.text, preparedTexts.join("\n")].filter(Boolean).join("\n"));
+    this.logInternal("info", "invoice_parsed", "Parser de nota fiscal executado.", {
+      inboundMessageId: inbound.id,
+      foundInvoice: Boolean(invoice),
+      total: invoice?.total ?? null,
+      confidence: invoice?.confidence ?? null,
+      itemCount: invoice?.items.length ?? 0,
+    });
     if (!invoice || invoice.total === null) {
       await this.repository.updateInboundMessage({
         id: inbound.id,
@@ -757,6 +875,17 @@ export class WhatsAppAgentService {
 
   private async handleTransactionMessage(inbound: InboundMessageRecord, user: User, event: WhatsAppInboundEvent) {
     const intent = this.parser.parse({ text: event.text });
+    this.logInternal("info", "intent_classified", "Mensagem classificada pelo parser financeiro.", {
+      inboundMessageId: inbound.id,
+      userId: user.id,
+      kind: intent.kind,
+      amount: intent.amount,
+      confidence: intent.confidence,
+      missingFields: intent.missingFields,
+      description: intent.description,
+      merchant: intent.merchant ?? null,
+      categorySuggestion: intent.categorySuggestion ?? null,
+    });
     if (intent.kind === "unknown" || intent.amount === null) {
       await this.repository.updateInboundMessage({
         id: inbound.id,
@@ -783,6 +912,16 @@ export class WhatsAppAgentService {
     const suppressed = await this.isSuppressedPattern(user.id, normalizedDescription);
     const resolution = await this.resolveAccountForMessage(user.id, event.text || "");
     const needsClarification = intent.confidence < WHATSAPP_CONFIRMATION_THRESHOLD;
+    this.logInternal("info", "transaction_decision_context", "Contexto de decisao do fluxo transacional calculado.", {
+      inboundMessageId: inbound.id,
+      confidence: intent.confidence,
+      needsClarification,
+      selectedAccountId: resolution.selectedAccount?.id ?? null,
+      accountOptions: resolution.accountOptions.map((account) => account.id),
+      suppressed,
+      autoCreateThreshold: WHATSAPP_AUTO_CREATE_THRESHOLD,
+      confirmationThreshold: WHATSAPP_CONFIRMATION_THRESHOLD,
+    });
     const candidate = await this.repository.createCandidate({
       userId: user.id,
       inboundMessageId: inbound.id,
@@ -811,6 +950,14 @@ export class WhatsAppAgentService {
         })),
         suppressedByPattern: suppressed,
       },
+    });
+    this.logInternal("info", "candidate_created", "Candidate criado a partir da mensagem do WhatsApp.", {
+      inboundMessageId: inbound.id,
+      candidateId: candidate.id,
+      status: candidate.status,
+      confidence: intent.confidence,
+      kind: intent.kind,
+      amount: intent.amount,
     });
 
     if (needsClarification) {
@@ -913,6 +1060,13 @@ export class WhatsAppAgentService {
   }
 
   private async handleOpenCandidateReply(candidate: CandidateRecord, inbound: InboundMessageRecord, user: User, text: string) {
+    this.logInternal("info", "open_candidate_reply_started", "Processando mensagem como resposta a candidate pendente.", {
+      inboundMessageId: inbound.id,
+      candidateId: candidate.id,
+      candidateStatus: candidate.status,
+      textPreview: textPreview(text),
+    });
+
     if (detectResetIntent(text)) {
       await this.repository.updateCandidate({
         candidateId: candidate.id,
@@ -1234,10 +1388,20 @@ export class WhatsAppAgentService {
   }
 
   private async sendReplyToInbound(inbound: InboundMessageRecord, text: string) {
+    this.logInternal("info", "outbound_reply_attempt", "Tentando enviar resposta outbound pelo WhatsApp.", {
+      inboundMessageId: inbound.id,
+      fromPhone: inbound.fromPhone,
+      textPreview: textPreview(text),
+    });
     try {
       const sent = await this.messenger.sendTextMessage(inbound.fromPhone, text);
       if (!sent) {
         this.logInternal("warn", "outbound_reply_skipped", "Nao foi possivel enviar resposta no chat.", {
+          inboundMessageId: inbound.id,
+          fromPhone: inbound.fromPhone,
+        });
+      } else {
+        this.logInternal("info", "outbound_reply_success", "Resposta outbound enviada com sucesso.", {
           inboundMessageId: inbound.id,
           fromPhone: inbound.fromPhone,
         });

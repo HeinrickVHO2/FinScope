@@ -6,8 +6,17 @@ export class WhatsAppMessenger {
     const config = getWhatsAppMetaConfig();
     const normalizedPhone = normalizePhone(phone).replace(/\D+/g, "");
     const sanitizedText = String(text || "").replace(/\s+/g, " ").trim().slice(0, 1000);
+    const configStatus = {
+      hasAccessToken: Boolean(config.accessToken),
+      hasPhoneNumberId: Boolean(config.phoneNumberId),
+      hasWabaId: Boolean(config.wabaId),
+    };
 
     if (!normalizedPhone || !sanitizedText) {
+      console.warn("[WHATSAPP OUTBOUND] skipped sendTextMessage: invalid payload", {
+        normalizedPhone,
+        hasText: Boolean(sanitizedText),
+      });
       return false;
     }
 
@@ -15,11 +24,18 @@ export class WhatsAppMessenger {
       console.info("[WHATSAPP OUTBOUND] skipped sendTextMessage: outbound config missing", {
         normalizedPhone,
         preview: sanitizedText,
+        configStatus,
       });
       return false;
     }
 
     const endpoint = `https://graph.facebook.com/v22.0/${config.phoneNumberId}/messages`;
+    console.info("[WHATSAPP OUTBOUND] sendTextMessage start", {
+      normalizedPhone,
+      preview: sanitizedText,
+      endpoint,
+      configStatus,
+    });
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -42,10 +58,16 @@ export class WhatsAppMessenger {
       console.warn("[WHATSAPP OUTBOUND] failed sendTextMessage", {
         status: response.status,
         body: errorBody.slice(0, 500),
+        normalizedPhone,
+        endpoint,
       });
       return false;
     }
 
+    console.info("[WHATSAPP OUTBOUND] sendTextMessage success", {
+      normalizedPhone,
+      endpoint,
+    });
     return true;
   }
 }

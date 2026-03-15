@@ -294,7 +294,13 @@ export function registerWhatsAppAgentRoutes(params: {
   });
 
   app.post("/api/whatsapp/webhook/meta", async (req: any, res) => {
-    console.log("[WHATSAPP] evento Meta recebido");
+    const rawBody = Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.from(JSON.stringify(req.body || {}), "utf8");
+    console.log("[WHATSAPP] evento Meta recebido", {
+      rawBytes: rawBody.byteLength,
+      hasSignature: Boolean(req.headers["x-hub-signature-256"]),
+      object: req.body?.object || null,
+      entryCount: Array.isArray(req.body?.entry) ? req.body.entry.length : 0,
+    });
 
     try {
       const metaConfig = getWhatsAppMetaConfig();
@@ -308,15 +314,46 @@ export function registerWhatsAppAgentRoutes(params: {
       if (events.length > 20) {
         return res.status(413).json({ error: "Quantidade de eventos acima do limite permitido." });
       }
-      console.log("[WHATSAPP] eventos normalizados", { count: events.length });
+      console.log("[WHATSAPP] eventos normalizados", {
+        count: events.length,
+        events: events.map((event) => ({
+          providerMessageId: event.providerMessageId,
+          fromPhone: event.fromPhone,
+          type: event.type,
+          hasText: Boolean(event.text),
+          mediaCount: event.media?.length ?? 0,
+        })),
+      });
 
-      for (const event of events) {
-        await service.processInboundEvent(event);
+      if (!events.length) {
+        console.warn("[WHATSAPP] payload recebido sem eventos processaveis", {
+          topLevelKeys: Object.keys(req.body || {}),
+        });
+      }
+
+      for (const [index, event] of events.entries()) {
+        console.log("[WHATSAPP] iniciando processamento de evento normalizado", {
+          index,
+          providerMessageId: event.providerMessageId,
+          fromPhone: event.fromPhone,
+          type: event.type,
+        });
+        const result = await service.processInboundEvent(event);
+        console.log("[WHATSAPP] evento processado", {
+          index,
+          providerMessageId: event.providerMessageId,
+          result: result.status,
+        });
       }
 
       return res.json({ received: true, count: events.length });
     } catch (error) {
-      console.error("[WHATSAPP] erro ao processar webhook Meta", error);
+      console.error("[WHATSAPP] erro ao processar webhook Meta", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        object: req.body?.object || null,
+        entryCount: Array.isArray(req.body?.entry) ? req.body.entry.length : 0,
+      });
       return res.status(400).json({
         error: error instanceof Error ? error.message : "Não foi possível processar a mensagem.",
       });
@@ -326,8 +363,15 @@ export function registerWhatsAppAgentRoutes(params: {
   app.post("/api/integrations/whatsapp/webhook", async (req: any, res) => {
     try {
       const events = parseMetaWebhookPayload(req.body || {});
+      console.log("[WHATSAPP] integracao webhook normalizada", {
+        count: events.length,
+      });
       for (const event of events) {
-        await service.processInboundEvent(event);
+        const result = await service.processInboundEvent(event);
+        console.log("[WHATSAPP] integracao webhook evento processado", {
+          providerMessageId: event.providerMessageId,
+          result: result.status,
+        });
       }
       return res.json({ received: true, count: events.length });
     } catch (error) {

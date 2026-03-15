@@ -372,6 +372,44 @@ test("WhatsAppAgentService auto creates transaction for high confidence messages
   assert.match(messenger.sentMessages.at(-1)?.text || "", /Registrei/i);
 });
 
+test("WhatsAppAgentService processes the real whatsapp phrases used in the current flow", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const expense = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-real-expense",
+    text: "Paguei uma coxinha de 10 reais",
+  }));
+  const income = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-real-income",
+    text: "Recebi 300 reais de um amigo de presente de aniversario",
+  }));
+  const unknown = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-real-unknown",
+    text: "Comprei uma mochila",
+  }));
+  const expense2 = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-real-expense-2",
+    text: "paguei 50 reais de gasolina",
+  }));
+
+  assert.equal(expense.status, "auto_created_pending_review");
+  assert.equal(income.status, "auto_created_pending_review");
+  assert.equal(unknown.status, "needs_clarification");
+  assert.equal(expense2.status, "auto_created_pending_review");
+  assert.equal(storage.createTransactionCalls, 3);
+});
+
 test("WhatsAppAgentService asks for confirmation for medium confidence messages and confirms in chat", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();
