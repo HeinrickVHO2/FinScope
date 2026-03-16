@@ -1020,7 +1020,9 @@ test("WhatsAppAgentService confirms invoice suggestion, persists whatsapp transa
   assert.equal(first.status, "awaiting_user_confirmation");
   assert.equal(second.status, "confirmed_via_whatsapp");
   assert.equal(storage.createTransactionCalls, 1);
+  assert.equal(repository.candidates.get("candidate-1")?.transaction_date?.slice(0, 10), "2026-03-14");
   assert.equal(storage.transactions.get("tx-1")?.source, "whatsapp_agent");
+  assert.equal(storage.transactions.get("tx-1")?.date?.toISOString().slice(0, 10), "2026-03-14");
 
   const summary = await service.processInboundEvent(buildBaseEvent({
     providerMessageId: "provider-summary-after-invoice",

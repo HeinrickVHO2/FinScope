@@ -13,7 +13,7 @@ import {
   sanitizeIncomingText,
 } from "./decision";
 import { getWhatsAppAgentRuntimeInfo, getWhatsAppMetaConfig } from "./config";
-import { parseInvoiceText, formatInvoiceReplySummary } from "./invoiceParser";
+import { parseInvoiceCalendarDate, parseInvoiceText, formatInvoiceReplySummary } from "./invoiceParser";
 import { FinancialIntentParser } from "./intentParser";
 import { WhatsAppMediaService } from "./media";
 import { WhatsAppMessenger } from "./messenger";
@@ -1578,10 +1578,7 @@ export class WhatsAppAgentService {
   }
 
   private parseInvoiceDate(value: string) {
-    const [day, month, yearRaw] = value.split("/");
-    const year = yearRaw.length === 2 ? `20${yearRaw}` : yearRaw;
-    const parsed = new Date(Number(year), Number(month) - 1, Number(day));
-    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    return parseInvoiceCalendarDate(value) ?? new Date();
   }
 
   private pickInvoiceCategory(invoice: ReturnType<typeof parseInvoiceText>) {

@@ -22,3 +22,12 @@ test("FinancialIntentParser keeps pending fields when ambiguous", () => {
   assert.ok(intent.missingFields.includes("kind"));
 });
 
+test("FinancialIntentParser parses thousand-based Brazilian payment phrases deterministically", () => {
+  const parser = new FinancialIntentParser();
+  const intent = parser.parse({ text: "Recebi meu pagamento. 10 mil reais" });
+
+  assert.equal(intent.kind, "income");
+  assert.equal(intent.amount, 10000);
+  assert.equal(intent.categorySuggestion, "Salário");
+});
+

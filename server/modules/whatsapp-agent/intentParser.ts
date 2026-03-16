@@ -1,14 +1,8 @@
-﻿import type { FinancialIntent } from "./types";
+import type { FinancialIntent } from "./types";
+import { parseMonetaryAmountFromNaturalLanguage } from "./amountParser";
 
 function parseAmount(text: string): number | null {
-  const match = text.match(/(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})|\d+(?:[.,]\d{1,2})?)/);
-  if (!match) return null;
-
-  const normalized = match[1]
-    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
-    .replace(",", ".");
-  const value = Number(normalized);
-  return Number.isFinite(value) && value > 0 ? Number(value.toFixed(2)) : null;
+  return parseMonetaryAmountFromNaturalLanguage(text);
 }
 
 function parseType(text: string): "income" | "expense" | "unknown" {
@@ -112,4 +106,3 @@ export class FinancialIntentParser {
     };
   }
 }
-

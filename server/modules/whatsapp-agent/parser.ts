@@ -1,4 +1,5 @@
 import type { ParsedWhatsAppIntent } from "./types";
+import { parseMonetaryAmountFromNaturalLanguage } from "./amountParser";
 
 const removeAccents = (value: string) =>
   value
@@ -47,11 +48,7 @@ export function parseAmountFromWhatsAppText(value: string) {
 }
 
 export function extractAmountFromText(text: string) {
-  const matches = text.match(/(?:r\$\s*)?(-?\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})|-?\d+(?:[.,]\d{2})?)/i);
-  if (!matches) {
-    return null;
-  }
-  return parseAmountFromWhatsAppText(matches[0]);
+  return parseMonetaryAmountFromNaturalLanguage(text);
 }
 
 export function extractTransactionDateFromText(text: string) {

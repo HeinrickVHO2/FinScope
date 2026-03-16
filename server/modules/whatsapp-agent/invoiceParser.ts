@@ -13,6 +13,12 @@ export interface ParsedInvoice {
   confidence: number;
 }
 
+type InvoiceDateCandidate = {
+  value: string;
+  score: number;
+  index: number;
+};
+
 function parseBrazilianAmount(raw: string) {
   const normalized = raw.replace(/[^\d,.-]/g, "");
   if (!normalized) return null;
@@ -51,6 +57,65 @@ function looksLikeMerchant(line: string) {
   if (/\d{5,}/.test(line)) return false;
   if (/http|www\.|qrcode|qr code|protocolo|consumidor|chave de acesso|consulta via/i.test(line)) return false;
   return /[A-Za-zÀ-ÿ]/.test(line);
+}
+
+function normalizeInvoiceDateToken(raw: string) {
+  const match = raw.match(/(\d{2})\/(\d{2})\/(\d{2,4})/);
+  if (!match) return null;
+
+  const day = match[1];
+  const month = match[2];
+  const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+  return `${day}/${month}/${year}`;
+}
+
+function scoreInvoiceDateLine(line: string) {
+  if (/data de emiss[aã]o|emiss[aã]o|emitid[ao]/i.test(line)) return 120;
+  if (/data da compra|data compra|data da venda|data venda/i.test(line)) return 115;
+  if (/data\/hora|data hora|data:/i.test(line)) return 105;
+  if (/autoriza[cç][aã]o|protocolo|consulta via|chave de acesso/i.test(line)) return 40;
+  return 80;
+}
+
+export function extractInvoiceDate(text: string) {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 120);
+
+  const candidates: InvoiceDateCandidate[] = [];
+
+  lines.forEach((line, index) => {
+    const matches = Array.from(line.matchAll(/\b(\d{2}\/\d{2}\/\d{2,4})\b/g));
+    matches.forEach((match) => {
+      const normalized = normalizeInvoiceDateToken(match[1]);
+      if (!normalized) return;
+      candidates.push({
+        value: normalized,
+        score: scoreInvoiceDateLine(line),
+        index,
+      });
+    });
+  });
+
+  if (!candidates.length) return null;
+
+  candidates.sort((left, right) => {
+    if (right.score !== left.score) return right.score - left.score;
+    return left.index - right.index;
+  });
+
+  return candidates[0]?.value ?? null;
+}
+
+export function parseInvoiceCalendarDate(value: string) {
+  const normalized = normalizeInvoiceDateToken(value);
+  if (!normalized) return null;
+
+  const [day, month, year] = normalized.split("/");
+  const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12, 0, 0));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function parseItemLine(line: string): ParsedInvoiceItem | null {
@@ -118,7 +183,7 @@ export function parseInvoiceText(text: string): ParsedInvoice | null {
   }
 
   const merchant = lines.slice(0, 8).find(looksLikeMerchant) ?? lines.find(looksLikeMerchant) ?? null;
-  const dateMatch = lines.join(" ").match(/\b(\d{2}\/\d{2}\/\d{2,4})\b/);
+  const detectedDate = extractInvoiceDate(lines.join("\n"));
   const prioritizedTotalLine = lines.find((line) => /valor pago|valor a pagar|vlr total|v\.?\s*total|valor total|total da nota|total r\$|^total$/i.test(line));
   const secondaryTotalLine = lines.find((line) => /subtotal|totais|total/i.test(line));
   const detectedTotal = prioritizedTotalLine
@@ -142,7 +207,7 @@ export function parseInvoiceText(text: string): ParsedInvoice | null {
       0.34 +
         (merchant ? 0.12 : 0) +
         (detectedTotal !== null ? 0.3 : 0) +
-        (dateMatch ? 0.08 : 0) +
+        (detectedDate ? 0.08 : 0) +
         Math.min(0.28, items.length * 0.06),
     ).toFixed(2),
   );
@@ -154,7 +219,7 @@ export function parseInvoiceText(text: string): ParsedInvoice | null {
   return {
     merchant,
     total: detectedTotal,
-    date: dateMatch?.[1] ?? null,
+    date: detectedDate,
     items,
     confidence,
   };
