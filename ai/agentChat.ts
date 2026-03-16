@@ -17,6 +17,8 @@ import type { User } from "@shared/schema";
 import fetch from "node-fetch";
 import { executeAgentActions, type AgentActionResult } from "./agentActionsHandler";
 import { fetchChatHistory, saveChatHistoryMessage, type ChatHistoryRow } from "./chatHistory";
+import { buildFinancialAssistantReply, looksLikeFinanceAssistantQuestion } from "../server/modules/shared/financialAssistant";
+import { storage } from "../server/storage";
 
 export interface ChatRequest {
   content: string;
@@ -54,6 +56,17 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
 
   const userMessageRow = await saveChatHistoryMessage(userId, "user", content);
   addConversationContext(userId, "user", content);
+
+  if (looksLikeFinanceAssistantQuestion(content)) {
+    const assistantReply = await buildFinancialAssistantReply(storage, userId, content, "internal_chat");
+    const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", assistantReply);
+    addConversationContext(userId, "assistant", assistantReply);
+    return {
+      userMessage: mapHistoryToResponse(userMessageRow),
+      assistantMessage: mapHistoryToResponse(assistantMessageRow),
+      actions: [],
+    };
+  }
 
   let resolvedAccountType = detectAccountTypeFromText(content) ?? session.lastAccountType;
 

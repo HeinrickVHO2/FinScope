@@ -965,6 +965,73 @@ test("WhatsAppAgentService uses structured receipt OCR when invoice text is spar
   assert.match(messenger.sentMessages.at(-1)?.text || "", /52,52/i);
 });
 
+test("WhatsAppAgentService confirms invoice suggestion, persists whatsapp transaction and uses it in summary", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const ocrProvider = {
+    async extractText() {
+      return {
+        text: "",
+        confidence: 0.89,
+        receiptDetected: true,
+        structuredReceipt: {
+          merchant: "SUPERMERCADO TRIUNFO LTDA",
+          total: 52.52,
+          date: "14/03/2026",
+          items: [
+            { description: "File de Peito", quantity: 0.341, unitPrice: 19.99, totalPrice: 6.81 },
+            { description: "Acougue Bovino", quantity: 1, unitPrice: 9.99, totalPrice: 9.99 },
+          ],
+        },
+      };
+    },
+  };
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    messenger: messenger as any,
+    ocrProvider: ocrProvider as any,
+    mediaService: new FakeMediaService() as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const first = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-structured-invoice-confirm-1",
+    type: "image",
+    text: "",
+    media: [
+      {
+        id: "media-4",
+        mimeType: "image/jpeg",
+        base64: "aGVsbG8=",
+      },
+    ],
+  }));
+
+  const second = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-structured-invoice-confirm-2",
+    text: "sim",
+  }));
+
+  assert.equal(first.status, "awaiting_user_confirmation");
+  assert.equal(second.status, "confirmed_via_whatsapp");
+  assert.equal(storage.createTransactionCalls, 1);
+  assert.equal(storage.transactions.get("tx-1")?.source, "whatsapp_agent");
+
+  const summary = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-summary-after-invoice",
+    text: "Me mostra meu resumo financeiro",
+  }));
+
+  assert.equal(summary.status, "assistant_answered");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /52,52/i);
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /Categoria com maior peso/i);
+});
+
 test("WhatsAppAgentService does not trap a new standalone transaction behind an older pending candidate", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();

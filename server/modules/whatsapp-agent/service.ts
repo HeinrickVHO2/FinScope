@@ -166,6 +166,13 @@ function buildStructuredReceiptText(structuredReceipt?: {
   return lines.join("\n").trim();
 }
 
+const WHATSAPP_TRANSACTION_PROVENANCE = {
+  source: "whatsapp_agent" as const,
+  origin: "whatsapp" as const,
+  sourceType: "agent_whatsapp" as const,
+  channel: "whatsapp" as const,
+};
+
 export class WhatsAppAgentService {
   private readonly parser: FinancialIntentParser;
   private readonly ocrProvider: OcrProvider;
@@ -1292,7 +1299,8 @@ export class WhatsAppAgentService {
       selectedAccountType: selectedAccount.type,
       amount: candidate.amount,
       proposedType: candidate.proposed_type,
-      source: "whatsapp_agent",
+      source: WHATSAPP_TRANSACTION_PROVENANCE.source,
+      origin: WHATSAPP_TRANSACTION_PROVENANCE.origin,
     });
     let transaction: Transaction;
     try {
@@ -1305,7 +1313,7 @@ export class WhatsAppAgentService {
         category: candidate.category_suggestion || categoryFromIntent(candidate.proposed_type === "income" ? "income" : "expense", candidate.category_suggestion),
         date: new Date(candidate.transaction_date),
         accountType: selectedAccount.type.toUpperCase() === "PJ" ? "PJ" : "PF",
-        source: "whatsapp_agent",
+        source: WHATSAPP_TRANSACTION_PROVENANCE.source,
       });
     } catch (error) {
       this.logInternal("error", "transaction_create_failed", "Falha ao criar transacao a partir do candidate.", {
@@ -1339,6 +1347,9 @@ export class WhatsAppAgentService {
         selectedAccountId: selectedAccount.id,
         selectedAccountLabel: accountLabel(selectedAccount),
         transactionId: transaction.id,
+        transactionOrigin: WHATSAPP_TRANSACTION_PROVENANCE.origin,
+        transactionChannel: WHATSAPP_TRANSACTION_PROVENANCE.channel,
+        transactionSourceType: WHATSAPP_TRANSACTION_PROVENANCE.sourceType,
       }),
     });
     await this.appendInboundProcessingLog({
@@ -1351,7 +1362,8 @@ export class WhatsAppAgentService {
         candidateId: candidate.id,
         transactionId: transaction.id,
         finalStatus: options.finalStatus,
-        source: "whatsapp_agent",
+        source: WHATSAPP_TRANSACTION_PROVENANCE.source,
+        origin: WHATSAPP_TRANSACTION_PROVENANCE.origin,
       },
     });
 
@@ -1595,6 +1607,9 @@ export class WhatsAppAgentService {
       date: transaction.date.toISOString(),
       accountType: transaction.accountType,
       source: transaction.source,
+      origin: transaction.source === WHATSAPP_TRANSACTION_PROVENANCE.source ? WHATSAPP_TRANSACTION_PROVENANCE.origin : "app",
+      sourceType: transaction.source === WHATSAPP_TRANSACTION_PROVENANCE.source ? WHATSAPP_TRANSACTION_PROVENANCE.sourceType : transaction.source,
+      channel: transaction.source === WHATSAPP_TRANSACTION_PROVENANCE.source ? WHATSAPP_TRANSACTION_PROVENANCE.channel : "app",
     };
   }
 
