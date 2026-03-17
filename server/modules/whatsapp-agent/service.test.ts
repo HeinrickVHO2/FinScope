@@ -931,6 +931,82 @@ test("WhatsAppAgentService interpreta milhar com virgula em metas e aporte inici
   }
 });
 
+test("WhatsAppAgentService interpreta objetivo de quitar divida como meta com aporte inicial", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, { messenger: messenger as any });
+
+  const restoreCreateGoal = patchMethod(
+    GoalService.prototype,
+    "createGoal",
+    (async (_userId: string, payload: any) => ({
+      id: "goal-3",
+      userId: "user-1",
+      title: payload.title,
+      targetValue: String(payload.targetValue),
+      currentValue: "0",
+      targetDate: null,
+      status: "active",
+      archivedAt: null,
+      completedAt: null,
+      metadata: payload.metadata ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })) as GoalService["createGoal"],
+  );
+
+  const restoreAddContribution = patchMethod(
+    GoalService.prototype,
+    "addContribution",
+    (async ({ amount }: any) => ({
+      goal: {
+        id: "goal-3",
+        userId: "user-1",
+        title: "divida",
+        targetValue: "17000",
+        currentValue: String(amount),
+        targetDate: null,
+        status: "active",
+        archivedAt: null,
+        completedAt: null,
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      contribution: {
+        id: "contrib-3",
+        goalId: "goal-3",
+        userId: "user-1",
+        amount: String(amount),
+        contributedAt: new Date(),
+        note: "Aporte inicial via assistente",
+        createdAt: new Date(),
+      },
+    })) as GoalService["addContribution"],
+  );
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  try {
+    const result = await service.processInboundEvent(buildBaseEvent({
+      providerMessageId: "provider-goal-debt-payoff",
+      text: "Quero pagar uma divida de 17 mil. Ja juntei 4,200 reais",
+    }));
+
+    assert.equal(result.status, "assistant_answered");
+    assert.match(messenger.sentMessages[0]?.text || "", /17\.000,00|17000/i);
+    assert.match(messenger.sentMessages[0]?.text || "", /4\.200,00|4200/i);
+  } finally {
+    restoreCreateGoal();
+    restoreAddContribution();
+  }
+});
+
 test("WhatsAppAgentService answers category queries from current month data", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();

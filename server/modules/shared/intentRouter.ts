@@ -54,6 +54,7 @@ function parseGoalTitle(rawText: string) {
     /guardar\s+(?:dinheiro\s+)?para\s+(?:comprar\s+)?(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
     /juntar\s+(?:dinheiro\s+)?para\s+(?:comprar\s+)?(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
     /objetivo\s+para\s+(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
+    /(?:pagar|quitar)\s+(?:uma\s+|a\s+)?(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
   ];
 
   for (const pattern of patterns) {
@@ -177,7 +178,7 @@ function detectSummaryFocus(normalized: string): SummaryIntentFocus {
 
 export function looksLikeGoalIntent(text: string) {
   const normalized = normalizeAssistantText(text);
-  return /crie uma meta|criar meta|quero uma meta|meta para|guardar dinheiro para|juntar dinheiro para|guardar para|juntar para|objetivo para/.test(normalized);
+  return /crie uma meta|criar meta|quero uma meta|meta para|guardar dinheiro para|juntar dinheiro para|guardar para|juntar para|objetivo para|quero pagar uma divida|quero quitar uma divida|pagar uma divida|quitar uma divida|pagar a divida|quitar a divida/.test(normalized);
 }
 
 export function looksLikeReminderIntent(text: string) {

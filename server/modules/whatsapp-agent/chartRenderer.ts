@@ -258,158 +258,153 @@ function buildHtml(payload?: VisualPayload | null) {
             color: #111827;
           }
           .frame {
-            width: 960px;
-            padding: 32px;
+            width: 760px;
+            padding: 24px;
           }
           .sheet {
             background: white;
-            border-radius: 28px;
-            padding: 32px;
-            box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
+            border-radius: 26px;
+            padding: 24px;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
           }
           .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 24px;
-            margin-bottom: 24px;
+            display: block;
+            margin-bottom: 20px;
           }
           .eyebrow {
             display: inline-flex;
-            padding: 8px 14px;
+            padding: 7px 12px;
             border-radius: 999px;
             background: #dcfce7;
             color: #166534;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 700;
             letter-spacing: 0.04em;
             text-transform: uppercase;
           }
           h1 {
-            margin: 14px 0 8px;
-            font-size: 42px;
-            line-height: 1.05;
+            margin: 12px 0 6px;
+            font-size: 34px;
+            line-height: 1.08;
           }
           .subtitle {
             margin: 0;
             color: #4b5563;
-            font-size: 20px;
+            font-size: 17px;
           }
           .brand {
-            text-align: right;
+            margin-top: 10px;
             color: #16a34a;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 700;
           }
           .cards {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 14px;
-            margin-bottom: 18px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
           }
           .card,
           .panel {
             border: 1px solid #e5e7eb;
-            border-radius: 20px;
+            border-radius: 18px;
             background: #ffffff;
           }
           .card {
-            padding: 18px;
-            min-height: 96px;
+            padding: 16px;
+            min-height: 84px;
           }
           .card span {
             display: block;
             color: #6b7280;
-            font-size: 15px;
-            margin-bottom: 10px;
+            font-size: 13px;
+            margin-bottom: 8px;
           }
           .card strong {
-            font-size: 28px;
+            font-size: 23px;
             line-height: 1.1;
           }
           .panel {
-            padding: 20px;
-            margin-top: 16px;
+            padding: 16px;
+            margin-top: 12px;
           }
           .section-header {
             display: flex;
             justify-content: space-between;
             gap: 12px;
             align-items: flex-end;
-            margin-bottom: 18px;
+            margin-bottom: 14px;
           }
           .section-header h3 {
             margin: 0;
-            font-size: 24px;
+            font-size: 20px;
           }
           .section-header p {
             margin: 0;
             color: #6b7280;
-            font-size: 14px;
+            font-size: 12px;
           }
           .bar-chart {
             display: flex;
             align-items: flex-end;
-            gap: 14px;
-            min-height: 250px;
+            gap: 10px;
+            min-height: 200px;
           }
           .bar-item {
             flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            min-width: 0;
           }
           .bar-value {
-            font-size: 13px;
+            font-size: 11px;
             color: #4b5563;
             text-align: center;
           }
           .bar-shell {
             width: 100%;
-            height: 190px;
+            height: 150px;
             display: flex;
             align-items: flex-end;
             justify-content: center;
-            padding: 0 8px;
+            padding: 0 4px;
           }
           .bar-fill {
             width: 100%;
-            border-radius: 16px 16px 8px 8px;
+            border-radius: 12px 12px 6px 6px;
             box-shadow: inset 0 -18px 24px rgba(255, 255, 255, 0.24);
           }
           .bar-label {
-            font-size: 15px;
+            font-size: 12px;
             color: #374151;
             text-transform: lowercase;
           }
           .breakdown-body {
-            display: grid;
-            grid-template-columns: 280px 1fr;
-            gap: 28px;
-            align-items: center;
+            display: block;
           }
           .pie {
-            width: 240px;
-            height: 240px;
+            width: 180px;
+            height: 180px;
             border-radius: 999px;
-            margin: 0 auto;
+            margin: 0 auto 16px;
           }
           .legend {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
           }
           .legend-row {
             display: grid;
-            grid-template-columns: 18px 1fr auto auto;
-            gap: 10px;
+            grid-template-columns: 14px 1fr auto auto;
+            gap: 8px;
             align-items: center;
-            font-size: 15px;
+            font-size: 13px;
           }
           .legend-dot {
-            width: 18px;
-            height: 18px;
+            width: 14px;
+            height: 14px;
             border-radius: 999px;
           }
           .legend-name {
@@ -419,12 +414,12 @@ function buildHtml(payload?: VisualPayload | null) {
           .limits {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 12px;
           }
           .limit-card {
             border: 1px solid #e5e7eb;
-            border-radius: 18px;
-            padding: 16px;
+            border-radius: 16px;
+            padding: 14px;
             background: #fafafa;
           }
           .limit-head,
@@ -435,11 +430,11 @@ function buildHtml(payload?: VisualPayload | null) {
             align-items: center;
           }
           .limit-head {
-            margin-bottom: 12px;
+            margin-bottom: 10px;
           }
           .limit-track {
             width: 100%;
-            height: 14px;
+            height: 12px;
             border-radius: 999px;
             background: #e5e7eb;
             overflow: hidden;
@@ -449,17 +444,17 @@ function buildHtml(payload?: VisualPayload | null) {
             border-radius: 999px;
           }
           .limit-foot {
-            margin-top: 10px;
+            margin-top: 8px;
             color: #4b5563;
-            font-size: 14px;
+            font-size: 12px;
           }
           .notes p {
             margin: 0;
-            font-size: 18px;
+            font-size: 15px;
             line-height: 1.5;
           }
           .notes p + p {
-            margin-top: 10px;
+            margin-top: 8px;
           }
         </style>
       </head>
@@ -497,18 +492,12 @@ export class PuppeteerWhatsAppVisualRenderer implements WhatsAppVisualRenderer {
 
     try {
       const page = await browser.newPage();
-      await page.setViewport({ width: 1024, height: 1200, deviceScaleFactor: 2 });
+      await page.setViewport({ width: 820, height: 1400, deviceScaleFactor: 2 });
       await page.setContent(html, { waitUntil: "domcontentloaded" });
-      const contentHeight = await page.evaluate(() => Math.ceil(document.body.scrollHeight));
-      await page.setViewport({
-        width: 1024,
-        height: Math.max(800, Math.min(1600, contentHeight + 24)),
-        deviceScaleFactor: 2,
-      });
-
-      const screenshot = await page.screenshot({
+      const sheet = await page.$(".sheet");
+      if (!sheet) return null;
+      const screenshot = await sheet.screenshot({
         type: "png",
-        fullPage: true,
       });
 
       return {

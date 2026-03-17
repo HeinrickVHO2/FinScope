@@ -39,6 +39,14 @@ test("parseAssistantRouteIntent identifica meta, aporte e lembrete", () => {
     initialContribution: 850,
   });
 
+  const debtGoal = parseAssistantRouteIntent("Quero pagar uma divida de 17 mil. Ja juntei 4,200 reais");
+  assert.deepEqual(debtGoal, {
+    type: "create_goal",
+    title: "divida",
+    targetValue: 17000,
+    initialContribution: 4200,
+  });
+
   const reminder = parseAssistantRouteIntent("Boleto do carro todo dia 12, R$ 1300");
   assert.deepEqual(reminder, {
     type: "create_reminder",
