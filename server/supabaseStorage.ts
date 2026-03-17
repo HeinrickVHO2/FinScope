@@ -30,6 +30,14 @@ import { classifyExpenseCategory, shouldAutoClassifyExpense } from "./modules/sh
 
 type AccountScope = "PF" | "PJ" | "ALL";
 
+const startOfToday = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+};
+
+const isFutureExpenseOverdue = (expense: { status: string; dueDate: Date }) =>
+  expense.status === "pending" && expense.dueDate.getTime() < startOfToday().getTime();
+
 export class SupabaseStorage implements IStorage {
   private mapFutureExpenseRow(row: any): FutureExpense {
     return {
@@ -1021,6 +1029,30 @@ export class SupabaseStorage implements IStorage {
   }
 
   async getFutureExpenses(userId: string, scope: AccountScope = "ALL", status?: "pending" | "paid" | "overdue"): Promise<FutureExpense[]> {
+    let overdueQuery = supabase
+      .from("future_expenses")
+      .select("id,due_date,status")
+      .eq("user_id", userId)
+      .eq("status", "pending");
+
+    if (scope && scope !== "ALL") {
+      overdueQuery = overdueQuery.eq("account_type", scope);
+    }
+
+    const { data: pendingRows } = await overdueQuery;
+    const overdueIds = (pendingRows || [])
+      .filter((row) => row?.due_date && new Date(row.due_date).getTime() < startOfToday().getTime())
+      .map((row) => row.id)
+      .filter(Boolean);
+
+    if (overdueIds.length) {
+      await supabase
+        .from("future_expenses")
+        .update({ status: "overdue" })
+        .in("id", overdueIds)
+        .eq("user_id", userId);
+    }
+
     let query = supabase
       .from("future_expenses")
       .select("*")
@@ -1040,6 +1072,11 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createFutureExpense(expense: InsertFutureExpense): Promise<FutureExpense> {
+    const normalizedStatus = expense.status || (isFutureExpenseOverdue({
+      status: "pending",
+      dueDate: expense.dueDate,
+    }) ? "overdue" : "pending");
+
     const { data, error } = await supabase
       .from("future_expenses")
       .insert({
@@ -1051,7 +1088,7 @@ export class SupabaseStorage implements IStorage {
         due_date: expense.dueDate.toISOString(),
         is_recurring: expense.isRecurring ?? false,
         recurrence_type: expense.recurrenceType ?? null,
-        status: expense.status || "pending",
+        status: normalizedStatus,
       })
       .select()
       .single();

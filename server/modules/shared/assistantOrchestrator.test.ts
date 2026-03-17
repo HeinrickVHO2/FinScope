@@ -306,6 +306,24 @@ test("AssistantOrchestrator cria lembrete, marca como pago, resume investimentos
   assert.equal((switchView.payload as any)?.data?.view, "goals");
 });
 
+test("AssistantOrchestrator cria conta a pagar avulsa com titulo resumido", async () => {
+  const storage = buildFakeStorage();
+  const orchestrator = new AssistantOrchestrator(storage as any);
+
+  const payable = await orchestrator.handleMessage({
+    userId: "user-1",
+    text: "Tenho que pagar minha fatura do cartao no valor de 3 mil reais no dia 02/04/2026",
+    channel: "whatsapp",
+  });
+
+  assert.equal(payable.handled, true);
+  assert.equal(storage.reminders.length, 1);
+  assert.equal(storage.reminders[0]?.title, "fatura do cartao");
+  assert.equal(storage.reminders[0]?.amount, 3000);
+  assert.equal((payable.payload as any)?.data?.route, "/future-expenses");
+  assert.match(payable.reply || "", /Conta a pagar criada/i);
+});
+
 test("AssistantOrchestrator devolve payload estruturado para divisao e explicacao de aumento", async () => {
   const restoreListByUser = patchMethod(
     CategoryLimitService.prototype,

@@ -113,8 +113,21 @@ export default function FutureExpensesPage() {
     },
   });
 
+  const allExpensesQuery = useQuery<FutureExpense[]>({
+    queryKey: ["future-expenses", scopeFilter, "all-statuses"],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        accountType: scopeFilter,
+      });
+      const response = await apiRequest("GET", `/api/future-expenses?${params.toString()}`);
+      return response.json();
+    },
+  });
+
   const invalidateExpenses = () => {
     queryClient.invalidateQueries({ queryKey: ["future-expenses", scopeFilter, statusFilter] });
+    queryClient.invalidateQueries({ queryKey: ["future-expenses", scopeFilter, "all-statuses"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
   };
 
   const createExpenseMutation = useMutation({
@@ -173,6 +186,31 @@ export default function FutureExpensesPage() {
   });
 
   const expenses = useMemo(() => expensesQuery.data || [], [expensesQuery.data]);
+  const summary = useMemo(() => {
+    const allExpenses = allExpensesQuery.data || [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueSoonLimit = new Date(today);
+    dueSoonLimit.setDate(dueSoonLimit.getDate() + 3);
+
+    return allExpenses.reduce(
+      (acc, expense) => {
+        const dueDate = new Date(expense.dueDate);
+        if (expense.status === "overdue") acc.overdue += 1;
+        if (expense.status === "pending") acc.pending += 1;
+        if (expense.status === "paid") acc.paid += 1;
+        if (
+          expense.status === "pending"
+          && dueDate.getTime() >= today.getTime()
+          && dueDate.getTime() <= dueSoonLimit.getTime()
+        ) {
+          acc.dueSoon += 1;
+        }
+        return acc;
+      },
+      { overdue: 0, pending: 0, paid: 0, dueSoon: 0 },
+    );
+  }, [allExpensesQuery.data]);
 
   const handleScopeChange = (scope: Scope) => {
     if (scope === "PJ" && !isPremium) {
@@ -218,6 +256,28 @@ export default function FutureExpensesPage() {
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <Card>
           <CardHeader className="flex flex-col gap-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Atrasadas</p>
+                <p className="mt-2 text-2xl font-semibold text-rose-600">{summary.overdue}</p>
+                <p className="text-sm text-muted-foreground">Contas que ja passaram da data.</p>
+              </div>
+              <div className="rounded-xl border bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Vencendo</p>
+                <p className="mt-2 text-2xl font-semibold text-amber-600">{summary.dueSoon}</p>
+                <p className="text-sm text-muted-foreground">Proximas dos proximos 3 dias.</p>
+              </div>
+              <div className="rounded-xl border bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Em aberto</p>
+                <p className="mt-2 text-2xl font-semibold text-primary">{summary.pending}</p>
+                <p className="text-sm text-muted-foreground">Pendencias ainda nao pagas.</p>
+              </div>
+            </div>
+            {summary.overdue > 0 && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                Voce tem {summary.overdue} conta{summary.overdue > 1 ? "s" : ""} atrasada{summary.overdue > 1 ? "s" : ""}. Elas tambem aparecem destacadas abaixo e no sino de notificacoes.
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Próximos pagamentos</CardTitle>
@@ -273,8 +333,8 @@ export default function FutureExpensesPage() {
                         R$ {Number(expense.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </p>
                       <div className="flex gap-2">
-                        <Badge className={cn("text-xs font-medium", STATUS_META[statusFilter].color)}>
-                          <span className="flex items-center gap-1">{STATUS_META[statusFilter].icon}{STATUS_META[statusFilter].label}</span>
+                        <Badge className={cn("text-xs font-medium", STATUS_META[(expense.status as StatusFilter) || "pending"].color)}>
+                          <span className="flex items-center gap-1">{STATUS_META[(expense.status as StatusFilter) || "pending"].icon}{STATUS_META[(expense.status as StatusFilter) || "pending"].label}</span>
                         </Badge>
                       </div>
                       <div className="flex gap-2">

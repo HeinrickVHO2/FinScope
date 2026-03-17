@@ -2,6 +2,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,14 +12,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User } from "lucide-react";
+import { Bell, Clock3, LogOut, TriangleAlert, User } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 
 interface DashboardHeaderProps {
   userName?: string;
   userPlan?: string;
+  trialDaysLeft?: number;
 }
+
+type NotificationItem = {
+  id: string;
+  kind: string;
+  severity: "high" | "medium" | "low";
+  title: string;
+  message: string;
+  route?: string;
+};
+
+type NotificationResponse = {
+  unreadCount: number;
+  notifications: NotificationItem[];
+};
 
 export function DashboardHeader({ 
   userName = "Usuário", 
@@ -26,6 +43,14 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const [, setLocation] = useLocation();
   const { logout } = useAuth();
+  const notificationsQuery = useQuery<NotificationResponse>({
+    queryKey: ["/api/notifications"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/notifications");
+      return response.json();
+    },
+    staleTime: 60_000,
+  });
 
   const handleLogout = async () => {
     await logout();
@@ -40,6 +65,8 @@ export function DashboardHeader({
   };
 
   const planBadge = getPlanBadge();
+  const notifications = notificationsQuery.data?.notifications || [];
+  const unreadCount = notificationsQuery.data?.unreadCount || 0;
 
   return (
     <header className="flex items-center justify-between gap-4 border-b p-4 bg-background">
@@ -55,6 +82,45 @@ export function DashboardHeader({
         <Badge variant={planBadge.variant} data-testid="badge-plan">
           {planBadge.label}
         </Badge>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuLabel>Notificacoes</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {notifications.length ? (
+              notifications.slice(0, 6).map((notification) => (
+                <DropdownMenuItem
+                  key={notification.id}
+                  className="items-start gap-3 whitespace-normal"
+                  onClick={() => notification.route && setLocation(notification.route)}
+                >
+                  {notification.severity === "high" ? (
+                    <TriangleAlert className="mt-0.5 h-4 w-4 text-rose-500" />
+                  ) : (
+                    <Clock3 className="mt-0.5 h-4 w-4 text-amber-500" />
+                  )}
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium leading-none">{notification.title}</p>
+                    <p className="text-xs text-muted-foreground">{notification.message}</p>
+                  </div>
+                </DropdownMenuItem>
+              ))
+            ) : (
+              <div className="px-2 py-3 text-sm text-muted-foreground">
+                Sem alertas no momento.
+              </div>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-user-menu">

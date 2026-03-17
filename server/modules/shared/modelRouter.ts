@@ -80,7 +80,7 @@ export function resolveModelForIntent(intent: AssistantRouteIntent): ModelSelect
     return resolveModel("goal", { requiresNarrative: true });
   }
 
-  if (intent.type === "create_reminder" || intent.type === "mark_reminder_paid") {
+  if (intent.type === "create_reminder" || intent.type === "create_payable" || intent.type === "mark_reminder_paid") {
     return resolveModel("reminder");
   }
 

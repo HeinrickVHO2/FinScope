@@ -54,6 +54,15 @@ test("parseAssistantRouteIntent identifica meta, aporte e lembrete", () => {
     amount: 1300,
     dayOfMonth: 12,
   });
+
+  const payable = parseAssistantRouteIntent("Tenho que pagar minha fatura do cartao no valor de 3 mil reais no dia 02/04/2026");
+  assert.equal(payable?.type, "create_payable");
+  assert.equal((payable as any)?.title, "fatura do cartao");
+  assert.equal((payable as any)?.amount, 3000);
+  assert.equal((payable as any)?.accountType, "PF");
+  assert.equal((payable as any)?.dueDate?.getFullYear(), 2026);
+  assert.equal((payable as any)?.dueDate?.getMonth(), 3);
+  assert.equal((payable as any)?.dueDate?.getDate(), 2);
 });
 
 test("parseAssistantRouteIntent identifica resumo, categoria dominante e limites", () => {

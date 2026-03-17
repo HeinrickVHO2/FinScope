@@ -1,7 +1,7 @@
 import type { ParsedWhatsAppIntent } from "./types";
 import { parseMonetaryAmountFromNaturalLanguage } from "./amountParser";
 import { inferExpenseCategory } from "../shared/expenseClassifier";
-import { looksLikeGoalIntent, looksLikeReminderIntent } from "../shared/intentRouter";
+import { looksLikeGoalIntent, looksLikePayableIntent, looksLikeReminderIntent } from "../shared/intentRouter";
 
 const removeAccents = (value: string) =>
   value
@@ -15,7 +15,7 @@ const normalizeText = (value: string) =>
     .trim();
 
 const INCOME_KEYWORDS = ["recebi", "entrou", "ganhei", "vendi", "pix recebido", "depositaram", "pagaram"];
-const EXPENSE_KEYWORDS = ["gastei", "paguei", "comprei", "uber", "mercado", "pix enviado", "boleto", "conta"];
+const EXPENSE_KEYWORDS = ["gastei", "paguei", "comprei", "uber", "mercado", "pix enviado"];
 
 function inferIncomeCategory(text: string) {
   const normalized = normalizeText(text);
@@ -75,7 +75,7 @@ export function extractTransactionDateFromText(text: string) {
 }
 
 export function detectIntentType(text: string): "income" | "expense" | null {
-  if (looksLikeGoalIntent(text) || looksLikeReminderIntent(text)) return null;
+  if (looksLikeGoalIntent(text) || looksLikeReminderIntent(text) || looksLikePayableIntent(text)) return null;
 
   const normalized = normalizeText(text);
   if (INCOME_KEYWORDS.some((keyword) => normalized.includes(keyword))) return "income";

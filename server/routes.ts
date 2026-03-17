@@ -45,7 +45,7 @@ import {
   insertGoalContributionSchema,
   insertCategoryLimitSchema,
 } from "@shared/schema";
-import type { User, Transaction, FutureTransaction, RecurringTransaction } from "@shared/schema";
+import type { User, Transaction, FutureExpense, FutureTransaction, RecurringTransaction } from "@shared/schema";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import fetch from "node-fetch";
@@ -188,6 +188,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return String(value || "PF").toUpperCase() === "PJ" ? "PJ" : "PF";
   };
 
+  const startOfCurrentDay = () => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  };
+
+  const deriveFutureExpenseStatus = (expense: Pick<FutureExpense, "status" | "dueDate">): "pending" | "paid" | "overdue" => {
+    if (expense.status === "paid") return "paid";
+    return new Date(expense.dueDate).getTime() < startOfCurrentDay().getTime() ? "overdue" : "pending";
+  };
+
+  const deriveScheduledExpenseStatus = (tx: Pick<FutureTransaction, "status" | "dueDate" | "expectedDate">): "pending" | "paid" | "overdue" => {
+    if (tx.status === "paid") return "paid";
+    const dueDate = tx.dueDate ? new Date(tx.dueDate) : new Date(tx.expectedDate);
+    return dueDate.getTime() < startOfCurrentDay().getTime() ? "overdue" : "pending";
+  };
+
+  const mapScheduledFutureExpense = (tx: FutureTransaction): FutureExpense => {
+    const category = (tx as any)?.category || "Outros";
+    const amountNum = typeof tx.amount === "number" ? tx.amount : Number(tx.amount || 0);
+    const dueDate = tx.dueDate ? new Date(tx.dueDate) : new Date(tx.expectedDate);
+
+    return {
+      id: `scheduled-${tx.id}`,
+      userId: tx.userId,
+      accountType: tx.accountType,
+      title: tx.description || "Despesa futura",
+      category,
+      amount: amountNum.toFixed(2),
+      dueDate,
+      isRecurring: false,
+      recurrenceType: null,
+      status: deriveScheduledExpenseStatus(tx),
+      createdAt: tx.createdAt ? new Date(tx.createdAt) : new Date(),
+    };
+  };
+
+  const buildPayablesNotifications = (items: FutureExpense[]) => {
+    const today = startOfCurrentDay().getTime();
+    const threeDaysAhead = new Date(startOfCurrentDay());
+    threeDaysAhead.setDate(threeDaysAhead.getDate() + 3);
+
+    const notifications = items
+      .filter((item) => item.status !== "paid")
+      .map((item) => {
+        const dueTime = new Date(item.dueDate).getTime();
+        const isOverdue = dueTime < today;
+        const isDueSoon = !isOverdue && dueTime <= threeDaysAhead.getTime();
+        if (!isOverdue && !isDueSoon) return null;
+
+        return {
+          id: `payable-${item.id}`,
+          kind: isOverdue ? "overdue_payable" : "upcoming_payable",
+          severity: isOverdue ? "high" : "medium",
+          title: isOverdue ? "Conta atrasada" : "Conta vencendo",
+          message: `${item.title} ${isOverdue ? "venceu" : "vence"} em ${new Date(item.dueDate).toLocaleDateString("pt-BR")} no valor de ${formatCurrencyBRL(Number(item.amount || 0))}.`,
+          dueDate: item.dueDate,
+          amount: Number(item.amount || 0),
+          route: "/future-expenses",
+          accountType: item.accountType,
+        };
+      })
+      .filter(Boolean)
+      .sort((left: any, right: any) => new Date(left.dueDate).getTime() - new Date(right.dueDate).getTime());
+
+    const unreadCount = notifications.filter((item: any) => item.severity === "high" || item.severity === "medium").length;
+    return { unreadCount, notifications };
+  };
+
   const aiChatRequestSchema = z.object({
     content: z.string().min(1, "Mensagem é obrigatória").max(2000, "Mensagem muito longa"),
     insightFocus: z.enum(["economy", "debt", "investments"]).optional().nullable(),
@@ -301,7 +369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     amount: expense.amount?.toString() ?? "0",
     expectedDate: expense.dueDate,
     accountType: expense.accountType || "PF",
-    status: expense.status || "pending",
+    status: deriveFutureExpenseStatus(expense),
     createdAt: expense.createdAt,
     isScheduled: true,
     dueDate: expense.dueDate,
@@ -2100,29 +2168,11 @@ type AiInterpretationResult =
       const scheduledExpenses = scheduled
         .filter((tx) => tx.isScheduled && tx.type === "expense")
         .filter((tx) => {
+          const derivedStatus = deriveScheduledExpenseStatus(tx);
           if (!statusFilter) return true;
-          if (statusFilter === "paid") return tx.status === "paid";
-          if (statusFilter === "overdue") return tx.status === "overdue";
-          return tx.status === "pending";
+          return derivedStatus === statusFilter;
         })
-        .map((tx) => {
-          const category = (tx as any)?.category || "Outros";
-          const amountNum = typeof tx.amount === "number" ? tx.amount : Number(tx.amount || 0);
-          const amountValue = amountNum.toFixed(2);
-          return {
-            id: `scheduled-${tx.id}`,
-            userId: tx.userId,
-            accountType: tx.accountType,
-            title: tx.description || "Despesa futura",
-            category,
-            amount: amountValue,
-            dueDate: tx.dueDate ? new Date(tx.dueDate) : new Date(tx.expectedDate),
-            isRecurring: false,
-            recurrenceType: null,
-            status: tx.status === "paid" ? "paid" : tx.status === "overdue" ? "overdue" : "pending",
-            createdAt: tx.createdAt ? new Date(tx.createdAt) : new Date(),
-          };
-        });
+        .map(mapScheduledFutureExpense);
 
       res.json([...expenses, ...scheduledExpenses]);
     } catch (error) {
@@ -2174,6 +2224,29 @@ type AiInterpretationResult =
     }
   });
 
+  app.get("/api/notifications", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const scope = parseAccountScope(req.query?.accountType);
+      if (!ensureScopeAccess(scope, req, res)) {
+        return;
+      }
+
+      const [expenses, scheduled] = await Promise.all([
+        storage.getFutureExpenses(req.session.userId, scope),
+        storage.getFutureTransactions(req.session.userId, scope, "pending"),
+      ]);
+
+      const scheduledExpenses = scheduled
+        .filter((item) => item.type === "expense")
+        .map(mapScheduledFutureExpense);
+
+      res.json(buildPayablesNotifications([...expenses, ...scheduledExpenses]));
+    } catch (error) {
+      console.error("[NOTIFICATIONS] erro ao buscar notificacoes:", error);
+      res.status(500).json({ error: "Erro ao buscar notificacoes" });
+    }
+  });
+
   app.get("/api/future", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const scope = parseAccountScope(req.query?.type);
@@ -2188,11 +2261,12 @@ type AiInterpretationResult =
 
       const expenseAsFuture = expenseItems
         .filter((expense) => {
+          const derivedStatus = deriveFutureExpenseStatus(expense);
           if (!statusFilter) return true;
-          if (statusFilter === "pending") return expense.status === "pending";
-          if (statusFilter === "paid") return expense.status === "paid";
-          if (statusFilter === "received") return expense.status === "paid";
-          if (statusFilter === "overdue") return expense.status === "overdue";
+          if (statusFilter === "pending") return derivedStatus === "pending";
+          if (statusFilter === "paid") return derivedStatus === "paid";
+          if (statusFilter === "received") return derivedStatus === "paid";
+          if (statusFilter === "overdue") return derivedStatus === "overdue";
           return false;
         })
         .map(convertExpenseToFuture);

@@ -175,6 +175,8 @@ class FakeStorage {
   public deleteTransactionCalls = 0;
   public failCreateTransaction = false;
   public transactions = new Map<string, any>();
+  public futureExpenses = new Map<string, any>();
+  public createFutureExpenseCalls = 0;
   public accounts = [
     {
       id: "acc-1",
@@ -285,6 +287,52 @@ class FakeStorage {
       monthlyIncome,
       monthlyExpenses,
       netCashFlow: monthlyIncome - monthlyExpenses,
+    };
+  }
+
+  async createFutureExpense(payload: any) {
+    this.createFutureExpenseCalls += 1;
+    const record = {
+      id: `future-expense-${this.createFutureExpenseCalls}`,
+      userId: payload.userId,
+      title: payload.title,
+      category: payload.category,
+      amount: String(Number(payload.amount).toFixed(2)),
+      dueDate: payload.dueDate,
+      accountType: payload.accountType || "PF",
+      isRecurring: Boolean(payload.isRecurring),
+      recurrenceType: payload.recurrenceType ?? null,
+      status: payload.status || "pending",
+      createdAt: new Date(),
+    };
+    this.futureExpenses.set(record.id, record);
+    return record;
+  }
+
+  async getFutureExpenses(userId: string, scope: "PF" | "PJ" | "ALL" = "ALL") {
+    return Array.from(this.futureExpenses.values()).filter((item) => {
+      if (item.userId !== userId) return false;
+      if (scope === "ALL") return true;
+      return (item.accountType || "PF") === scope;
+    });
+  }
+
+  async updateFutureExpenseStatus(id: string, userId: string, status: "pending" | "paid" | "overdue") {
+    const current = this.futureExpenses.get(id);
+    if (!current || current.userId !== userId) return undefined;
+    const updated = { ...current, status };
+    this.futureExpenses.set(id, updated);
+    return updated;
+  }
+
+  async getFutureTransactions() {
+    return [];
+  }
+
+  async getInvestmentsSummary() {
+    return {
+      totalInvested: 0,
+      byType: [],
     };
   }
 }
@@ -1162,6 +1210,32 @@ test("WhatsAppAgentService envia imagem para dicas financeiras baseadas na conta
   assert.equal(result.status, "assistant_answered");
   assert.match(messenger.sentMessages.at(-1)?.text || "", /Mercado|economizar|separar/i);
   assert.equal(messenger.sentImages.at(-1)?.filename, "financial-guidance.png");
+});
+
+test("WhatsAppAgentService cadastra conta a pagar em vez de lancar transacao", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-payable-create",
+    text: "Tenho que pagar minha fatura do cartao no valor de 3 mil reais no dia 02/04/2026",
+  }));
+
+  assert.equal(result.status, "assistant_answered");
+  assert.equal(storage.createTransactionCalls, 0);
+  assert.equal(storage.createFutureExpenseCalls, 1);
+  assert.equal(storage.futureExpenses.get("future-expense-1")?.title, "fatura do cartao");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /Conta a pagar criada/i);
 });
 
 test("WhatsAppAgentService answers capability fallback in chat", async () => {

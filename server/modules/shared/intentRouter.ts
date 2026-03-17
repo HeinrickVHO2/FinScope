@@ -19,6 +19,7 @@ export type AssistantRouteIntent =
   | { type: "add_goal_contribution"; amount: number }
   | { type: "list_goals" }
   | { type: "goal_progress" }
+  | { type: "create_payable"; title: string; amount: number; dueDate: Date; accountType: "PF" | "PJ" }
   | { type: "create_reminder"; title: string; amount: number; dayOfMonth: number }
   | { type: "mark_reminder_paid" };
 
@@ -153,6 +154,104 @@ function parseReminder(rawText: string, normalized: string) {
   return { title, amount, dayOfMonth: Number(dayMatch[1]) };
 }
 
+function resolveFutureDateByDay(dayOfMonth: number, reference = new Date()) {
+  const candidate = new Date(reference.getFullYear(), reference.getMonth(), dayOfMonth);
+  candidate.setHours(12, 0, 0, 0);
+  if (candidate.getTime() < reference.getTime()) {
+    return new Date(reference.getFullYear(), reference.getMonth() + 1, dayOfMonth, 12, 0, 0, 0);
+  }
+  return candidate;
+}
+
+function parseDueDate(rawText: string, normalized: string) {
+  const now = new Date();
+  now.setHours(12, 0, 0, 0);
+
+  const explicitDate = rawText.match(/(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?/);
+  if (explicitDate) {
+    const day = Number(explicitDate[1]);
+    const month = Number(explicitDate[2]) - 1;
+    const yearRaw = explicitDate[3] ? Number(explicitDate[3]) : now.getFullYear();
+    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+    const candidate = new Date(year, month, day, 12, 0, 0, 0);
+    if (!Number.isNaN(candidate.getTime())) return candidate;
+  }
+
+  const dayMatch = normalized.match(/(?:dia|vence(?:\s+em)?|vencimento(?:\s+em)?|para)\s+(\d{1,2})(?!\d)/);
+  if (dayMatch) {
+    const day = Number(dayMatch[1]);
+    if (Number.isFinite(day) && day >= 1 && day <= 31) {
+      return resolveFutureDateByDay(day, now);
+    }
+  }
+
+  if (/\bamanha\b/.test(normalized)) {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12, 0, 0, 0);
+  }
+
+  return null;
+}
+
+function cleanPayableTitle(value: string) {
+  return value
+    .replace(/^(tenho que|tenho de|preciso|vou)\s+pagar\s+/i, "")
+    .replace(/^pagar\s+/i, "")
+    .replace(/^(minha|minhas|meu|meus|uma|um|a|o)\s+/i, "")
+    .replace(/\s+no valor.*$/i, "")
+    .replace(/\s+r\$\s*[\d.,]+.*$/i, "")
+    .replace(/\s+de\s+[\d.,]+\s*(?:reais?|k|mil|milhao|milhoes)?.*$/i, "")
+    .replace(/\s+(?:no|na|para|ate|até)\s+dia\s+\d{1,2}.*$/i, "")
+    .replace(/\s+(?:em|no dia)\s+\d{1,2}[\/.-]\d{1,2}(?:[\/.-]\d{2,4})?.*$/i, "")
+    .replace(/\s+vence.*$/i, "")
+    .replace(/[,.!?;:]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parsePayableTitle(rawText: string, normalized: string) {
+  const patterns = [
+    /(?:tenho que|tenho de|preciso|vou)\s+pagar\s+(.+?)(?:\s+no valor|\s+r\$|\s+de\s+\d|\s+(?:no|na|para|ate|até)\s+dia\s+\d|\s+(?:em|no dia)\s+\d{1,2}[\/.-]\d{1,2}|$)/i,
+    /pagar\s+(.+?)(?:\s+no valor|\s+r\$|\s+de\s+\d|\s+(?:no|na|para|ate|até)\s+dia\s+\d|\s+(?:em|no dia)\s+\d{1,2}[\/.-]\d{1,2}|$)/i,
+    /((?:fatura|boleto|conta|parcela|iptu|ipva|aluguel)[^,.]*?)(?:\s+no valor|\s+r\$|\s+de\s+\d|\s+(?:no|na|para|ate|até)\s+dia\s+\d|\s+(?:em|no dia)\s+\d{1,2}[\/.-]\d{1,2}|$)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = rawText.match(pattern);
+    if (match?.[1]) {
+      const title = cleanPayableTitle(match[1]);
+      if (title) return title;
+    }
+  }
+
+  if (/conta de luz/.test(normalized)) return "Conta de luz";
+  if (/conta de agua|conta d'agua/.test(normalized)) return "Conta de agua";
+  if (/fatura.*cartao/.test(normalized)) return "Fatura do cartao";
+  if (/boleto/.test(normalized)) return "Boleto";
+  return "Conta a pagar";
+}
+
+function looksLikePayableIntent(text: string) {
+  const normalized = normalizeAssistantText(text);
+  const hasFutureBillVerb = /\b(tenho que pagar|tenho de pagar|preciso pagar|vou pagar|venc(e|imento)|fatura|boleto|conta de|aluguel|iptu|ipva)\b/.test(normalized);
+  const hasDateCue = /\b(todo dia|todo mes|mensal|dia\s+\d{1,2}|\d{1,2}[\/.-]\d{1,2}(?:[\/.-]\d{2,4})?|amanha)\b/.test(normalized);
+  return hasFutureBillVerb && hasDateCue;
+}
+
+function parsePayable(rawText: string, normalized: string) {
+  if (looksLikeReminderIntent(normalized) || !looksLikePayableIntent(normalized)) return null;
+
+  const amount = parseMonetaryAmountFromNaturalLanguage(rawText);
+  const dueDate = parseDueDate(rawText, normalized);
+  if (!amount || !dueDate) return null;
+
+  return {
+    title: parsePayableTitle(rawText, normalized),
+    amount,
+    dueDate,
+    accountType: (detectScope(normalized) === "PJ" ? "PJ" : "PF") as "PF" | "PJ",
+  };
+}
+
 function isReminderPaidMessage(normalized: string) {
   return /^(paguei ja|ja paguei|marca como pago|marque como pago|pago ja)$/.test(normalized);
 }
@@ -186,6 +285,8 @@ export function looksLikeReminderIntent(text: string) {
   const normalized = normalizeAssistantText(text);
   return /todo dia|todo mes|mensal|me lembra|me lembre|lembrete/.test(normalized) && /dia\s+\d{1,2}/.test(normalized);
 }
+
+export { looksLikePayableIntent };
 
 export function parseAssistantRouteIntent(text: string): AssistantRouteIntent | null {
   const normalized = normalizeAssistantText(text);
@@ -260,6 +361,17 @@ export function parseAssistantRouteIntent(text: string): AssistantRouteIntent | 
       title: reminder.title,
       amount: reminder.amount,
       dayOfMonth: reminder.dayOfMonth,
+    };
+  }
+
+  const payable = parsePayable(text, normalized);
+  if (payable) {
+    return {
+      type: "create_payable",
+      title: payable.title,
+      amount: payable.amount,
+      dueDate: payable.dueDate,
+      accountType: payable.accountType,
     };
   }
 

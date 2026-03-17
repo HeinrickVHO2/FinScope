@@ -646,6 +646,40 @@ export class AssistantOrchestrator {
       });
     }
 
+    if (intent.type === "create_payable") {
+      const expense = await this.storage.createFutureExpense({
+        userId: params.userId,
+        title: intent.title,
+        category: "Contas Fixas",
+        amount: intent.amount,
+        dueDate: intent.dueDate,
+        accountType: intent.accountType,
+        isRecurring: false,
+        recurrenceType: null,
+        status: "pending",
+      });
+
+      return buildResponse({
+        intent: "payables.create",
+        action: "create_payable",
+        message: `Conta a pagar criada: ${expense.title} com vencimento em ${expense.dueDate.toLocaleDateString("pt-BR")} no valor de ${formatCurrency(toNumber(expense.amount))}.`,
+        data: { payable: expense, route: "/future-expenses" },
+        uiPayload: {
+          type: "reminder_created",
+          title: expense.title,
+          route: "/future-expenses",
+          cards: [{
+            amount: intent.amount,
+            dueDate: expense.dueDate,
+            status: expense.status,
+            accountType: expense.accountType,
+            recurrenceType: null,
+          }],
+        },
+        model: modelSelection,
+      });
+    }
+
     if (intent.type === "create_reminder") {
       const expense = await this.storage.createFutureExpense({
         userId: params.userId,
@@ -680,8 +714,10 @@ export class AssistantOrchestrator {
     }
 
     if (intent.type === "mark_reminder_paid") {
-      const reminders = await this.storage.getFutureExpenses(params.userId, "ALL", "pending");
-      const candidate = [...reminders].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0];
+      const reminders = await this.storage.getFutureExpenses(params.userId, "ALL");
+      const candidate = [...reminders]
+        .filter((item) => item.status !== "paid")
+        .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0];
       if (!candidate) {
         return buildResponse({
           intent: "reminders.mark_paid",

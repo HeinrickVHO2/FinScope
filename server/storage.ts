@@ -48,6 +48,14 @@ const matchesScope = (accountType: string, scope: AccountScope) => {
   return (accountType || "PF").toUpperCase() === scope;
 };
 
+const startOfToday = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+};
+
+const isFutureExpenseOverdue = (expense: Pick<FutureExpense, "status" | "dueDate">) =>
+  expense.status === "pending" && new Date(expense.dueDate).getTime() < startOfToday().getTime();
+
 export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
@@ -167,7 +175,7 @@ export class MemStorage {
     };
   }
 
-  private toApiRecurringTransaction(record: RecurringTransaction & { amount: number; nextDate: Date }): RecurringTransaction {
+  private toApiRecurringTransaction(record: StoredRecurringTransaction): RecurringTransaction {
     return {
       ...record,
       amount: record.amount.toFixed(2),
@@ -502,6 +510,14 @@ export class MemStorage {
   }
 
   async getFutureExpenses(userId: string, scope: AccountScope = "ALL", status?: "pending" | "paid" | "overdue") {
+    const today = startOfToday().getTime();
+    for (const [id, expense] of this.futureExpenses.entries()) {
+      if (expense.userId !== userId) continue;
+      if (expense.status !== "pending") continue;
+      if (new Date(expense.dueDate).getTime() >= today) continue;
+      this.futureExpenses.set(id, { ...expense, status: "overdue" });
+    }
+
     return Array.from(this.futureExpenses.values()).filter((expense) => {
       if (expense.userId !== userId) return false;
       if (scope !== "ALL" && (expense.accountType || "PF").toUpperCase() !== scope) {
@@ -526,7 +542,10 @@ export class MemStorage {
       dueDate: expense.dueDate,
       isRecurring: Boolean(expense.isRecurring),
       recurrenceType: expense.recurrenceType ?? null,
-      status: expense.status || "pending",
+      status: expense.status || (isFutureExpenseOverdue({
+        status: "pending",
+        dueDate: expense.dueDate,
+      }) ? "overdue" : "pending"),
       createdAt: new Date(),
     };
     this.futureExpenses.set(id, record);
