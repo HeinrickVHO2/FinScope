@@ -83,31 +83,74 @@ function renderCards(cards: Array<Record<string, unknown>>) {
   `;
 }
 
+function formatCompactRangeLabel(items: Array<Record<string, unknown>>, fallbackIndex: number) {
+  const firstDate = String(items[0]?.date || "");
+  const lastDate = String(items[items.length - 1]?.date || "");
+  const first = firstDate ? new Date(firstDate) : null;
+  const last = lastDate ? new Date(lastDate) : null;
+
+  if (first && !Number.isNaN(first.getTime()) && last && !Number.isNaN(last.getTime())) {
+    const startDay = String(first.getDate()).padStart(2, "0");
+    const endDay = String(last.getDate()).padStart(2, "0");
+    return startDay === endDay ? startDay : `${startDay}-${endDay}`;
+  }
+
+  return `bloco ${fallbackIndex + 1}`;
+}
+
+function compactBarSeries(series: Array<Record<string, unknown>>) {
+  if (series.length <= 8) {
+    return {
+      items: series.map((item) => ({
+        label: String(item.label || item.date || "-"),
+        amount: toNumber(item.amount),
+      })),
+      dense: false,
+    };
+  }
+
+  const bucketCount = Math.min(5, Math.max(4, Math.ceil(series.length / 6)));
+  const chunkSize = Math.ceil(series.length / bucketCount);
+  const condensed: Array<{ label: string; amount: number }> = [];
+
+  for (let index = 0; index < series.length; index += chunkSize) {
+    const bucket = series.slice(index, index + chunkSize);
+    condensed.push({
+      label: formatCompactRangeLabel(bucket, condensed.length),
+      amount: Number(bucket.reduce((sum, item) => sum + toNumber(item.amount), 0).toFixed(2)),
+    });
+  }
+
+  return { items: condensed, dense: true };
+}
+
 function renderBarChart(series: Array<Record<string, unknown>>) {
   if (!series.length) return "";
-  const maxValue = series.reduce((best, item) => Math.max(best, toNumber(item.amount)), 0) || 1;
+  const compacted = compactBarSeries(series);
+  const maxValue = compacted.items.reduce((best, item) => Math.max(best, toNumber(item.amount)), 0) || 1;
 
   return `
     <section class="panel">
       <div class="section-header">
         <h3>Gastos por dia</h3>
-        <p>Visao dos ultimos dias registrados</p>
+        <p>${compacted.dense ? "Visao consolidada do periodo" : "Visao dos ultimos dias registrados"}</p>
       </div>
       <div class="bar-chart">
-        ${series.map((item, index) => {
+        ${compacted.items.map((item, index) => {
           const amount = toNumber(item.amount);
           const height = Math.max(8, Math.round((amount / maxValue) * 180));
           return `
             <div class="bar-item">
-              <span class="bar-value">${formatCurrency(amount)}</span>
+              ${compacted.dense ? "" : `<span class="bar-value">${formatCurrency(amount)}</span>`}
               <div class="bar-shell">
                 <div class="bar-fill" style="height:${height}px; background:${CHART_COLORS[index % CHART_COLORS.length]};"></div>
               </div>
-              <span class="bar-label">${escapeHtml(item.label || item.date || "-")}</span>
+              <span class="bar-label">${escapeHtml(item.label || "-")}</span>
             </div>
           `;
         }).join("")}
       </div>
+      ${compacted.dense ? `<p class="chart-note">Mes consolidado em blocos para ficar legivel no WhatsApp.</p>` : ""}
     </section>
   `;
 }
@@ -434,7 +477,7 @@ function buildHtml(payload?: VisualPayload | null) {
           .bar-chart {
             display: flex;
             align-items: flex-end;
-            gap: 10px;
+            gap: 12px;
             min-height: 200px;
           }
           .bar-item {
@@ -466,7 +509,13 @@ function buildHtml(payload?: VisualPayload | null) {
           .bar-label {
             font-size: 12px;
             color: #374151;
-            text-transform: lowercase;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+          }
+          .chart-note {
+            margin: 12px 0 0;
+            color: #6b7280;
+            font-size: 12px;
           }
           .breakdown-body {
             display: block;
