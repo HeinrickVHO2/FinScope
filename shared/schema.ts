@@ -404,6 +404,21 @@ export const insertCategoryLimitSchema = z.object({
   ),
 });
 
+export const insertAppNotificationSchema = z.object({
+  title: z.string().min(1, "Titulo e obrigatorio").max(120, "Titulo muito longo"),
+  message: z.string().min(1, "Mensagem e obrigatoria").max(2000, "Mensagem muito longa"),
+  kind: z.enum(["global_update", "global_promotion", "global_alert"]).default("global_update"),
+  bucket: z.enum(["general", "updates", "promotions"]).default("general"),
+  route: z.string().max(255, "Rota muito longa").optional().nullable(),
+  ctaLabel: z.string().max(60, "CTA muito longo").optional().nullable(),
+  startsAt: z.coerce.date().optional(),
+  expiresAt: z.coerce.date().optional().nullable(),
+  sendEmail: z.boolean().default(false),
+  emailSubject: z.string().max(160, "Assunto muito longo").optional().nullable(),
+  isActive: z.boolean().default(true),
+  metadata: z.record(z.string(), z.any()).optional().nullable(),
+});
+
 // Login schema
 export const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -470,6 +485,9 @@ export type GoalContribution = typeof goalContributions.$inferSelect;
 
 export type InsertCategoryLimit = z.infer<typeof insertCategoryLimitSchema> & { userId: string };
 export type CategoryLimit = typeof categoryLimits.$inferSelect;
+
+export type InsertAppNotification = z.infer<typeof insertAppNotificationSchema> & { createdBy?: string | null };
+export type AppNotification = typeof appNotifications.$inferSelect;
 
 export type LoginData = z.infer<typeof loginSchema>;
 export type UpdateUserProfile = z.infer<typeof updateUserProfileSchema>;
@@ -566,6 +584,25 @@ export const categoryLimits = pgTable("category_limits", {
   amount: numeric("amount").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const appNotifications = pgTable("app_notifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  kind: text("kind").notNull().default("global_update"),
+  bucket: text("bucket").notNull().default("general"),
+  route: text("route"),
+  ctaLabel: text("cta_label"),
+  audience: text("audience").notNull().default("all"),
+  isActive: boolean("is_active").notNull().default(true),
+  startsAt: timestamp("starts_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+  sendEmail: boolean("send_email").notNull().default(false),
+  emailSubject: text("email_subject"),
+  metadata: jsonb("metadata"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const bankStatementUploads = pgTable("bank_statement_uploads", {

@@ -5,6 +5,7 @@ import session from "express-session";
 import { supabase } from "./supabase";
 import { sendResetEmail } from "server/emails/resetEmail";
 import { sendContactEmail } from "server/emails/contactEmail";
+import { createTransporter } from "server/emails/transporter";
 import puppeteer from "puppeteer";
 import fs from "node:fs";
 import path from "node:path";
@@ -22,6 +23,7 @@ import { registerStatementImportRoutes } from "./modules/statement-import/routes
 import { registerWhatsAppAgentRoutes } from "./modules/whatsapp-agent/routes";
 import { GoalService } from "./modules/shared/goalService";
 import { CategoryLimitService } from "./modules/shared/categoryLimitService";
+import { buildBroadcastEmailHtml, buildNotificationFeed } from "./modules/shared/appNotificationService";
 import { 
   insertUserSchema, 
   loginSchema,
@@ -44,6 +46,7 @@ import {
   updateGoalSchema,
   insertGoalContributionSchema,
   insertCategoryLimitSchema,
+  insertAppNotificationSchema,
 } from "@shared/schema";
 import type { User, Transaction, FutureExpense, FutureTransaction, RecurringTransaction } from "@shared/schema";
 import { z } from "zod";
@@ -229,56 +232,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   };
 
-  const buildPayablesNotifications = (items: FutureExpense[]) => {
-    const todayDate = startOfCurrentDay();
-    const today = todayDate.getTime();
-    const weekLimit = new Date(todayDate);
-    weekLimit.setDate(weekLimit.getDate() + 7);
+  const broadcastMailer = createTransporter();
 
-    const notifications = items
-      .filter((item) => item.status !== "paid")
-      .map((item) => {
-        const dueDate = new Date(item.dueDate);
-        const dueTime = dueDate.getTime();
-        const isOverdue = dueTime < today;
-        const isDueToday = !isOverdue && isSameCalendarDay(dueDate, todayDate);
-        const isDueThisWeek = !isOverdue && !isDueToday && dueTime <= weekLimit.getTime();
-        if (!isOverdue && !isDueToday && !isDueThisWeek) return null;
+  const getBroadcastAuthToken = () =>
+    process.env.BROADCAST_ADMIN_TOKEN || process.env.FINSCOPE_ADMIN_TOKEN || "";
 
-        const bucket = isOverdue ? "overdue" : isDueToday ? "today" : "week";
+  const isBroadcastAuthorized = (req: any) => {
+    const expected = getBroadcastAuthToken();
+    if (!expected) return false;
+    const provided = req.headers["x-broadcast-token"] || req.headers["x-admin-token"] || req.body?.token;
+    return String(provided || "") === expected;
+  };
 
-        return {
-          id: `payable-${item.id}`,
-          kind: isOverdue ? "overdue_payable" : "upcoming_payable",
-          bucket,
-          severity: isOverdue ? "high" : isDueToday ? "high" : "medium",
-          title: isOverdue ? "Conta atrasada" : isDueToday ? "Vence hoje" : "Vence nesta semana",
-          message: `${item.title} ${isOverdue ? "venceu" : "vence"} em ${dueDate.toLocaleDateString("pt-BR")} no valor de ${formatCurrencyBRL(Number(item.amount || 0))}.`,
-          dueDate,
-          amount: Number(item.amount || 0),
-          route: "/future-expenses",
-          accountType: item.accountType,
-        };
-      })
-      .filter(Boolean)
-      .sort((left: any, right: any) => new Date(left.dueDate).getTime() - new Date(right.dueDate).getTime());
+  const fetchBroadcastNotifications = async () => {
+    const { data, error } = await supabase
+      .from("app_notifications")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(20);
 
-      const unreadCount = notifications.filter((item: any) => item.severity === "high" || item.severity === "medium").length;
-      return {
-        unreadCount,
-        notifications,
-        summary: {
-          overdue: notifications.filter((item: any) => item.bucket === "overdue").length,
-          today: notifications.filter((item: any) => item.bucket === "today").length,
-          week: notifications.filter((item: any) => item.bucket === "week").length,
-        },
-        groups: {
-          overdue: notifications.filter((item: any) => item.bucket === "overdue"),
-          today: notifications.filter((item: any) => item.bucket === "today"),
-          week: notifications.filter((item: any) => item.bucket === "week"),
-        },
-      };
-    };
+    if (error) {
+      console.error("[NOTIFICATIONS] erro ao buscar notificacoes globais:", error);
+      return [];
+    }
+
+    return data || [];
+  };
+
+  const fetchBroadcastRecipients = async () => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, email, full_name, billing_status")
+      .eq("billing_status", "active")
+      .neq("email", null);
+
+    if (error) {
+      console.error("[NOTIFICATIONS] erro ao buscar destinatarios de broadcast:", error);
+      return [];
+    }
+
+    return (data || []).filter((row: any) => row.email);
+  };
+
+  const sendBroadcastEmails = async (notification: any) => {
+    const sender =
+      process.env.BROADCAST_EMAIL_FROM ||
+      process.env.MAIL_FROM ||
+      process.env.MAIL_USER;
+
+    if (!sender) {
+      console.warn("[NOTIFICATIONS] Remetente de email nao configurado para broadcast.");
+      return 0;
+    }
+
+    const recipients = await fetchBroadcastRecipients();
+    if (!recipients.length) return 0;
+
+    const html = buildBroadcastEmailHtml({
+      title: notification.title,
+      message: notification.message,
+      route: notification.route,
+      ctaLabel: notification.cta_label,
+      kind: notification.kind,
+    });
+
+    let sent = 0;
+    for (const recipient of recipients) {
+      try {
+        await broadcastMailer.sendMail({
+          from: sender,
+          to: recipient.email,
+          subject: notification.email_subject || notification.title,
+          html,
+        });
+        sent += 1;
+      } catch (error) {
+        console.error(`[NOTIFICATIONS] erro ao enviar broadcast para ${recipient.email}:`, error);
+      }
+    }
+    return sent;
+  };
 
   const aiChatRequestSchema = z.object({
     content: z.string().min(1, "Mensagem é obrigatória").max(2000, "Mensagem muito longa"),
@@ -2264,10 +2298,86 @@ type AiInterpretationResult =
         .filter((item) => item.type === "expense")
         .map(mapScheduledFutureExpense);
 
-      res.json(buildPayablesNotifications([...expenses, ...scheduledExpenses]));
+      const broadcasts = await fetchBroadcastNotifications();
+      res.json(buildNotificationFeed({
+        payables: [...expenses, ...scheduledExpenses],
+        broadcasts: broadcasts as any,
+      }));
     } catch (error) {
       console.error("[NOTIFICATIONS] erro ao buscar notificacoes:", error);
       res.status(500).json({ error: "Erro ao buscar notificacoes" });
+    }
+  });
+
+  app.get("/api/admin/broadcast-notifications", async (req: any, res) => {
+    if (!isBroadcastAuthorized(req)) {
+      return res.status(403).json({ error: "Nao autorizado" });
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("app_notifications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) {
+        throw error;
+      }
+
+      res.json({ items: data || [] });
+    } catch (error) {
+      console.error("[NOTIFICATIONS] erro ao listar broadcasts:", error);
+      res.status(500).json({ error: "Erro ao listar broadcasts" });
+    }
+  });
+
+  app.post("/api/admin/broadcast-notifications", async (req: any, res) => {
+    if (!isBroadcastAuthorized(req)) {
+      return res.status(403).json({ error: "Nao autorizado" });
+    }
+
+    try {
+      const parsed = insertAppNotificationSchema.parse(req.body || {});
+      const insertPayload = {
+        title: parsed.title,
+        message: parsed.message,
+        kind: parsed.kind,
+        bucket: parsed.bucket,
+        route: parsed.route || null,
+        cta_label: parsed.ctaLabel || null,
+        audience: "all",
+        is_active: parsed.isActive,
+        starts_at: (parsed.startsAt || new Date()).toISOString(),
+        expires_at: parsed.expiresAt ? parsed.expiresAt.toISOString() : null,
+        send_email: parsed.sendEmail,
+        email_subject: parsed.emailSubject || parsed.title,
+        metadata: parsed.metadata || null,
+        created_by: req.headers["x-broadcast-actor"] || "broadcast-api",
+      };
+
+      const { data, error } = await supabase
+        .from("app_notifications")
+        .insert(insertPayload)
+        .select("*")
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      const emailsSent = parsed.sendEmail ? await sendBroadcastEmails(data) : 0;
+
+      res.status(201).json({
+        notification: data,
+        emailsSent,
+      });
+    } catch (error) {
+      console.error("[NOTIFICATIONS] erro ao criar broadcast:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.flatten() });
+      }
+      res.status(500).json({ error: "Erro ao criar broadcast" });
     }
   });
 

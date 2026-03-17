@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Bell, CircleHelp, Clock3, LogOut, Mail, TriangleAlert, User, X } from "lucide-react";
+import { Bell, CircleHelp, Clock3, LogOut, Mail, Megaphone, Sparkles, TriangleAlert, User, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 
@@ -26,26 +26,19 @@ interface DashboardHeaderProps {
 type NotificationItem = {
   id: string;
   kind: string;
-  bucket: "overdue" | "today" | "week";
+  bucket: string;
   severity: "high" | "medium" | "low";
   title: string;
   message: string;
   route?: string;
+  ctaLabel?: string;
 };
 
 type NotificationResponse = {
   unreadCount: number;
   notifications: NotificationItem[];
-  summary: {
-    overdue: number;
-    today: number;
-    week: number;
-  };
-  groups: {
-    overdue: NotificationItem[];
-    today: NotificationItem[];
-    week: NotificationItem[];
-  };
+  summary: Record<string, number>;
+  groups: Record<string, NotificationItem[]>;
 };
 
 export function DashboardHeader({ 
@@ -102,9 +95,10 @@ export function DashboardHeader({
   );
   const groupedNotifications = useMemo(
     () => ({
-      overdue: visibleNotifications.filter((notification) => notification.bucket === "overdue"),
-      today: visibleNotifications.filter((notification) => notification.bucket === "today"),
-      week: visibleNotifications.filter((notification) => notification.bucket === "week"),
+      attention: visibleNotifications.filter((notification) => ["overdue", "today", "week"].includes(notification.bucket)),
+      updates: visibleNotifications.filter((notification) => notification.kind === "global_update"),
+      promotions: visibleNotifications.filter((notification) => notification.kind === "global_promotion"),
+      general: visibleNotifications.filter((notification) => notification.kind === "global_alert" || notification.bucket === "general"),
     }),
     [visibleNotifications],
   );
@@ -177,9 +171,10 @@ export function DashboardHeader({
             {visibleNotifications.length ? (
               <>
                 {([
-                  { key: "overdue", label: "Atrasadas", icon: <TriangleAlert className="h-3.5 w-3.5 text-rose-500" /> },
-                  { key: "today", label: "Vencem hoje", icon: <Clock3 className="h-3.5 w-3.5 text-amber-500" /> },
-                  { key: "week", label: "Esta semana", icon: <Clock3 className="h-3.5 w-3.5 text-sky-500" /> },
+                  { key: "attention", label: "Atencao", icon: <TriangleAlert className="h-3.5 w-3.5 text-rose-500" /> },
+                  { key: "updates", label: "Atualizacoes", icon: <Megaphone className="h-3.5 w-3.5 text-sky-500" /> },
+                  { key: "promotions", label: "Promocoes", icon: <Sparkles className="h-3.5 w-3.5 text-amber-500" /> },
+                  { key: "general", label: "Geral", icon: <Bell className="h-3.5 w-3.5 text-muted-foreground" /> },
                 ] as const)
                   .filter((group) => groupedNotifications[group.key].length > 0)
                   .map((group) => (
@@ -188,7 +183,7 @@ export function DashboardHeader({
                         {group.icon}
                         {group.label}
                       </div>
-                      {groupedNotifications[group.key].slice(0, 3).map((notification) => (
+                      {groupedNotifications[group.key].slice(0, 4).map((notification) => (
                         <DropdownMenuItem
                           key={notification.id}
                           className="items-start gap-3 whitespace-normal"
@@ -196,6 +191,10 @@ export function DashboardHeader({
                         >
                           {notification.severity === "high" ? (
                             <TriangleAlert className="mt-0.5 h-4 w-4 text-rose-500" />
+                          ) : notification.kind === "global_promotion" ? (
+                            <Sparkles className="mt-0.5 h-4 w-4 text-amber-500" />
+                          ) : notification.kind === "global_update" ? (
+                            <Megaphone className="mt-0.5 h-4 w-4 text-sky-500" />
                           ) : notification.bucket === "week" ? (
                             <Clock3 className="mt-0.5 h-4 w-4 text-sky-500" />
                           ) : (
@@ -204,6 +203,9 @@ export function DashboardHeader({
                           <div className="space-y-1">
                             <p className="text-sm font-medium leading-none">{notification.title}</p>
                             <p className="text-xs text-muted-foreground">{notification.message}</p>
+                            {notification.ctaLabel && (
+                              <p className="text-[11px] font-medium text-primary">{notification.ctaLabel}</p>
+                            )}
                           </div>
                           <Button
                             type="button"
