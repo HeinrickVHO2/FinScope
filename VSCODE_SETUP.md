@@ -1,7 +1,7 @@
 # Configuração do Projeto FinScope no VS Code Local
 
 ## 1. Clone o Projeto
-Se ainda não clonou, use o Git para baixar o projeto do Replit.
+Se ainda não clonou, use o Git para baixar o projeto do Replit. :)
 
 ## 2. Instale as Dependências
 ```bash
