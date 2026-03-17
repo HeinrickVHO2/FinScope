@@ -25,6 +25,7 @@ interface DashboardHeaderProps {
 type NotificationItem = {
   id: string;
   kind: string;
+  bucket: "overdue" | "today" | "week";
   severity: "high" | "medium" | "low";
   title: string;
   message: string;
@@ -34,6 +35,16 @@ type NotificationItem = {
 type NotificationResponse = {
   unreadCount: number;
   notifications: NotificationItem[];
+  summary: {
+    overdue: number;
+    today: number;
+    week: number;
+  };
+  groups: {
+    overdue: NotificationItem[];
+    today: NotificationItem[];
+    week: NotificationItem[];
+  };
 };
 
 export function DashboardHeader({ 
@@ -67,6 +78,8 @@ export function DashboardHeader({
   const planBadge = getPlanBadge();
   const notifications = notificationsQuery.data?.notifications || [];
   const unreadCount = notificationsQuery.data?.unreadCount || 0;
+  const groupedNotifications = notificationsQuery.data?.groups || { overdue: [], today: [], week: [] };
+  const summary = notificationsQuery.data?.summary || { overdue: 0, today: 0, week: 0 };
 
   return (
     <header className="flex items-center justify-between gap-4 border-b p-4 bg-background">
@@ -96,24 +109,57 @@ export function DashboardHeader({
           <DropdownMenuContent align="end" className="w-80">
             <DropdownMenuLabel>Notificacoes</DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <div className="grid grid-cols-3 gap-2 px-2 pb-2">
+              <div className="rounded-lg border bg-rose-50 px-2 py-2 text-center">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-rose-600">Atrasadas</p>
+                <p className="mt-1 text-lg font-semibold text-rose-700">{summary.overdue}</p>
+              </div>
+              <div className="rounded-lg border bg-amber-50 px-2 py-2 text-center">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-amber-600">Hoje</p>
+                <p className="mt-1 text-lg font-semibold text-amber-700">{summary.today}</p>
+              </div>
+              <div className="rounded-lg border bg-sky-50 px-2 py-2 text-center">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-sky-600">Semana</p>
+                <p className="mt-1 text-lg font-semibold text-sky-700">{summary.week}</p>
+              </div>
+            </div>
+            <DropdownMenuSeparator />
             {notifications.length ? (
-              notifications.slice(0, 6).map((notification) => (
-                <DropdownMenuItem
-                  key={notification.id}
-                  className="items-start gap-3 whitespace-normal"
-                  onClick={() => notification.route && setLocation(notification.route)}
-                >
-                  {notification.severity === "high" ? (
-                    <TriangleAlert className="mt-0.5 h-4 w-4 text-rose-500" />
-                  ) : (
-                    <Clock3 className="mt-0.5 h-4 w-4 text-amber-500" />
-                  )}
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium leading-none">{notification.title}</p>
-                    <p className="text-xs text-muted-foreground">{notification.message}</p>
-                  </div>
-                </DropdownMenuItem>
-              ))
+              <>
+                {([
+                  { key: "overdue", label: "Atrasadas", icon: <TriangleAlert className="h-3.5 w-3.5 text-rose-500" /> },
+                  { key: "today", label: "Vencem hoje", icon: <Clock3 className="h-3.5 w-3.5 text-amber-500" /> },
+                  { key: "week", label: "Esta semana", icon: <Clock3 className="h-3.5 w-3.5 text-sky-500" /> },
+                ] as const)
+                  .filter((group) => groupedNotifications[group.key].length > 0)
+                  .map((group) => (
+                    <div key={group.key}>
+                      <div className="flex items-center gap-2 px-2 py-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                        {group.icon}
+                        {group.label}
+                      </div>
+                      {groupedNotifications[group.key].slice(0, 3).map((notification) => (
+                        <DropdownMenuItem
+                          key={notification.id}
+                          className="items-start gap-3 whitespace-normal"
+                          onClick={() => notification.route && setLocation(notification.route)}
+                        >
+                          {notification.severity === "high" ? (
+                            <TriangleAlert className="mt-0.5 h-4 w-4 text-rose-500" />
+                          ) : notification.bucket === "week" ? (
+                            <Clock3 className="mt-0.5 h-4 w-4 text-sky-500" />
+                          ) : (
+                            <Clock3 className="mt-0.5 h-4 w-4 text-amber-500" />
+                          )}
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium leading-none">{notification.title}</p>
+                            <p className="text-xs text-muted-foreground">{notification.message}</p>
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                    </div>
+                  ))}
+              </>
             ) : (
               <div className="px-2 py-3 text-sm text-muted-foreground">
                 Sem alertas no momento.

@@ -193,6 +193,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   };
 
+  const isSameCalendarDay = (left: Date, right: Date) =>
+    left.getFullYear() === right.getFullYear()
+    && left.getMonth() === right.getMonth()
+    && left.getDate() === right.getDate();
+
   const deriveFutureExpenseStatus = (expense: Pick<FutureExpense, "status" | "dueDate">): "pending" | "paid" | "overdue" => {
     if (expense.status === "paid") return "paid";
     return new Date(expense.dueDate).getTime() < startOfCurrentDay().getTime() ? "overdue" : "pending";
@@ -225,25 +230,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   const buildPayablesNotifications = (items: FutureExpense[]) => {
-    const today = startOfCurrentDay().getTime();
-    const threeDaysAhead = new Date(startOfCurrentDay());
-    threeDaysAhead.setDate(threeDaysAhead.getDate() + 3);
+    const todayDate = startOfCurrentDay();
+    const today = todayDate.getTime();
+    const weekLimit = new Date(todayDate);
+    weekLimit.setDate(weekLimit.getDate() + 7);
 
     const notifications = items
       .filter((item) => item.status !== "paid")
       .map((item) => {
-        const dueTime = new Date(item.dueDate).getTime();
+        const dueDate = new Date(item.dueDate);
+        const dueTime = dueDate.getTime();
         const isOverdue = dueTime < today;
-        const isDueSoon = !isOverdue && dueTime <= threeDaysAhead.getTime();
-        if (!isOverdue && !isDueSoon) return null;
+        const isDueToday = !isOverdue && isSameCalendarDay(dueDate, todayDate);
+        const isDueThisWeek = !isOverdue && !isDueToday && dueTime <= weekLimit.getTime();
+        if (!isOverdue && !isDueToday && !isDueThisWeek) return null;
+
+        const bucket = isOverdue ? "overdue" : isDueToday ? "today" : "week";
 
         return {
           id: `payable-${item.id}`,
           kind: isOverdue ? "overdue_payable" : "upcoming_payable",
-          severity: isOverdue ? "high" : "medium",
-          title: isOverdue ? "Conta atrasada" : "Conta vencendo",
-          message: `${item.title} ${isOverdue ? "venceu" : "vence"} em ${new Date(item.dueDate).toLocaleDateString("pt-BR")} no valor de ${formatCurrencyBRL(Number(item.amount || 0))}.`,
-          dueDate: item.dueDate,
+          bucket,
+          severity: isOverdue ? "high" : isDueToday ? "high" : "medium",
+          title: isOverdue ? "Conta atrasada" : isDueToday ? "Vence hoje" : "Vence nesta semana",
+          message: `${item.title} ${isOverdue ? "venceu" : "vence"} em ${dueDate.toLocaleDateString("pt-BR")} no valor de ${formatCurrencyBRL(Number(item.amount || 0))}.`,
+          dueDate,
           amount: Number(item.amount || 0),
           route: "/future-expenses",
           accountType: item.accountType,
@@ -252,9 +263,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .filter(Boolean)
       .sort((left: any, right: any) => new Date(left.dueDate).getTime() - new Date(right.dueDate).getTime());
 
-    const unreadCount = notifications.filter((item: any) => item.severity === "high" || item.severity === "medium").length;
-    return { unreadCount, notifications };
-  };
+      const unreadCount = notifications.filter((item: any) => item.severity === "high" || item.severity === "medium").length;
+      return {
+        unreadCount,
+        notifications,
+        summary: {
+          overdue: notifications.filter((item: any) => item.bucket === "overdue").length,
+          today: notifications.filter((item: any) => item.bucket === "today").length,
+          week: notifications.filter((item: any) => item.bucket === "week").length,
+        },
+        groups: {
+          overdue: notifications.filter((item: any) => item.bucket === "overdue"),
+          today: notifications.filter((item: any) => item.bucket === "today"),
+          week: notifications.filter((item: any) => item.bucket === "week"),
+        },
+      };
+    };
 
   const aiChatRequestSchema = z.object({
     content: z.string().min(1, "Mensagem é obrigatória").max(2000, "Mensagem muito longa"),
