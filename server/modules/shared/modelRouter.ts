@@ -111,7 +111,7 @@ export function resolveModelForText(text: string): ModelSelection {
     return resolveModel("simple_transaction");
   }
 
-  if (/quanto eu gastei|por que|o que mudou|divisao|limites|meta|investimentos/.test(normalized)) {
+  if (/quanto eu gastei|por que|o que mudou|divisao|grafico|limites|meta|investimentos/.test(normalized)) {
     return resolveModel("insight", { requiresNarrative: true });
   }
 

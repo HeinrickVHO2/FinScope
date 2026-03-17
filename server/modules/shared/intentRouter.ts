@@ -14,7 +14,7 @@ export type AssistantRouteIntent =
   | { type: "upsert_limit"; category: string; amount: number; scope: "PF" | "PJ" | "ALL" }
   | { type: "investments_summary" }
   | { type: "switch_financial_view"; view: "goals" | "investments" }
-  | { type: "create_goal"; title: string; targetValue: number }
+  | { type: "create_goal"; title: string; targetValue: number; initialContribution?: number }
   | { type: "add_goal_contribution"; amount: number }
   | { type: "list_goals" }
   | { type: "goal_progress" }
@@ -67,6 +67,64 @@ function parseGoalTitle(rawText: string) {
   return "Meta financeira";
 }
 
+function parseFirstCurrencyLikeAmount(fragment: string) {
+  const match = fragment.match(/(?:r\$\s*)?\d[\d.,]*(?:\s*(?:k|mil|milhao|milhoes))?/i);
+  if (!match?.[0]) return null;
+
+  const normalized = match[0]
+    .replace(/r\$\s*/i, "")
+    .trim()
+    .toLowerCase();
+
+  if (/^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/.test(normalized)) {
+    const value = Number(normalized.replace(/\./g, "").replace(",", "."));
+    return Number.isFinite(value) ? value : null;
+  }
+
+  return parseMonetaryAmountFromNaturalLanguage(match[0]);
+}
+
+function parseGoalTargetValue(rawText: string) {
+  const patterns = [
+    /no valor de\s+([^!?\n]+)/i,
+    /valor de\s+([^!?\n]+)/i,
+    /preciso de\s+([^!?\n]+)/i,
+    /objetivo de\s+([^!?\n]+)/i,
+    /meta de\s+([^!?\n]+)/i,
+    /para comprar .*?\bde\s+([^!?\n]+)/i,
+    /para .*?\bde\s+([^!?\n]+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = rawText.match(pattern);
+    if (!match?.[1]) continue;
+    const amount = parseFirstCurrencyLikeAmount(match[1]);
+    if (amount) return amount;
+  }
+
+  return parseMonetaryAmountFromNaturalLanguage(rawText);
+}
+
+function parseGoalInitialContribution(rawText: string) {
+  const patterns = [
+    /ja tenho\s+([^.!?\n]+?)\s+(?:guardado|guardada|guardados|guardadas|juntado|juntada|separado|separada)/i,
+    /tenho\s+([^.!?\n]+?)\s+(?:guardado|guardada|guardados|guardadas|juntado|juntada|separado|separada)/i,
+    /ja guardei\s+([^.!?\n]+)/i,
+    /guardei\s+([^.!?\n]+)/i,
+    /ja juntei\s+([^.!?\n]+)/i,
+    /juntei\s+([^.!?\n]+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = rawText.match(pattern);
+    if (!match?.[1]) continue;
+    const amount = parseMonetaryAmountFromNaturalLanguage(match[1]);
+    if (amount) return amount;
+  }
+
+  return null;
+}
+
 function parseLimitCategory(rawText: string) {
   const match = rawText.match(/limite(?:\s+de\s+gastos?)?\s+(?:para\s+)?(.+?)(?:\s+de|\s+r\$|$)/i);
   return match?.[1]?.trim() || null;
@@ -98,7 +156,7 @@ function isReminderPaidMessage(normalized: string) {
 }
 
 function detectSummaryFocus(normalized: string): SummaryIntentFocus {
-  if (/divisao dos meus gastos|divisao por categoria|gastos por categoria|me mostra a divisao|grafico|pizza/.test(normalized)) {
+  if (/divisao dos meus gastos|divisao por categoria|gastos por categoria|me mostra a divisao|pizza/.test(normalized)) {
     return "category_breakdown";
   }
 
@@ -131,7 +189,7 @@ export function parseAssistantRouteIntent(text: string): AssistantRouteIntent | 
   const normalized = normalizeAssistantText(text);
   if (!normalized) return null;
 
-  if (/quanto eu gastei|resumo|ultimos dias|essa semana|este mes|mes passado|divisao dos meus gastos|gastos por categoria|maior gasto|o que subiu|o que mudou em relacao|por que meus gastos aumentaram/.test(normalized)) {
+  if (/quanto eu gastei|resumo|ultimos 7 dias|ultimos dias|essa semana|este mes|mes passado|divisao dos meus gastos|gastos por categoria|maior gasto|o que subiu|o que mudou em relacao|por que meus gastos aumentaram|grafico/.test(normalized)) {
     return {
       type: "summary",
       periodKey: resolvePeriodKey(normalized),
@@ -156,9 +214,15 @@ export function parseAssistantRouteIntent(text: string): AssistantRouteIntent | 
   }
 
   if (looksLikeGoalIntent(normalized)) {
-    const targetValue = parseMonetaryAmountFromNaturalLanguage(text);
+    const targetValue = parseGoalTargetValue(text);
     if (targetValue) {
-      return { type: "create_goal", title: parseGoalTitle(text), targetValue };
+      const initialContribution = parseGoalInitialContribution(text);
+      return {
+        type: "create_goal",
+        title: parseGoalTitle(text),
+        targetValue,
+        ...(initialContribution ? { initialContribution } : {}),
+      };
     }
   }
 

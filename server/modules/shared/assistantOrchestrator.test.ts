@@ -229,13 +229,15 @@ test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload
 
     const created = await orchestrator.handleMessage({
       userId: "user-1",
-      text: "Quero guardar dinheiro para comprar um Iphone no valor de 5760 reais",
+      text: "Quero juntar dinheiro para comprar uma moto de 13.500 reais. Ja tenho 3 mil guardado",
       channel: "internal_chat",
     });
     assert.equal(created.handled, true);
     assert.equal((created.payload as any)?.data?.route, "/goals");
     assert.equal((created.payload as any)?.ui_payload?.type, "goal_progress");
     assert.equal((created.payload as any)?.model?.tier, "advanced");
+    assert.equal((created.payload as any)?.data?.goal?.currentValue, "3000");
+    assert.match(created.reply || "", /3\.000,00|3000/);
 
     const contributed = await orchestrator.handleMessage({
       userId: "user-1",

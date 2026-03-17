@@ -385,7 +385,7 @@ export class AssistantOrchestrator {
     }
 
     if (intent.type === "create_goal") {
-      const goal = await this.goalService.createGoal(params.userId, {
+      const createdGoal = await this.goalService.createGoal(params.userId, {
         userId: params.userId,
         title: intent.title,
         targetValue: intent.targetValue,
@@ -393,12 +393,25 @@ export class AssistantOrchestrator {
         status: "active",
         metadata: { origin: "assistant" },
       });
+      const goalResult = intent.initialContribution && intent.initialContribution > 0
+        ? await this.goalService.addContribution({
+            userId: params.userId,
+            goalId: createdGoal.id,
+            amount: intent.initialContribution,
+            note: "Aporte inicial via assistente",
+          })
+        : null;
+      const goal = goalResult?.goal ?? createdGoal;
+      const progress = toNumber(goal.currentValue) / Math.max(1, toNumber(goal.targetValue));
+      const initialContributionMessage = intent.initialContribution && intent.initialContribution > 0
+        ? ` Ja deixei registrado que voce ja guardou ${formatCurrency(intent.initialContribution)}.`
+        : "";
 
       return buildResponse({
         intent: "goals.create",
         action: "create_goal",
-        message: `Meta criada: ${goal.title} com objetivo de ${formatCurrency(toNumber(goal.targetValue))}. Quando quiser, me diga algo como 'ja guardei 500 hoje'.`,
-        data: { goal, route: "/goals", view: "goals" },
+        message: `Meta criada: ${goal.title} com objetivo de ${formatCurrency(toNumber(goal.targetValue))}.${initialContributionMessage} Progresso atual: ${Math.round(progress * 100)}% (${formatCurrency(toNumber(goal.currentValue))} de ${formatCurrency(toNumber(goal.targetValue))}).`,
+        data: { goal, contribution: goalResult?.contribution ?? null, route: "/goals", view: "goals" },
         uiPayload: {
           type: "goal_progress",
           title: goal.title,
@@ -407,7 +420,7 @@ export class AssistantOrchestrator {
           progress: {
             current: toNumber(goal.currentValue),
             target: toNumber(goal.targetValue),
-            percentage: 0,
+            percentage: Number((progress * 100).toFixed(2)),
           },
         },
         model: modelSelection,

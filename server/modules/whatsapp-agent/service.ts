@@ -736,7 +736,7 @@ export class WhatsAppAgentService {
         channel: "whatsapp",
       });
       if (orchestrated.handled && orchestrated.reply) {
-        return this.handleAssistantReply(inbound, user, orchestrated.reply, "assistant_orchestrated");
+        return this.handleAssistantReply(inbound, user, orchestrated.reply, "assistant_orchestrated", orchestrated.payload ?? null);
       }
 
       if (looksLikeFinanceAssistantQuestion(sanitizedEvent.text || "")) {
@@ -788,11 +788,17 @@ export class WhatsAppAgentService {
     return { status: "assistant_answered" };
   }
 
-  private async handleAssistantReply(inbound: InboundMessageRecord, user: User, reply: string, mode: string) {
+  private async handleAssistantReply(
+    inbound: InboundMessageRecord,
+    user: User,
+    reply: string,
+    mode: string,
+    payload?: Record<string, unknown> | null,
+  ) {
     await this.repository.updateInboundMessage({
       id: inbound.id,
       status: "assistant_answered",
-      extractedPayload: { mode },
+      extractedPayload: { mode, payload: payload ?? null },
     });
     await this.appendInboundProcessingLog({
       inboundMessageId: inbound.id,
@@ -800,9 +806,12 @@ export class WhatsAppAgentService {
       level: "info",
       event: "assistant_answered",
       message: "Mensagem respondida pela camada orquestradora compartilhada.",
-      metadata: { mode },
+      metadata: { mode, uiPayloadType: payload?.ui_payload ? String((payload.ui_payload as Record<string, unknown>).type || "") : null },
     });
     await this.sendReplyToInbound(inbound, reply);
+    for (const followUp of this.buildWhatsAppVisualFollowUps(payload)) {
+      await this.sendReplyToInbound(inbound, followUp);
+    }
     return { status: "assistant_answered" };
   }
 
@@ -1680,6 +1689,77 @@ export class WhatsAppAgentService {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  private buildWhatsAppVisualFollowUps(payload?: Record<string, unknown> | null) {
+    const uiPayload = (payload?.ui_payload || null) as Record<string, unknown> | null;
+    if (!uiPayload?.type) return [];
+
+    if (uiPayload.type === "financial_summary") {
+      const chart = (uiPayload.chart || {}) as Record<string, unknown>;
+      const series = Array.isArray(chart.series) ? chart.series as Array<Record<string, unknown>> : [];
+      const breakdownSeries = Array.isArray(chart.breakdownSeries) ? chart.breakdownSeries as Array<Record<string, unknown>> : [];
+      const segments: string[] = [];
+
+      if (series.length) {
+        segments.push(this.formatAsciiBarChart("Grafico dos seus gastos", series, "amount"));
+      }
+
+      if (breakdownSeries.length) {
+        segments.push(this.formatAsciiBarChart("Divisao por categoria", breakdownSeries.slice(0, 5), "value", "label", true));
+      }
+
+      return segments.filter(Boolean);
+    }
+
+    if (uiPayload.type === "expense_breakdown") {
+      const chart = (uiPayload.chart || {}) as Record<string, unknown>;
+      const series = Array.isArray(chart.series) ? chart.series as Array<Record<string, unknown>> : [];
+      return series.length
+        ? [this.formatAsciiBarChart("Divisao por categoria", series.slice(0, 6), "value", "label", true)]
+        : [];
+    }
+
+    if (uiPayload.type === "limits_overview") {
+      const limits = Array.isArray(uiPayload.limits) ? uiPayload.limits as Array<Record<string, unknown>> : [];
+      if (!limits.length) return [];
+      const lines = ["Grafico dos seus limites"];
+      for (const item of limits.slice(0, 5)) {
+        const utilization = Math.max(0, Math.min(100, Math.round(Number(item.utilization || 0) * 100)));
+        lines.push(`${String(item.category || "Categoria").slice(0, 14).padEnd(14)} ${this.renderBar(utilization)} ${utilization}%`);
+      }
+      return [lines.join("\n")];
+    }
+
+    return [];
+  }
+
+  private formatAsciiBarChart(
+    title: string,
+    items: Array<Record<string, unknown>>,
+    valueKey: string,
+    labelKey = "label",
+    appendPercent = false,
+  ) {
+    const maxValue = items.reduce((best, item) => Math.max(best, Number(item[valueKey] || 0)), 0);
+    const lines = [title];
+
+    for (const item of items) {
+      const value = Number(item[valueKey] || 0);
+      const label = String(item[labelKey] || "-").slice(0, 14).padEnd(14);
+      const ratio = maxValue > 0 ? value / maxValue : 0;
+      const percent = appendPercent ? ` ${Math.round(Number(item.share || 0) * 100)}%` : "";
+      lines.push(`${label} ${this.renderBar(Math.round(ratio * 100))} ${formatCurrencyBRL(value)}${percent}`);
+    }
+
+    return lines.join("\n");
+  }
+
+  private renderBar(percent: number) {
+    const clamped = Math.max(0, Math.min(100, percent));
+    const total = 8;
+    const filled = Math.round((clamped / 100) * total);
+    return `${"█".repeat(filled)}${"░".repeat(Math.max(0, total - filled))}`;
   }
 
   private async confirmPhoneBinding(pending: PendingPhoneBinding, event: WhatsAppInboundEvent): Promise<{ status: string }> {
