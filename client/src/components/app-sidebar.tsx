@@ -1,5 +1,5 @@
 ﻿import { useState, type ComponentType } from "react";
-import { Home, ArrowLeftRight, Settings, PiggyBank, Building2, Lock, CalendarClock, Sparkles, MessageCircle } from "lucide-react";
+import { Home, ArrowLeftRight, Settings, PiggyBank, Building2, Lock, CalendarClock, Sparkles, MessageCircle, Target } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import UpgradeModal from "@/components/UpgradeModal";
@@ -19,6 +19,7 @@ const baseMenuItems = [
   { title: "Início", url: "/dashboard", icon: Home },
   { title: "Transações", url: "/transactions", icon: ArrowLeftRight },
   { title: "Investimentos", url: "/investments", icon: PiggyBank },
+  { title: "Metas", url: "/goals", icon: Target },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
 

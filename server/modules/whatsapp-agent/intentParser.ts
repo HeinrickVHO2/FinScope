@@ -1,5 +1,6 @@
 import type { FinancialIntent } from "./types";
 import { parseMonetaryAmountFromNaturalLanguage } from "./amountParser";
+import { inferExpenseCategory } from "../shared/expenseClassifier";
 
 function parseAmount(text: string): number | null {
   return parseMonetaryAmountFromNaturalLanguage(text);
@@ -12,6 +13,7 @@ function parseType(text: string): "income" | "expense" | "unknown" {
 
   if (incomeKeywords.some((keyword) => normalized.includes(keyword))) return "income";
   if (expenseKeywords.some((keyword) => normalized.includes(keyword))) return "expense";
+  if (inferExpenseCategory(text)) return "expense";
   return "unknown";
 }
 
@@ -51,20 +53,20 @@ function extractMerchant(description: string): string | undefined {
   return undefined;
 }
 
-function suggestCategory(description: string, kind: "income" | "expense" | "unknown"): string | undefined {
+function suggestIncomeCategory(description: string): string | undefined {
   const normalized = description.toLowerCase();
+  if (/salario|folha|pagamento/.test(normalized)) return "Salario";
+  if (/freela|cliente|faturamento/.test(normalized)) return "Freelance";
+  return undefined;
+}
 
+function suggestCategory(description: string, kind: "income" | "expense" | "unknown"): string | undefined {
   if (kind === "income") {
-    if (/salario|folha|pagamento/.test(normalized)) return "Salário";
-    if (/freela|cliente|faturamento/.test(normalized)) return "Freelance";
-    return "Outros";
+    return suggestIncomeCategory(description);
   }
 
   if (kind === "expense") {
-    if (/gasolina|combust|uber|transporte/.test(normalized)) return "Transporte";
-    if (/mercado|supermerc|padaria/.test(normalized)) return "Alimentação";
-    if (/farmacia|remedio|medic/.test(normalized)) return "Saúde";
-    return "Outros";
+    return inferExpenseCategory(description) ?? undefined;
   }
 
   return undefined;

@@ -3,6 +3,7 @@ import { StatementParserFactory } from "./parserFactory";
 import { normalizeDescriptionForMatching, normalizeEntry } from "./normalizer";
 import { ReconciliationEngine } from "./reconciliationEngine";
 import { StatementImportRepository } from "./repository";
+import { inferExpenseCategory } from "../shared/expenseClassifier";
 import type {
   NormalizedStatementEntry,
   ReconciliationResult,
@@ -48,7 +49,23 @@ function summarize(entries: Array<{ reconciliationStatus: ReconciliationStatus }
   return initial;
 }
 
-function categoryFromDescription(description: string): string {
+function categoryFromDescription(description: string, type: "entrada" | "saida"): string {
+  if (type === "entrada") {
+    const normalizedIncome = normalizeDescriptionForMatching(description);
+    if (normalizedIncome.includes("salario") || normalizedIncome.includes("folha") || normalizedIncome.includes("pagamento")) {
+      return "Salario";
+    }
+    if (normalizedIncome.includes("cliente") || normalizedIncome.includes("venda") || normalizedIncome.includes("faturamento")) {
+      return "Vendas";
+    }
+    return "Outros";
+  }
+
+  const inferred = inferExpenseCategory(description);
+  if (inferred) {
+    return inferred;
+  }
+
   const normalized = normalizeDescriptionForMatching(description);
 
   const rules: Array<{ category: string; keywords: string[] }> = [
@@ -237,7 +254,7 @@ export class StatementImportService {
         description: entry.originalDescription,
         type,
         amount: entry.amount,
-        category: categoryFromDescription(entry.originalDescription),
+        category: categoryFromDescription(entry.originalDescription, type),
         date: new Date(entry.transactionDate),
         accountType,
         source: "statement_import",

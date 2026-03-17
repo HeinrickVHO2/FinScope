@@ -17,6 +17,7 @@ import { insertInvestmentSchema, INVESTMENT_TYPES, type Investment, type Investm
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Link } from "wouter";
 
 type InsertInvestment = z.infer<typeof insertInvestmentSchema>;
 
@@ -258,6 +259,18 @@ export default function InvestmentsPage() {
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
+          <div className="mb-3 flex flex-wrap gap-2">
+            <Button>
+              <TrendingUp className="mr-2 h-4 w-4" />
+              Investimentos
+            </Button>
+            <Link href="/goals">
+              <Button variant="outline">
+                <Target className="mr-2 h-4 w-4" />
+                Metas
+              </Button>
+            </Link>
+          </div>
           <h1 className="text-3xl font-poppins font-bold" data-testid="text-investments-title">Investimentos</h1>
           <p className="text-muted-foreground" data-testid="text-investments-subtitle">
             Acompanhe seus investimentos e veja sua evolução com clareza

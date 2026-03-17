@@ -20,6 +20,8 @@ import { generateAiInsights } from "./aiInsights";
 import type { AiInsightResult } from "./aiInsights";
 import { registerStatementImportRoutes } from "./modules/statement-import/routes";
 import { registerWhatsAppAgentRoutes } from "./modules/whatsapp-agent/routes";
+import { GoalService } from "./modules/shared/goalService";
+import { CategoryLimitService } from "./modules/shared/categoryLimitService";
 import { 
   insertUserSchema, 
   loginSchema,
@@ -38,6 +40,10 @@ import {
   insertFutureExpenseSchema,
   insertFutureTransactionSchema,
   insertUserReportPreferenceSchema,
+  insertGoalSchema,
+  updateGoalSchema,
+  insertGoalContributionSchema,
+  insertCategoryLimitSchema,
 } from "@shared/schema";
 import type { User, Transaction, FutureTransaction, RecurringTransaction } from "@shared/schema";
 import { z } from "zod";
@@ -65,6 +71,8 @@ declare global {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const goalService = new GoalService();
+  const categoryLimitService = new CategoryLimitService();
 
   const puppeteerExecutable = resolvePuppeteerExecutable();
   if (!puppeteerExecutable) {
@@ -2556,9 +2564,124 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
 
   await storage.deleteInvestmentGoal(req.params.investmentId);
 
-  res.json({ success: true });
+res.json({ success: true });
 });
 
+
+  // ===== DASHBOARD ROUTES =====
+  
+  app.get("/api/goals", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const status = typeof req.query?.status === "string" ? req.query.status : undefined;
+      const goals = await goalService.listGoals(
+        req.session.userId,
+        status === "active" || status === "completed" || status === "archived" ? status : undefined,
+      );
+      res.json(goals);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message || "Erro ao buscar metas" });
+    }
+  });
+
+  app.post("/api/goals", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const data = insertGoalSchema.parse(req.body);
+      const goal = await goalService.createGoal(req.session.userId, {
+        ...data,
+        userId: req.session.userId,
+      });
+      res.json(goal);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados invalidos", details: error.errors });
+      }
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  app.patch("/api/goals/:id", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const patch = updateGoalSchema.parse(req.body);
+      const goal = await goalService.updateGoal(req.session.userId, req.params.id, patch);
+      res.json(goal);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados invalidos", details: error.errors });
+      }
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  app.post("/api/goals/:id/contributions", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const payload = insertGoalContributionSchema.parse(req.body);
+      const result = await goalService.addContribution({
+        userId: req.session.userId,
+        goalId: req.params.id,
+        amount: payload.amount,
+        note: payload.note,
+        contributedAt: payload.contributedAt,
+      });
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados invalidos", details: error.errors });
+      }
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  app.get("/api/goals/:id/contributions", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const contributions = await goalService.listContributions(req.session.userId, req.params.id);
+      res.json(contributions);
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  app.post("/api/goals/:id/archive", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const goal = await goalService.archiveGoal(req.session.userId, req.params.id);
+      res.json(goal);
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  app.post("/api/goals/:id/complete", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const goal = await goalService.completeGoal(req.session.userId, req.params.id);
+      res.json(goal);
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  app.get("/api/category-limits", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const limits = await categoryLimitService.listByUser(req.session.userId);
+      res.json(limits);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message || "Erro ao buscar limites" });
+    }
+  });
+
+  app.post("/api/category-limits", requireAuth, requireActiveBilling, async (req: any, res) => {
+    try {
+      const payload = insertCategoryLimitSchema.parse(req.body);
+      const limit = await categoryLimitService.upsert(req.session.userId, {
+        ...payload,
+        userId: req.session.userId,
+      });
+      res.json(limit);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Dados invalidos", details: error.errors });
+      }
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
 
   // ===== DASHBOARD ROUTES =====
   

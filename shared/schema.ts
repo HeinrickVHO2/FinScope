@@ -361,6 +361,48 @@ export const insertInvestmentTransactionSchema = createInsertSchema(investmentTr
   createdAt: true,
 });
 
+export const insertGoalSchema = z.object({
+  title: z.string().min(1, "Nome da meta e obrigatorio"),
+  targetValue: z.coerce.number().positive("Meta deve ser maior que zero").refine(
+    (val) => Number.isFinite(val) && Math.round(val * 100) === val * 100,
+    "Meta deve ter no maximo 2 casas decimais"
+  ),
+  currentValue: z.coerce.number().min(0, "Valor atual nao pode ser negativo").default(0),
+  targetDate: z.coerce.date().optional().nullable(),
+  status: z.enum(["active", "completed", "archived"]).default("active"),
+  metadata: z.record(z.string(), z.any()).optional().nullable(),
+});
+
+export const updateGoalSchema = z.object({
+  title: z.string().min(1, "Nome da meta e obrigatorio").optional(),
+  targetValue: z.coerce.number().positive("Meta deve ser maior que zero").optional(),
+  currentValue: z.coerce.number().min(0, "Valor atual nao pode ser negativo").optional(),
+  targetDate: z.coerce.date().optional().nullable(),
+  status: z.enum(["active", "completed", "archived"]).optional(),
+  archivedAt: z.coerce.date().optional().nullable(),
+  completedAt: z.coerce.date().optional().nullable(),
+  metadata: z.record(z.string(), z.any()).optional().nullable(),
+}).strict();
+
+export const insertGoalContributionSchema = z.object({
+  amount: z.coerce.number().positive("Aporte deve ser maior que zero").refine(
+    (val) => Number.isFinite(val) && Math.round(val * 100) === val * 100,
+    "Aporte deve ter no maximo 2 casas decimais"
+  ),
+  contributedAt: z.coerce.date().optional(),
+  note: z.string().optional().nullable(),
+});
+
+export const insertCategoryLimitSchema = z.object({
+  category: z.string().min(1, "Categoria e obrigatoria"),
+  scope: z.enum(["PF", "PJ", "ALL"]).default("ALL"),
+  period: z.enum(["weekly", "monthly"]).default("monthly"),
+  amount: z.coerce.number().positive("Limite deve ser maior que zero").refine(
+    (val) => Number.isFinite(val) && Math.round(val * 100) === val * 100,
+    "Limite deve ter no maximo 2 casas decimais"
+  ),
+});
+
 // Login schema
 export const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -418,6 +460,16 @@ export type InvestmentGoal = typeof investmentGoals.$inferSelect;
 export type InsertInvestmentTransaction = z.infer<typeof insertInvestmentTransactionSchema> & {userId: string; investmentId: string; sourceAccountId: string;};
 export type InvestmentTransaction = typeof investmentTransactions.$inferSelect;
 
+export type InsertGoal = z.infer<typeof insertGoalSchema> & { userId: string };
+export type UpdateGoal = z.infer<typeof updateGoalSchema>;
+export type Goal = typeof goals.$inferSelect;
+
+export type InsertGoalContribution = z.infer<typeof insertGoalContributionSchema> & { userId: string; goalId: string };
+export type GoalContribution = typeof goalContributions.$inferSelect;
+
+export type InsertCategoryLimit = z.infer<typeof insertCategoryLimitSchema> & { userId: string };
+export type CategoryLimit = typeof categoryLimits.$inferSelect;
+
 export type LoginData = z.infer<typeof loginSchema>;
 export type UpdateUserProfile = z.infer<typeof updateUserProfileSchema>;
 
@@ -443,6 +495,24 @@ export const CATEGORIES = [
   "Outros",
 ] as const;
 
+export const SMART_EXPENSE_CATEGORIES = [
+  "Mercado",
+  "Alimentacao",
+  "Jantar fora",
+  "Transporte",
+  "Lazer",
+  "Compras",
+  "Roupas",
+  "Saude",
+  "Educacao",
+  "Contas Fixas",
+  "Moradia",
+  "Assinaturas",
+  "Viagem",
+  "Delivery",
+  "Outros",
+] as const;
+
 // Investment types
 export const INVESTMENT_TYPES = [
   { value: "reserva_emergencia", label: "Reserva de Emergência" },
@@ -463,10 +533,38 @@ export const futureBills = pgTable("future_bills", {
 
 export const goals = pgTable("goals", {
   id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").notNull(),
+  userId: text("user_id").notNull(),
   title: text("title").notNull(),
   targetValue: numeric("target_value").notNull(),
-  createdAt: timestamp("created_at").defaultNow()
+  currentValue: numeric("current_value").notNull().default("0"),
+  targetDate: timestamp("target_date"),
+  status: text("status").notNull().default("active"),
+  archivedAt: timestamp("archived_at"),
+  completedAt: timestamp("completed_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const goalContributions = pgTable("goal_contributions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  goalId: uuid("goal_id").notNull(),
+  userId: text("user_id").notNull(),
+  amount: numeric("amount").notNull(),
+  contributedAt: timestamp("contributed_at").defaultNow().notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const categoryLimits = pgTable("category_limits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  category: text("category").notNull(),
+  scope: text("scope").notNull().default("ALL"),
+  period: text("period").notNull().default("monthly"),
+  amount: numeric("amount").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const bankStatementUploads = pgTable("bank_statement_uploads", {

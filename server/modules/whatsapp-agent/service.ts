@@ -18,6 +18,8 @@ import { FinancialIntentParser } from "./intentParser";
 import { WhatsAppMediaService } from "./media";
 import { WhatsAppMessenger } from "./messenger";
 import { createDefaultOcrProvider, type OcrProvider } from "./ocr";
+import { AssistantOrchestrator } from "../shared/assistantOrchestrator";
+import { inferExpenseCategory } from "../shared/expenseClassifier";
 import { buildWhatsAppConversationUrl, normalizePhone } from "./phone";
 import type { InboundMessageRecord, WhatsAppRepository } from "./repository";
 import type {
@@ -41,8 +43,11 @@ function formatCurrencyBRL(value: number) {
   return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function categoryFromIntent(kind: "income" | "expense", suggestion?: string | null): string {
+function categoryFromIntent(kind: "income" | "expense", suggestion?: string | null, description?: string | null): string {
   if (suggestion) return suggestion;
+  if (kind === "expense" && description) {
+    return inferExpenseCategory(description) || "Outros";
+  }
   return "Outros";
 }
 
@@ -178,6 +183,7 @@ export class WhatsAppAgentService {
   private readonly ocrProvider: OcrProvider;
   private readonly messenger: WhatsAppMessenger;
   private readonly mediaService: WhatsAppMediaService;
+  private readonly assistantOrchestrator: AssistantOrchestrator;
   private readonly runtimeInfo = getWhatsAppAgentRuntimeInfo();
   private readonly pendingBindingsByCode = new Map<string, PendingPhoneBinding>();
   private readonly pendingBindingsByUser = new Map<string, PendingPhoneBinding>();
@@ -196,6 +202,7 @@ export class WhatsAppAgentService {
     this.ocrProvider = deps.ocrProvider ?? createDefaultOcrProvider();
     this.messenger = deps.messenger ?? new WhatsAppMessenger();
     this.mediaService = deps.mediaService ?? new WhatsAppMediaService();
+    this.assistantOrchestrator = new AssistantOrchestrator(this.storage);
   }
 
   async getSession(userId: string): Promise<WhatsAppSessionState> {
@@ -723,6 +730,15 @@ export class WhatsAppAgentService {
         return { status: "assistant_answered" };
       }
 
+      const orchestrated = await this.assistantOrchestrator.handleMessage({
+        userId: user.id,
+        text: sanitizedEvent.text || "",
+        channel: "whatsapp",
+      });
+      if (orchestrated.handled && orchestrated.reply) {
+        return this.handleAssistantReply(inbound, user, orchestrated.reply, "assistant_orchestrated");
+      }
+
       if (looksLikeFinanceAssistantQuestion(sanitizedEvent.text || "")) {
         this.logInternal("info", "branch_assistant_message", "Mensagem classificada como pergunta financeira.", {
           inboundMessageId: inbound.id,
@@ -767,6 +783,24 @@ export class WhatsAppAgentService {
       level: "info",
       event: "assistant_answered",
       message: "Pergunta financeira respondida no chat.",
+    });
+    await this.sendReplyToInbound(inbound, reply);
+    return { status: "assistant_answered" };
+  }
+
+  private async handleAssistantReply(inbound: InboundMessageRecord, user: User, reply: string, mode: string) {
+    await this.repository.updateInboundMessage({
+      id: inbound.id,
+      status: "assistant_answered",
+      extractedPayload: { mode },
+    });
+    await this.appendInboundProcessingLog({
+      inboundMessageId: inbound.id,
+      userId: user.id,
+      level: "info",
+      event: "assistant_answered",
+      message: "Mensagem respondida pela camada orquestradora compartilhada.",
+      metadata: { mode },
     });
     await this.sendReplyToInbound(inbound, reply);
     return { status: "assistant_answered" };
@@ -1310,7 +1344,11 @@ export class WhatsAppAgentService {
         description: candidate.description,
         type: candidate.proposed_type === "income" ? "entrada" : "saida",
         amount: Number(candidate.amount),
-        category: candidate.category_suggestion || categoryFromIntent(candidate.proposed_type === "income" ? "income" : "expense", candidate.category_suggestion),
+        category: candidate.category_suggestion || categoryFromIntent(
+          candidate.proposed_type === "income" ? "income" : "expense",
+          candidate.category_suggestion,
+          candidate.description,
+        ),
         date: new Date(candidate.transaction_date),
         accountType: selectedAccount.type.toUpperCase() === "PJ" ? "PJ" : "PF",
         source: WHATSAPP_TRANSACTION_PROVENANCE.source,
@@ -1560,7 +1598,7 @@ export class WhatsAppAgentService {
     const action = intent.kind === "income" ? "uma entrada" : "um gasto";
     const amount = intent.amount === null ? 0 : intent.amount;
     const kind = intent.kind === "income" ? "income" : "expense";
-    return `${action} de ${formatCurrencyBRL(amount)} em ${categoryFromIntent(kind, intent.categorySuggestion)}`;
+    return `${action} de ${formatCurrencyBRL(amount)} em ${categoryFromIntent(kind, intent.categorySuggestion, (intent as any).description)}`;
   }
 
   private describeCandidate(candidate: CandidateRecord) {
@@ -1583,6 +1621,12 @@ export class WhatsAppAgentService {
 
   private pickInvoiceCategory(invoice: ReturnType<typeof parseInvoiceText>) {
     if (!invoice) return "Outros";
+    const inferred = inferExpenseCategory(
+      [invoice.merchant, ...invoice.items.map((item) => item.description)]
+        .filter(Boolean)
+        .join(" "),
+    );
+    if (inferred) return inferred;
     const haystack = [invoice.merchant, ...invoice.items.map((item) => item.description)].join(" ").toLowerCase();
     if (/mercado|supermerc|padaria|hortifruti/.test(haystack)) return "Alimentação";
     if (/farmacia|drogaria/.test(haystack)) return "Saúde";

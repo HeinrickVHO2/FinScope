@@ -25,6 +25,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
+import { classifyExpenseCategory, shouldAutoClassifyExpense } from "./modules/shared/expenseClassifier";
 
 // Internal types with numeric amounts for calculations
 type StoredAccount = Omit<Account, 'initialBalance'> & { initialBalance: number };
@@ -334,6 +335,19 @@ export class MemStorage {
         finalCategory = rule.categoryResult;
         autoRuleApplied = true;
         break;
+      }
+    }
+
+    if (insertTransaction.type === "saida" && shouldAutoClassifyExpense(finalCategory)) {
+      const history = await this.getTransactionsByUserId(insertTransaction.userId, "ALL");
+      const suggestion = classifyExpenseCategory({
+        description: insertTransaction.description,
+        currentCategory: finalCategory,
+        history,
+        rules: userRules,
+      });
+      if (!suggestion.usedFallback) {
+        finalCategory = suggestion.category;
       }
     }
 

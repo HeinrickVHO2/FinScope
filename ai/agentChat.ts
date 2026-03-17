@@ -19,6 +19,7 @@ import { executeAgentActions, type AgentActionResult } from "./agentActionsHandl
 import { fetchChatHistory, saveChatHistoryMessage, type ChatHistoryRow } from "./chatHistory";
 import { buildFinancialAssistantReply, looksLikeFinanceAssistantQuestion } from "../server/modules/shared/financialAssistant";
 import { storage } from "../server/storage";
+import { AssistantOrchestrator } from "../server/modules/shared/assistantOrchestrator";
 
 export interface ChatRequest {
   content: string;
@@ -31,6 +32,7 @@ export interface ChatResponse {
   userMessage: { id: string; role: string; content: string; createdAt: string };
   assistantMessage: { id: string; role: string; content: string; createdAt: string };
   actions: AgentActionResult[];
+  payload?: Record<string, unknown>;
 }
 
 export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> {
@@ -53,9 +55,26 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
   }
 
   const recentContext = getRecentContext(userId, 6);
+  const assistantOrchestrator = new AssistantOrchestrator(storage);
 
   const userMessageRow = await saveChatHistoryMessage(userId, "user", content);
   addConversationContext(userId, "user", content);
+
+  const orchestrated = await assistantOrchestrator.handleMessage({
+    userId,
+    text: content,
+    channel: "internal_chat",
+  });
+  if (orchestrated.handled && orchestrated.reply) {
+    const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", orchestrated.reply);
+    addConversationContext(userId, "assistant", orchestrated.reply);
+    return {
+      userMessage: mapHistoryToResponse(userMessageRow),
+      assistantMessage: mapHistoryToResponse(assistantMessageRow),
+      actions: [],
+      payload: orchestrated.payload,
+    };
+  }
 
   if (looksLikeFinanceAssistantQuestion(content)) {
     const assistantReply = await buildFinancialAssistantReply(storage, userId, content, "internal_chat");

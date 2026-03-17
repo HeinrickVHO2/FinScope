@@ -2,6 +2,7 @@ import type { User } from "@shared/schema";
 import { storage } from "../server/storage";
 import { supabase } from "../server/supabase";
 import type { FinancialContext } from "./buildFinancialContext";
+import { inferExpenseCategory } from "../server/modules/shared/expenseClassifier";
 
 type AccountKind = "PF" | "PJ";
 
@@ -290,6 +291,7 @@ async function upsertFutureExpense(
   category?: string
 ) {
   const normalizedTitle = normalizeText(title);
+  const inferredCategory = category || inferExpenseCategory(title) || "Outros";
   const { data: existing } = await supabase
     .from("future_expenses")
     .select("*")
@@ -305,7 +307,7 @@ async function upsertFutureExpense(
       .update({
         amount: String(amount),
         due_date: dueDate.toISOString(),
-        category: category || match.category || "Outros",
+        category: category || match.category || inferredCategory,
       })
       .eq("id", match.id);
     return;
@@ -317,7 +319,7 @@ async function upsertFutureExpense(
     amount: String(amount),
     due_date: dueDate.toISOString(),
     account_type: accountType,
-    category: category || "Outros",
+    category: inferredCategory,
     status: "pending",
   });
 }
@@ -380,6 +382,9 @@ function toNumber(value: any): number {
 
 function guessCategory(description: string, txType: string): string {
   const lower = description.toLowerCase();
+  if (txType !== "entrada") {
+    return inferExpenseCategory(description) || "Outros";
+  }
   if (txType === "entrada") {
     if (lower.includes("sal") || lower.includes("folha")) return "Salário";
     if (lower.includes("pix") || lower.includes("transfer")) return "Transferências";
