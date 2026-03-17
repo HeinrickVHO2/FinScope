@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Bell, Clock3, LogOut, TriangleAlert, User, X } from "lucide-react";
+import { Bell, CircleHelp, Clock3, LogOut, Mail, TriangleAlert, User, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 
@@ -108,14 +108,6 @@ export function DashboardHeader({
     }),
     [visibleNotifications],
   );
-  const summary = useMemo(
-    () => ({
-      overdue: groupedNotifications.overdue.length,
-      today: groupedNotifications.today.length,
-      week: groupedNotifications.week.length,
-    }),
-    [groupedNotifications],
-  );
   const unreadCount = visibleNotifications.length;
 
   const dismissNotification = (notificationId: string) => {
@@ -130,6 +122,11 @@ export function DashboardHeader({
       visibleNotifications.forEach((notification) => next.add(notification.id));
       return Array.from(next);
     });
+  };
+
+  const openSupportEmail = () => {
+    if (typeof window === "undefined") return;
+    window.location.href = "mailto:contato@finscope.com.br";
   };
 
   return (
@@ -176,21 +173,6 @@ export function DashboardHeader({
                 </Button>
               )}
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <div className="grid grid-cols-3 gap-2 px-2 pb-2">
-              <div className="rounded-lg border bg-rose-50 px-2 py-2 text-center">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-rose-600">Atrasadas</p>
-                <p className="mt-1 text-lg font-semibold text-rose-700">{summary.overdue}</p>
-              </div>
-              <div className="rounded-lg border bg-amber-50 px-2 py-2 text-center">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-amber-600">Hoje</p>
-                <p className="mt-1 text-lg font-semibold text-amber-700">{summary.today}</p>
-              </div>
-              <div className="rounded-lg border bg-sky-50 px-2 py-2 text-center">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-sky-600">Semana</p>
-                <p className="mt-1 text-lg font-semibold text-sky-700">{summary.week}</p>
-              </div>
-            </div>
             <DropdownMenuSeparator />
             {visibleNotifications.length ? (
               <>
@@ -246,6 +228,29 @@ export function DashboardHeader({
                 Sem alertas no momento.
               </div>
             )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" data-testid="button-support-menu">
+              <CircleHelp className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuLabel>Ajuda e suporte</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setLocation("/faq")} data-testid="menu-item-faq">
+              <CircleHelp className="mr-2 h-4 w-4" />
+              Central de ajuda
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLocation("/contato")} data-testid="menu-item-contact">
+              <User className="mr-2 h-4 w-4" />
+              Falar com o suporte
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={openSupportEmail} data-testid="menu-item-email-support">
+              <Mail className="mr-2 h-4 w-4" />
+              contato@finscope.com.br
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu>
