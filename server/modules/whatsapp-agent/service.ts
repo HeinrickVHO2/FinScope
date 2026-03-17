@@ -2,7 +2,7 @@ import { createHash, randomInt } from "node:crypto";
 import type { Account, Transaction, User } from "@shared/schema";
 import type { IStorage } from "../../storage";
 import { normalizeDescriptionForMatching } from "../statement-import/normalizer";
-import { buildFinanceAssistantReply, looksLikeFinanceAssistantQuestion } from "./assistant";
+import { buildFinanceAssistantResponse, looksLikeFinanceAssistantQuestion } from "./assistant";
 import {
   WHATSAPP_AUTO_CREATE_THRESHOLD,
   WHATSAPP_CANDIDATE_STATUS,
@@ -775,7 +775,11 @@ export class WhatsAppAgentService {
       userId: user.id,
       textPreview: textPreview(text),
     });
-    const reply = await buildFinanceAssistantReply(this.storage, user.id, text);
+    const response = await buildFinanceAssistantResponse(this.storage, user.id, text);
+    if (response.payload) {
+      return this.handleAssistantReply(inbound, user, response.message, "assistant_financial_context", response.payload);
+    }
+
     await this.repository.updateInboundMessage({
       id: inbound.id,
       status: "assistant_answered",
@@ -788,7 +792,7 @@ export class WhatsAppAgentService {
       event: "assistant_answered",
       message: "Pergunta financeira respondida no chat.",
     });
-    await this.sendReplyToInbound(inbound, reply);
+    await this.sendReplyToInbound(inbound, response.message);
     return { status: "assistant_answered" };
   }
 

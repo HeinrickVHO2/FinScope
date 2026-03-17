@@ -184,11 +184,80 @@ function renderLimits(limits: Array<Record<string, unknown>>) {
   `;
 }
 
+function renderGoalProgress(progress: Record<string, unknown> | null) {
+  if (!progress) return "";
+
+  const current = toNumber(progress.current);
+  const target = Math.max(1, toNumber(progress.target));
+  const remaining = Math.max(0, toNumber(progress.remaining ?? (target - current)));
+  const percentage = Math.max(0, Math.min(100, Number(progress.percentage || ((current / target) * 100))));
+
+  return `
+    <section class="panel goal-progress">
+      <div class="goal-ring" style="background: conic-gradient(#f97316 0% ${percentage}%, #e5e7eb ${percentage}% 100%);">
+        <div class="goal-ring-inner">
+          <strong>${Math.round(percentage)}%</strong>
+          <span>da meta</span>
+        </div>
+      </div>
+      <div class="goal-metrics">
+        <div class="goal-metric">
+          <span>Guardado</span>
+          <strong>${formatCurrency(current)}</strong>
+        </div>
+        <div class="goal-metric">
+          <span>Falta</span>
+          <strong>${formatCurrency(remaining)}</strong>
+        </div>
+        <div class="goal-metric full">
+          <span>Objetivo</span>
+          <strong>${formatCurrency(target)}</strong>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderGoalList(series: Array<Record<string, unknown>>) {
+  if (!series.length) return "";
+
+  return `
+    <section class="panel">
+      <div class="section-header">
+        <h3>Progresso das metas</h3>
+        <p>Visao consolidada das metas ativas</p>
+      </div>
+      <div class="goal-list">
+        ${series.map((item) => {
+          const percentage = Math.max(0, Math.min(100, Number(item.percentage || 0)));
+          return `
+            <div class="goal-list-card">
+              <div class="goal-list-head">
+                <strong>${escapeHtml(item.label || item.title || "Meta")}</strong>
+                <strong>${Math.round(percentage)}%</strong>
+              </div>
+              <div class="limit-track">
+                <div class="limit-fill" style="width:${percentage}%; background:#22c55e;"></div>
+              </div>
+              <div class="limit-foot">
+                <span>${formatCurrency(toNumber(item.current))}</span>
+                <span>de ${formatCurrency(toNumber(item.target))}</span>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderHighlights(payload: VisualPayload | null) {
   const data = (payload?.data || {}) as Record<string, unknown>;
   const chart = (((payload?.ui_payload || {}) as Record<string, unknown>).chart || {}) as Record<string, unknown>;
   const increaseExplanation = String(chart.increaseExplanation || data.increaseExplanation || "").trim();
   const largestExpense = (data.largestExpense || chart.largestExpense || null) as Record<string, unknown> | null;
+  const tips = Array.isArray(chart.tips) ? chart.tips as string[] : [];
+  const alerts = Array.isArray(chart.alerts) ? chart.alerts as string[] : [];
   const notes: string[] = [];
 
   if (increaseExplanation) {
@@ -197,6 +266,14 @@ function renderHighlights(payload: VisualPayload | null) {
 
   if (largestExpense?.description) {
     notes.push(`Maior gasto: ${largestExpense.description} (${formatCurrency(toNumber(largestExpense.amount))})`);
+  }
+
+  for (const alert of alerts.slice(0, 2)) {
+    notes.push(alert);
+  }
+
+  for (const tip of tips.slice(0, 2)) {
+    notes.push(`Dica: ${tip}`);
   }
 
   if (!notes.length) return "";
@@ -237,6 +314,16 @@ function buildHtml(payload?: VisualPayload | null) {
     body = [renderCards(cards), renderBreakdown(breakdownSeries)].join("");
   } else if (uiPayload.type === "limits_overview") {
     body = [renderLimits(limits)].join("");
+  } else if (uiPayload.type === "goal_progress") {
+    body = [renderGoalProgress((uiPayload.progress || null) as Record<string, unknown> | null)].join("");
+  } else if (uiPayload.type === "goals_list") {
+    body = [renderGoalList(series)].join("");
+  } else if (uiPayload.type === "financial_guidance") {
+    body = [
+      renderCards(cards),
+      renderBreakdown(breakdownSeries),
+      renderHighlights(safePayload),
+    ].join("");
   } else {
     return null;
   }
@@ -416,6 +503,80 @@ function buildHtml(payload?: VisualPayload | null) {
             flex-direction: column;
             gap: 12px;
           }
+          .goal-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          }
+          .goal-list-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 14px;
+            background: #fafafa;
+          }
+          .goal-list-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 10px;
+          }
+          .goal-progress {
+            text-align: center;
+          }
+          .goal-ring {
+            width: 220px;
+            height: 220px;
+            border-radius: 999px;
+            margin: 0 auto 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .goal-ring-inner {
+            width: 154px;
+            height: 154px;
+            border-radius: 999px;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 0 0 1px #e5e7eb;
+          }
+          .goal-ring-inner strong {
+            font-size: 40px;
+            line-height: 1;
+          }
+          .goal-ring-inner span {
+            margin-top: 6px;
+            font-size: 16px;
+            color: #6b7280;
+          }
+          .goal-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+          }
+          .goal-metric {
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 14px;
+            text-align: left;
+            background: #fafafa;
+          }
+          .goal-metric.full {
+            grid-column: 1 / -1;
+          }
+          .goal-metric span {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: #6b7280;
+          }
+          .goal-metric strong {
+            font-size: 24px;
+          }
           .limit-card {
             border: 1px solid #e5e7eb;
             border-radius: 16px;
@@ -506,7 +667,11 @@ export class PuppeteerWhatsAppVisualRenderer implements WhatsAppVisualRenderer {
         filename: `${String(uiPayload.type || "summary")}.png`,
         caption: uiPayload.type === "limits_overview"
           ? "Segue o relatorio visual dos seus limites."
-          : "Segue o grafico do seu resumo financeiro.",
+          : uiPayload.type === "goal_progress" || uiPayload.type === "goals_list"
+            ? "Segue o grafico das suas metas."
+            : uiPayload.type === "financial_guidance"
+              ? "Segue o contexto visual das suas dicas financeiras."
+              : "Segue o grafico do seu resumo financeiro.",
       };
     } finally {
       await browser.close().catch(() => undefined);

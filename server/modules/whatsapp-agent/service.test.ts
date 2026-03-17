@@ -1007,6 +1007,70 @@ test("WhatsAppAgentService interpreta objetivo de quitar divida como meta com ap
   }
 });
 
+test("WhatsAppAgentService envia grafico ao resumir metas no WhatsApp", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    messenger: messenger as any,
+    visualRenderer: buildVisualRenderer("goals-list.png") as any,
+  });
+
+  const restoreListGoals = patchMethod(
+    GoalService.prototype,
+    "listGoals",
+    (async () => [
+      {
+        id: "goal-1",
+        userId: "user-1",
+        title: "divida",
+        targetValue: "17000",
+        currentValue: "4200",
+        targetDate: null,
+        status: "active",
+        archivedAt: null,
+        completedAt: null,
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "goal-2",
+        userId: "user-1",
+        title: "playstation 5",
+        targetValue: "3700",
+        currentValue: "850",
+        targetDate: null,
+        status: "active",
+        archivedAt: null,
+        completedAt: null,
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]) as GoalService["listGoals"],
+  );
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  try {
+    const result = await service.processInboundEvent(buildBaseEvent({
+      providerMessageId: "provider-goals-summary",
+      text: "resuma minhas metas",
+    }));
+
+    assert.equal(result.status, "assistant_answered");
+    assert.match(messenger.sentMessages[0]?.text || "", /Suas metas/i);
+    assert.equal(messenger.sentImages[0]?.filename, "goals-list.png");
+  } finally {
+    restoreListGoals();
+  }
+});
+
 test("WhatsAppAgentService answers category queries from current month data", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();
@@ -1049,6 +1113,55 @@ test("WhatsAppAgentService answers category queries from current month data", as
 
   assert.equal(result.status, "assistant_answered");
   assert.match(messenger.sentMessages.at(-1)?.text || "", /R\$ 250,00/i);
+});
+
+test("WhatsAppAgentService envia imagem para dicas financeiras baseadas na conta", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    messenger: messenger as any,
+    visualRenderer: buildVisualRenderer("financial-guidance.png") as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  await storage.createTransaction({
+    userId: "user-1",
+    accountId: "acc-1",
+    description: "Mercado do bairro",
+    type: "saida",
+    amount: 320,
+    category: "Mercado",
+    date: new Date(),
+    accountType: "PF",
+    source: "manual",
+  });
+
+  await storage.createTransaction({
+    userId: "user-1",
+    accountId: "acc-1",
+    description: "Salario",
+    type: "entrada",
+    amount: 4500,
+    category: "Salario",
+    date: new Date(),
+    accountType: "PF",
+    source: "manual",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-guidance-visual",
+    text: "me de dicas para economizar",
+  }));
+
+  assert.equal(result.status, "assistant_answered");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /Mercado|economizar|separar/i);
+  assert.equal(messenger.sentImages.at(-1)?.filename, "financial-guidance.png");
 });
 
 test("WhatsAppAgentService answers capability fallback in chat", async () => {

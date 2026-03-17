@@ -10,6 +10,7 @@ export type SummaryIntentFocus =
 
 export type AssistantRouteIntent =
   | { type: "summary"; periodKey: SummaryPeriodKey; focus: SummaryIntentFocus }
+  | { type: "financial_guidance" }
   | { type: "limits_status" }
   | { type: "upsert_limit"; category: string; amount: number; scope: "PF" | "PJ" | "ALL" }
   | { type: "investments_summary" }
@@ -198,6 +199,10 @@ export function parseAssistantRouteIntent(text: string): AssistantRouteIntent | 
     };
   }
 
+  if (/me de dicas|me da dicas|dicas para economizar|como economizar|como posso economizar|como controlar meus gastos|como melhorar meu financeiro|quero dicas financeiras/.test(normalized)) {
+    return { type: "financial_guidance" };
+  }
+
   if (/como estao meus limites|meus limites|mostrar limites|consultar limites/.test(normalized)) {
     return { type: "limits_status" };
   }
@@ -232,7 +237,7 @@ export function parseAssistantRouteIntent(text: string): AssistantRouteIntent | 
     if (amount) return { type: "add_goal_contribution", amount };
   }
 
-  if (/listar metas|minhas metas|quais metas|metas ativas|me mostra minhas metas/.test(normalized)) {
+  if (/listar metas|minhas metas|quais metas|metas ativas|me mostra minhas metas|resuma minhas metas|resumo das metas/.test(normalized)) {
     return { type: "list_goals" };
   }
 

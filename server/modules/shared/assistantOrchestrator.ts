@@ -1,5 +1,6 @@
 import type { IStorage } from "../../storage";
 import { CategoryLimitService } from "./categoryLimitService";
+import { buildStructuredFinancialSummary } from "./financialAssistant";
 import { buildFinancialSummaryPayload, formatFinancialSummaryText, type FinancialSummaryPayload } from "./financialSummaryService";
 import { GoalService } from "./goalService";
 import { looksLikeAssistantOrchestratorMessage, parseAssistantRouteIntent, type SummaryIntentFocus } from "./intentRouter";
@@ -42,6 +43,97 @@ function resolveNextDueDate(dayOfMonth: number, reference = new Date()) {
     return new Date(reference.getFullYear(), reference.getMonth() + 1, dayOfMonth);
   }
   return candidate;
+}
+
+function buildGoalProgressUiPayload(goal: {
+  title: string;
+  currentValue: string | number | null | undefined;
+  targetValue: string | number | null | undefined;
+}): AgentUiPayload {
+  const current = toNumber(goal.currentValue);
+  const target = Math.max(1, toNumber(goal.targetValue));
+  const remaining = Math.max(0, Number((target - current).toFixed(2)));
+  const percentage = Number(((current / target) * 100).toFixed(2));
+
+  return {
+    type: "goal_progress",
+    title: goal.title,
+    route: "/goals",
+    view: "goals",
+    progress: {
+      current,
+      target,
+      remaining,
+      percentage,
+    },
+    chart: {
+      type: "goal_ring",
+      current,
+      target,
+      remaining,
+      percentage,
+    },
+  };
+}
+
+function buildGoalsListUiPayload(goals: Array<{
+  title: string;
+  currentValue: string | number | null | undefined;
+  targetValue: string | number | null | undefined;
+}>) {
+  const cards = goals.map((goal) => {
+    const current = toNumber(goal.currentValue);
+    const target = Math.max(1, toNumber(goal.targetValue));
+    return {
+      title: goal.title,
+      current,
+      target,
+      remaining: Math.max(0, Number((target - current).toFixed(2))),
+      percentage: Number(((current / target) * 100).toFixed(2)),
+    };
+  });
+
+  return {
+    type: "goals_list",
+    title: "Metas",
+    route: "/goals",
+    view: "goals",
+    cards,
+    chart: {
+      type: "goal_progress_bars",
+      series: cards.slice(0, 5).map((goal) => ({
+        label: goal.title,
+        current: goal.current,
+        target: goal.target,
+        remaining: goal.remaining,
+        percentage: goal.percentage,
+      })),
+    },
+  } satisfies AgentUiPayload;
+}
+
+function buildGuidanceUiPayload(summary: Awaited<ReturnType<typeof buildStructuredFinancialSummary>>): AgentUiPayload {
+  return {
+    type: "financial_guidance",
+    title: "Dicas financeiras",
+    subtitle: summary.periodLabel,
+    cards: [
+      { label: "Entradas", value: summary.totalEntries },
+      { label: "Saidas", value: summary.totalExits },
+      { label: "Saldo", value: summary.balance },
+      { label: "Reserva sugerida", value: summary.savingsSuggestion },
+    ],
+    chart: {
+      type: "guidance",
+      breakdownSeries: summary.topCategories.map((item) => ({
+        label: item.category,
+        value: item.amount,
+        share: item.share,
+      })),
+      tips: summary.tips,
+      alerts: summary.alerts,
+    },
+  };
 }
 
 function buildSummaryUiPayload(payload: FinancialSummaryPayload, focus: SummaryIntentFocus): AgentUiPayload {
@@ -239,6 +331,70 @@ export class AssistantOrchestrator {
       });
     }
 
+    if (intent.type === "financial_guidance") {
+      const summary = await buildStructuredFinancialSummary(this.storage, params.userId, "ALL");
+      const topCategory = summary.topCategories[0] || null;
+      const primaryTip = summary.tips[0]
+        || "Acompanhe semanalmente as categorias com maior peso para evitar concentracao no fim do mes.";
+      const supportTip = summary.tips[1] || null;
+      const attentionPoint = summary.alerts[0] || summary.observations[0] || null;
+      const normalizedText = params.text
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+
+      if (/durante a semana|na semana|dia a dia|cotidiano|rotina/.test(normalizedText)) {
+        const weeklyMessage = topCategory
+          ? `Para economizar mais no dia a dia, comece criando um teto semanal para ${topCategory.category}, que hoje e a categoria com maior peso da sua conta. ${primaryTip}`
+          : `Para economizar mais no dia a dia, monte um teto semanal simples para gastos variaveis e revise no fim da semana o que se repetiu.`;
+
+        const followUps = [];
+        if (summary.savingsSuggestion > 0) {
+          followUps.push(`Se mantiver esse ajuste, voce consegue separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mes.`);
+        }
+        if (attentionPoint) {
+          followUps.push(`Ponto de atencao: ${attentionPoint}`);
+        }
+
+        return buildResponse({
+          intent: "guidance.financial",
+          action: "show_financial_guidance",
+          message: [weeklyMessage, ...followUps].join(" "),
+          data: { summary },
+          uiPayload: buildGuidanceUiPayload(summary),
+          model: modelSelection,
+        });
+      }
+
+      const messageParts = [
+        topCategory
+          ? `Hoje o maior ponto de atencao da sua conta e ${topCategory.category}, com ${formatCurrency(topCategory.amount)} no periodo.`
+          : `Revise primeiro as categorias com maior peso do mes para proteger seu caixa.`,
+        primaryTip,
+      ];
+
+      if (summary.savingsSuggestion > 0) {
+        messageParts.push(`Mantendo esse ritmo, voce pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mes.`);
+      }
+
+      if (attentionPoint) {
+        messageParts.push(`Ponto de atencao: ${attentionPoint}`);
+      }
+
+      if (supportTip) {
+        messageParts.push(`Acao extra: ${supportTip}`);
+      }
+
+      return buildResponse({
+        intent: "guidance.financial",
+        action: "show_financial_guidance",
+        message: messageParts.join(" "),
+        data: { summary },
+        uiPayload: buildGuidanceUiPayload(summary),
+        model: modelSelection,
+      });
+    }
+
     if (intent.type === "limits_status") {
       const statuses = await this.limitService.buildStatus({
         userId: params.userId,
@@ -412,17 +568,7 @@ export class AssistantOrchestrator {
         action: "create_goal",
         message: `Meta criada: ${goal.title} com objetivo de ${formatCurrency(toNumber(goal.targetValue))}.${initialContributionMessage} Progresso atual: ${Math.round(progress * 100)}% (${formatCurrency(toNumber(goal.currentValue))} de ${formatCurrency(toNumber(goal.targetValue))}).`,
         data: { goal, contribution: goalResult?.contribution ?? null, route: "/goals", view: "goals" },
-        uiPayload: {
-          type: "goal_progress",
-          title: goal.title,
-          route: "/goals",
-          view: "goals",
-          progress: {
-            current: toNumber(goal.currentValue),
-            target: toNumber(goal.targetValue),
-            percentage: Number((progress * 100).toFixed(2)),
-          },
-        },
+        uiPayload: buildGoalProgressUiPayload(goal),
         model: modelSelection,
       });
     }
@@ -459,17 +605,7 @@ export class AssistantOrchestrator {
         action: "add_goal_contribution",
         message: `Aporte registrado em ${result.goal.title}: ${formatCurrency(intent.amount)}. Progresso atual: ${Math.round(progress * 100)}% (${formatCurrency(toNumber(result.goal.currentValue))} de ${formatCurrency(toNumber(result.goal.targetValue))}).`,
         data: { ...result, route: "/goals", view: "goals" },
-        uiPayload: {
-          type: "goal_progress",
-          title: result.goal.title,
-          route: "/goals",
-          view: "goals",
-          progress: {
-            current: toNumber(result.goal.currentValue),
-            target: toNumber(result.goal.targetValue),
-            percentage: Number((progress * 100).toFixed(2)),
-          },
-        },
+        uiPayload: buildGoalProgressUiPayload(result.goal),
         model: modelSelection,
       });
     }
@@ -505,18 +641,7 @@ export class AssistantOrchestrator {
         action: "show_goals",
         message: lines.join("\n"),
         data: { goals, route: "/goals", view: "goals" },
-        uiPayload: {
-          type: "goals_list",
-          title: "Metas",
-          route: "/goals",
-          view: "goals",
-          cards: goals.map((goal) => ({
-            title: goal.title,
-            current: toNumber(goal.currentValue),
-            target: toNumber(goal.targetValue),
-            percentage: Number(((toNumber(goal.currentValue) / Math.max(1, toNumber(goal.targetValue))) * 100).toFixed(2)),
-          })),
-        },
+        uiPayload: buildGoalsListUiPayload(goals),
         model: modelSelection,
       });
     }

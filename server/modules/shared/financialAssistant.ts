@@ -4,6 +4,18 @@ import type { IStorage } from "../../storage";
 type AccountScope = "PF" | "PJ" | "ALL";
 type AssistantChannel = "whatsapp" | "internal_chat";
 
+type AssistantUiPayload = {
+  type: string;
+  title?: string;
+  subtitle?: string;
+  chart?: Record<string, unknown>;
+  cards?: Array<Record<string, unknown>>;
+  progress?: Record<string, unknown>;
+  limits?: Array<Record<string, unknown>>;
+  route?: string;
+  view?: string;
+};
+
 type AssistantIntent =
   | { type: "education"; answer: string }
   | { type: "help" }
@@ -67,6 +79,18 @@ export type StructuredFinancialSummary = {
   tips: string[];
   alerts: string[];
   comparison: ComparisonSummary;
+};
+
+export type FinancialAssistantResponse = {
+  message: string;
+  payload?: {
+    intent: string;
+    action: string;
+    confidence: number;
+    message: string;
+    data?: Record<string, unknown>;
+    ui_payload?: AssistantUiPayload;
+  };
 };
 
 const EDUCATIONAL_ANSWERS: Array<{ pattern: RegExp; answer: string }> = [
@@ -245,6 +269,147 @@ function sumTransactions(transactions: Transaction[], type: "entrada" | "saida")
   return transactions
     .filter((item) => item.type === type)
     .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+}
+
+function buildDailyExpenseSeries(transactions: Transaction[], start: Date, end: Date) {
+  const totals = new Map<string, number>();
+  const cursor = new Date(start);
+
+  while (cursor < end) {
+    const key = cursor.toISOString().slice(0, 10);
+    totals.set(key, 0);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  for (const transaction of transactions) {
+    if (transaction.type !== "saida") continue;
+    const key = toDate(transaction.date).toISOString().slice(0, 10);
+    if (!totals.has(key)) continue;
+    totals.set(key, (totals.get(key) || 0) + Number(transaction.amount || 0));
+  }
+
+  return Array.from(totals.entries()).map(([date, amount]) => ({
+    date,
+    label: new Date(date).toLocaleDateString("pt-BR", { weekday: "short" }),
+    amount: Number(amount.toFixed(2)),
+  }));
+}
+
+function buildSummaryCards(summary: StructuredFinancialSummary) {
+  return [
+    { label: "Entradas", value: summary.totalEntries },
+    { label: "Saidas", value: summary.totalExits },
+    { label: "Saldo", value: summary.balance },
+    { label: "Reserva sugerida", value: summary.savingsSuggestion },
+  ];
+}
+
+function buildBreakdownSeries(summary: StructuredFinancialSummary) {
+  return summary.topCategories.map((item) => ({
+    label: item.category,
+    value: item.amount,
+    share: item.share,
+  }));
+}
+
+function buildMonthlySummaryUiPayload(summary: StructuredFinancialSummary, transactions: Transaction[]): AssistantUiPayload {
+  return {
+    type: "financial_summary",
+    title: "Resumo financeiro",
+    subtitle: summary.periodLabel,
+    cards: buildSummaryCards(summary),
+    chart: {
+      type: "bar",
+      series: buildDailyExpenseSeries(
+        transactions,
+        new Date(summary.periodStart),
+        new Date(summary.periodEndExclusive),
+      ),
+      breakdownSeries: buildBreakdownSeries(summary),
+      largestExpense: summary.largestExpense,
+      increaseExplanation: summary.observations[0] || summary.alerts[0] || null,
+      tips: summary.tips,
+      alerts: summary.alerts,
+    },
+  };
+}
+
+function buildBreakdownUiPayload(summary: StructuredFinancialSummary, title = "Divisao de gastos"): AssistantUiPayload {
+  return {
+    type: "expense_breakdown",
+    title,
+    subtitle: summary.periodLabel,
+    cards: buildSummaryCards(summary),
+    chart: {
+      type: "pie",
+      series: buildBreakdownSeries(summary),
+      tips: summary.tips,
+      alerts: summary.alerts,
+    },
+  };
+}
+
+function buildGuidanceUiPayload(summary: StructuredFinancialSummary): AssistantUiPayload {
+  return {
+    type: "financial_guidance",
+    title: "Dicas financeiras",
+    subtitle: summary.periodLabel,
+    cards: buildSummaryCards(summary),
+    chart: {
+      type: "guidance",
+      breakdownSeries: buildBreakdownSeries(summary),
+      tips: summary.tips,
+      alerts: summary.alerts,
+    },
+  };
+}
+
+function buildRecurringUiPayload(summary: StructuredFinancialSummary): AssistantUiPayload {
+  const totalRecurring = summary.recurringExpenses.reduce((sum, item) => sum + item.amount, 0);
+  return {
+    type: "financial_guidance",
+    title: "Gastos recorrentes",
+    subtitle: summary.periodLabel,
+    cards: summary.recurringExpenses.slice(0, 4).map((item) => ({
+      label: item.label,
+      value: item.amount,
+      subtitle: item.frequencyLabel,
+    })),
+    chart: {
+      type: "guidance",
+      breakdownSeries: summary.recurringExpenses.slice(0, 5).map((item) => ({
+        label: item.label,
+        value: item.amount,
+        share: totalRecurring > 0 ? Number((item.amount / totalRecurring).toFixed(4)) : 0,
+      })),
+      tips: summary.tips,
+      alerts: summary.alerts,
+    },
+  };
+}
+
+function buildAssistantPayload(params: {
+  intent: string;
+  action: string;
+  message: string;
+  summary?: StructuredFinancialSummary;
+  uiPayload?: AssistantUiPayload;
+  data?: Record<string, unknown>;
+}): FinancialAssistantResponse {
+  return {
+    message: params.message,
+    payload: {
+      intent: params.intent,
+      action: params.action,
+      confidence: 0.92,
+      message: params.message,
+      data: {
+        ...(params.data || {}),
+        ...(params.summary ? { summary: params.summary } : {}),
+      },
+      ui_payload: params.uiPayload,
+    },
+  };
 }
 
 function getTopExpenseCategories(transactions: Transaction[]): CategorySummary[] {
@@ -590,58 +755,89 @@ export function looksLikeFinanceAssistantQuestion(text: string) {
   return Boolean(classifyAssistantIntent(text));
 }
 
-export async function buildFinancialAssistantReply(
+export async function buildFinancialAssistantResponse(
   storage: IStorage,
   userId: string,
   text: string,
   channel: AssistantChannel = "whatsapp",
-) {
+): Promise<FinancialAssistantResponse> {
   const intent = classifyAssistantIntent(text);
   if (!intent) {
-    return channel === "whatsapp"
+    const message = channel === "whatsapp"
       ? "Posso ajudar com resumo do mes, gastos por categoria, controle de gastos, reserva sugerida e explicacoes simples sobre reserva de emergencia, CDB e poupanca."
       : "Posso ajudar com resumo financeiro, gastos por categoria, pontos de exagero, sugestao de reserva e explicacoes simples sobre organizacao financeira.";
+    return { message };
   }
 
   if (intent.type === "education") {
-    return intent.answer;
+    return { message: intent.answer };
   }
 
   if (intent.type === "help") {
-    return channel === "whatsapp"
-      ? "Posso registrar gastos e recebimentos, resumir seu mes, mostrar categorias com mais peso e sugerir ajustes com base nos seus dados."
-      : "Posso registrar movimentacoes e tambem analisar seu mes com base nas transacoes reais: resumo, categorias com maior peso, recorrencias, pontos de exagero e sugestao de reserva.";
+    return {
+      message: channel === "whatsapp"
+        ? "Posso registrar gastos e recebimentos, resumir seu mes, mostrar categorias com mais peso e sugerir ajustes com base nos seus dados."
+        : "Posso registrar movimentacoes e tambem analisar seu mes com base nas transacoes reais: resumo, categorias com maior peso, recorrencias, pontos de exagero e sugestao de reserva.",
+    };
   }
 
   const summary = await buildStructuredFinancialSummary(storage, userId, intent.scope);
   const topCategory = summary.topCategories[0] || null;
   const normalizedText = normalize(text);
+  const transactions = await storage.getTransactionsByUserId(userId, intent.scope);
 
   if (!summary.transactionCount) {
-    return channel === "whatsapp"
+    const message = channel === "whatsapp"
       ? `Ainda nao encontrei movimentacoes suficientes${scopeLabel(intent.scope)} neste mes para responder com confianca.`
       : `Ainda nao encontrei movimentacoes suficientes${scopeLabel(intent.scope)} neste mes para montar uma analise confiavel.`;
+    return buildAssistantPayload({
+      intent: "assistant.no_data",
+      action: "show_empty_financial_state",
+      message,
+      summary,
+      uiPayload: buildGuidanceUiPayload(summary),
+    });
   }
 
   if (intent.type === "monthly_summary") {
-    return formatStructuredFinancialSummary(summary, channel);
+    return buildAssistantPayload({
+      intent: "assistant.monthly_summary",
+      action: "show_monthly_summary",
+      message: formatStructuredFinancialSummary(summary, channel),
+      summary,
+      uiPayload: buildMonthlySummaryUiPayload(summary, transactions),
+    });
   }
 
   if (intent.type === "cash_flow") {
-    return channel === "whatsapp"
+    const message = channel === "whatsapp"
       ? `Neste mes${scopeLabel(intent.scope)}, entraram ${formatCurrency(summary.totalEntries)} e sairam ${formatCurrency(summary.totalExits)}. O saldo parcial esta em ${formatCurrency(summary.balance)}.`
       : `Neste mes${scopeLabel(intent.scope)}, seu fluxo esta em ${formatCurrency(summary.totalEntries)} de entradas contra ${formatCurrency(summary.totalExits)} de saidas. O saldo parcial esta em ${formatCurrency(summary.balance)}.`;
+    return buildAssistantPayload({
+      intent: "assistant.cash_flow",
+      action: "show_cash_flow",
+      message,
+      summary,
+      uiPayload: buildMonthlySummaryUiPayload(summary, transactions),
+    });
   }
 
   if (intent.type === "net_balance") {
-    return channel === "whatsapp"
+    const message = channel === "whatsapp"
       ? `Neste mes${scopeLabel(intent.scope)}, seu saldo parcial esta em ${formatCurrency(summary.balance)}.`
       : `Neste mes${scopeLabel(intent.scope)}, seu saldo parcial esta em ${formatCurrency(summary.balance)}. Em relacao ao mes anterior, ele ${summary.comparison.netDelta >= 0 ? "melhorou" : "piorou"} ${formatCurrency(Math.abs(summary.comparison.netDelta))}.`;
+    return buildAssistantPayload({
+      intent: "assistant.net_balance",
+      action: "show_net_balance",
+      message,
+      summary,
+      uiPayload: buildMonthlySummaryUiPayload(summary, transactions),
+    });
   }
 
   if (intent.type === "category_total") {
     const current = monthRange();
-    const matchedTransactions = (await storage.getTransactionsByUserId(userId, intent.scope))
+    const matchedTransactions = transactions
       .filter((item) => {
         const date = toDate(item.date);
         return date >= current.start && date < current.end;
@@ -649,91 +845,137 @@ export async function buildFinancialAssistantReply(
       .filter((item) => item.type === "saida" && matchCategory(item, intent.aliases));
     const matchedTotal = matchedTransactions.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-    if (matchedTotal <= 0) {
-      return `Ainda nao encontrei gastos de ${intent.categoryLabel.toLowerCase()}${scopeLabel(intent.scope)} neste mes.`;
-    }
+    const message = matchedTotal <= 0
+      ? `Ainda nao encontrei gastos de ${intent.categoryLabel.toLowerCase()}${scopeLabel(intent.scope)} neste mes.`
+      : channel === "whatsapp"
+        ? `Neste mes${scopeLabel(intent.scope)}, seus gastos com ${intent.categoryLabel.toLowerCase()} somam ${formatCurrency(matchedTotal)}.`
+        : `Neste mes${scopeLabel(intent.scope)}, seus gastos com ${intent.categoryLabel.toLowerCase()} somam ${formatCurrency(matchedTotal)}. Isso representa ${summary.totalExits > 0 ? Math.round((matchedTotal / summary.totalExits) * 100) : 0}% das suas saidas.`;
 
-    return channel === "whatsapp"
-      ? `Neste mes${scopeLabel(intent.scope)}, seus gastos com ${intent.categoryLabel.toLowerCase()} somam ${formatCurrency(matchedTotal)}.`
-      : `Neste mes${scopeLabel(intent.scope)}, seus gastos com ${intent.categoryLabel.toLowerCase()} somam ${formatCurrency(matchedTotal)}. Isso representa ${summary.totalExits > 0 ? Math.round((matchedTotal / summary.totalExits) * 100) : 0}% das suas saidas.`;
+    return buildAssistantPayload({
+      intent: "assistant.category_total",
+      action: "show_category_total",
+      message,
+      summary,
+      data: { categoryLabel: intent.categoryLabel, matchedTotal },
+      uiPayload: buildBreakdownUiPayload(summary, `Divisao de gastos`),
+    });
   }
 
   if (intent.type === "top_categories") {
-    if (!summary.topCategories.length) {
-      return `Ainda nao encontrei saidas suficientes${scopeLabel(intent.scope)} neste mes para destacar categorias.`;
-    }
-    const ranked = summary.topCategories
-      .map((item, index) => `${index + 1}. ${item.category} (${formatCurrency(item.amount)})`)
-      .join(channel === "whatsapp" ? " " : "\n");
-    return channel === "whatsapp"
-      ? `As categorias que mais pesaram${scopeLabel(intent.scope)} neste mes foram: ${ranked}`
-      : `As categorias que mais pesaram${scopeLabel(intent.scope)} neste mes foram:\n${ranked}`;
+    const ranked = summary.topCategories.length
+      ? summary.topCategories
+          .map((item, index) => `${index + 1}. ${item.category} (${formatCurrency(item.amount)})`)
+          .join(channel === "whatsapp" ? " " : "\n")
+      : "Ainda nao houve saidas suficientes para destacar categorias.";
+    const message = summary.topCategories.length
+      ? channel === "whatsapp"
+        ? `As categorias que mais pesaram${scopeLabel(intent.scope)} neste mes foram: ${ranked}`
+        : `As categorias que mais pesaram${scopeLabel(intent.scope)} neste mes foram:\n${ranked}`
+      : `Ainda nao encontrei saidas suficientes${scopeLabel(intent.scope)} neste mes para destacar categorias.`;
+
+    return buildAssistantPayload({
+      intent: "assistant.top_categories",
+      action: "show_top_categories",
+      message,
+      summary,
+      uiPayload: buildBreakdownUiPayload(summary, "Divisao por categoria"),
+    });
   }
 
   if (intent.type === "recurring_spending") {
-    if (!summary.recurringExpenses.length) {
-      return `Ainda nao identifiquei gastos recorrentes relevantes${scopeLabel(intent.scope)} neste periodo.`;
-    }
-    const ranked = summary.recurringExpenses
-      .map((item) => `${item.label} (${formatCurrency(item.amount)})`)
-      .join(channel === "whatsapp" ? ", " : "\n");
-    return channel === "whatsapp"
-      ? `Os recorrentes com mais peso${scopeLabel(intent.scope)} sao: ${ranked}.`
-      : `Os gastos recorrentes com mais peso${scopeLabel(intent.scope)} sao:\n${ranked}`;
+    const message = summary.recurringExpenses.length
+      ? channel === "whatsapp"
+        ? `Os recorrentes com mais peso${scopeLabel(intent.scope)} sao: ${summary.recurringExpenses.map((item) => `${item.label} (${formatCurrency(item.amount)})`).join(", ")}.`
+        : `Os gastos recorrentes com mais peso${scopeLabel(intent.scope)} sao:\n${summary.recurringExpenses.map((item) => `${item.label} (${formatCurrency(item.amount)})`).join("\n")}`
+      : `Ainda nao identifiquei gastos recorrentes relevantes${scopeLabel(intent.scope)} neste periodo.`;
+
+    return buildAssistantPayload({
+      intent: "assistant.recurring_spending",
+      action: "show_recurring_spending",
+      message,
+      summary,
+      uiPayload: buildRecurringUiPayload(summary),
+    });
   }
 
   if (intent.type === "spending_health") {
-    if (summary.totalEntries <= 0 && summary.totalExits > 0) {
-      return `Neste mes${scopeLabel(intent.scope)}, so encontrei saidas. Vale revisar se faltam entradas registradas antes de concluir se voce esta exagerando.`;
-    }
-    const ratio = summary.totalEntries > 0 ? summary.totalExits / summary.totalEntries : 1;
-    if (ratio >= 0.9) {
-      return topCategory
-        ? `Voce esta perto do limite${scopeLabel(intent.scope)}: suas saidas ja consomem cerca de ${Math.round(ratio * 100)}% das entradas, com maior pressao em ${topCategory.category}.`
-        : `Voce esta perto do limite${scopeLabel(intent.scope)}: suas saidas ja consomem cerca de ${Math.round(ratio * 100)}% das entradas.`;
-    }
-    if (ratio >= 0.7) {
-      return topCategory
-        ? `Seu mes esta relativamente equilibrado${scopeLabel(intent.scope)}, mas ${topCategory.category} ainda merece atencao para nao apertar o fechamento.`
-        : `Seu mes esta relativamente equilibrado${scopeLabel(intent.scope)}, mas ainda vale observar as categorias variaveis.`;
-    }
-    return `Seu ritmo de gastos esta controlado${scopeLabel(intent.scope)} neste mes.`;
+    const message = summary.totalEntries <= 0 && summary.totalExits > 0
+      ? `Neste mes${scopeLabel(intent.scope)}, so encontrei saidas. Vale revisar se faltam entradas registradas antes de concluir se voce esta exagerando.`
+      : summary.totalEntries > 0 && (summary.totalExits / summary.totalEntries) >= 0.9
+        ? topCategory
+          ? `Voce esta perto do limite${scopeLabel(intent.scope)}: suas saidas ja consomem cerca de ${Math.round((summary.totalExits / summary.totalEntries) * 100)}% das entradas, com maior pressao em ${topCategory.category}.`
+          : `Voce esta perto do limite${scopeLabel(intent.scope)}: suas saidas ja consomem cerca de ${Math.round((summary.totalExits / summary.totalEntries) * 100)}% das entradas.`
+        : summary.totalEntries > 0 && (summary.totalExits / summary.totalEntries) >= 0.7
+          ? topCategory
+            ? `Seu mes esta relativamente equilibrado${scopeLabel(intent.scope)}, mas ${topCategory.category} ainda merece atencao para nao apertar o fechamento.`
+            : `Seu mes esta relativamente equilibrado${scopeLabel(intent.scope)}, mas ainda vale observar as categorias variaveis.`
+          : `Seu ritmo de gastos esta controlado${scopeLabel(intent.scope)} neste mes.`;
+
+    return buildAssistantPayload({
+      intent: "assistant.spending_health",
+      action: "show_spending_health",
+      message,
+      summary,
+      uiPayload: buildGuidanceUiPayload(summary),
+    });
   }
 
   if (intent.type === "savings_capacity") {
-    if (summary.savingsSuggestion <= 0) {
-      return channel === "whatsapp"
+    const message = summary.savingsSuggestion <= 0
+      ? channel === "whatsapp"
         ? `Neste momento${scopeLabel(intent.scope)}, eu nao separaria reserva nova. Primeiro vale ajustar as categorias com maior peso e recuperar folga no caixa.`
-        : `Neste momento${scopeLabel(intent.scope)}, eu nao recomendaria separar uma reserva nova. O melhor proximo passo e ajustar as categorias com maior peso e recuperar folga no caixa.`;
-    }
-    return channel === "whatsapp"
-      ? `Mantendo o ritmo atual${scopeLabel(intent.scope)}, voce pode separar algo perto de ${formatCurrency(summary.savingsSuggestion)} neste mes.`
-      : `Mantendo o ritmo atual${scopeLabel(intent.scope)}, voce pode separar algo perto de ${formatCurrency(summary.savingsSuggestion)} neste mes. Eu faria isso depois de proteger as despesas ja recorrentes e os compromissos pendentes.`;
+        : `Neste momento${scopeLabel(intent.scope)}, eu nao recomendaria separar uma reserva nova. O melhor proximo passo e ajustar as categorias com maior peso e recuperar folga no caixa.`
+      : channel === "whatsapp"
+        ? `Mantendo o ritmo atual${scopeLabel(intent.scope)}, voce pode separar algo perto de ${formatCurrency(summary.savingsSuggestion)} neste mes.`
+        : `Mantendo o ritmo atual${scopeLabel(intent.scope)}, voce pode separar algo perto de ${formatCurrency(summary.savingsSuggestion)} neste mes. Eu faria isso depois de proteger as despesas ja recorrentes e os compromissos pendentes.`;
+
+    return buildAssistantPayload({
+      intent: "assistant.savings_capacity",
+      action: "show_savings_capacity",
+      message,
+      summary,
+      uiPayload: buildGuidanceUiPayload(summary),
+    });
   }
 
   if (intent.type === "guidance") {
-    if (/durante a semana|na semana|dia a dia|cotidiano|rotina/.test(normalizedText)) {
-      return topCategory
-        ? `Para economizar mais no dia a dia${scopeLabel(intent.scope)}, vale criar um teto curto para ${topCategory.category}, revisar pequenas compras da rotina e fechar a semana conferindo os gastos repetidos.`
-        : `Para economizar mais no dia a dia${scopeLabel(intent.scope)}, vale criar um teto semanal simples e revisar pequenas compras antes que elas se acumulem.`;
-    }
-
-    if (summary.balance <= 0) {
-      return topCategory
-        ? `Seu fluxo do mes esta apertado${scopeLabel(intent.scope)}. Eu comecaria revisando ${topCategory.category}, que ja soma ${formatCurrency(topCategory.amount)}, e tambem recorrencias pouco uteis.`
-        : `Seu fluxo do mes esta apertado${scopeLabel(intent.scope)}. Vale revisar gastos variaveis e recorrencias antes de pensar em novas metas.`;
-    }
-
     const recurringText = summary.recurringExpenses[0]
       ? ` e revisar ${summary.recurringExpenses[0].label}`
       : "";
+    const message = /durante a semana|na semana|dia a dia|cotidiano|rotina/.test(normalizedText)
+      ? topCategory
+        ? `Para economizar mais no dia a dia${scopeLabel(intent.scope)}, vale criar um teto curto para ${topCategory.category}, revisar pequenas compras da rotina e fechar a semana conferindo os gastos repetidos.`
+        : `Para economizar mais no dia a dia${scopeLabel(intent.scope)}, vale criar um teto semanal simples e revisar pequenas compras antes que elas se acumulem.`
+      : summary.balance <= 0
+        ? topCategory
+          ? `Seu fluxo do mes esta apertado${scopeLabel(intent.scope)}. Eu comecaria revisando ${topCategory.category}, que ja soma ${formatCurrency(topCategory.amount)}, e tambem recorrencias pouco uteis.`
+          : `Seu fluxo do mes esta apertado${scopeLabel(intent.scope)}. Vale revisar gastos variaveis e recorrencias antes de pensar em novas metas.`
+        : topCategory
+          ? `Para economizar mais${scopeLabel(intent.scope)}, eu atacaria primeiro ${topCategory.category}${recurringText}. Se mantiver esse ajuste, voce pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mes.`
+          : `Para economizar mais${scopeLabel(intent.scope)}, vale revisar gastos variaveis, criar um teto semanal simples e separar uma parte do saldo para reserva.`;
 
-    return topCategory
-      ? `Para economizar mais${scopeLabel(intent.scope)}, eu atacaria primeiro ${topCategory.category}${recurringText}. Se mantiver esse ajuste, voce pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mes.`
-      : `Para economizar mais${scopeLabel(intent.scope)}, vale revisar gastos variaveis, criar um teto semanal simples e separar uma parte do saldo para reserva.`;
+    return buildAssistantPayload({
+      intent: "assistant.guidance",
+      action: "show_financial_guidance",
+      message,
+      summary,
+      uiPayload: buildGuidanceUiPayload(summary),
+    });
   }
 
-  return channel === "whatsapp"
-    ? "Posso ajudar com resumo do mes, categorias com mais peso e sugestoes de economia baseadas nos seus dados."
-    : "Posso ajudar com resumo financeiro, categorias com maior peso e sugestoes praticas baseadas nas suas movimentacoes.";
+  return {
+    message: channel === "whatsapp"
+      ? "Posso ajudar com resumo do mes, categorias com mais peso e sugestoes de economia baseadas nos seus dados."
+      : "Posso ajudar com resumo financeiro, categorias com maior peso e sugestoes praticas baseadas nas suas movimentacoes.",
+  };
+}
+
+export async function buildFinancialAssistantReply(
+  storage: IStorage,
+  userId: string,
+  text: string,
+  channel: AssistantChannel = "whatsapp",
+) {
+  const response = await buildFinancialAssistantResponse(storage, userId, text, channel);
+  return response.message;
 }

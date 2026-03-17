@@ -1,0 +1,22 @@
+
+> rest-express@1.0.0 test
+> tsx --test server/modules/statement-import/*.test.ts server/modules/whatsapp-agent/*.test.ts server/modules/shared/*.test.ts
+
+node:fs:2702
+      const stats = binding.lstat(baseLong, true, undefined, true /* throwIfNoEntry */);
+                            ^
+
+Error: EPERM: operation not permitted, lstat 'C:\Users\victo'
+    at Object.realpathSync (node:fs:2702:29)
+    at toRealPath (node:internal/modules/helpers:58:13)
+    at Module._findPath (node:internal/modules/cjs/loader:695:22)
+    at resolveMainPath (node:internal/modules/run_main:28:23)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:135:24)
+    at node:internal/main/run_main_module:28:49 {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'lstat',
+  path: 'C:\\Users\\victo'
+}
+
+Node.js v21.7.3

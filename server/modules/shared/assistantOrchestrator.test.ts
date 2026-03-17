@@ -235,6 +235,7 @@ test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload
     assert.equal(created.handled, true);
     assert.equal((created.payload as any)?.data?.route, "/goals");
     assert.equal((created.payload as any)?.ui_payload?.type, "goal_progress");
+    assert.equal((created.payload as any)?.ui_payload?.chart?.type, "goal_ring");
     assert.equal((created.payload as any)?.model?.tier, "advanced");
     assert.equal((created.payload as any)?.data?.goal?.currentValue, "3000");
     assert.match(created.reply || "", /3\.000,00|3000/);
@@ -256,6 +257,7 @@ test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload
     assert.equal(listed.handled, true);
     assert.match(listed.reply || "", /Suas metas/i);
     assert.equal((listed.payload as any)?.data?.view, "goals");
+    assert.equal((listed.payload as any)?.ui_payload?.chart?.type, "goal_progress_bars");
   } finally {
     restoreCreateGoal();
     restoreGetLatestActiveGoal();
@@ -333,4 +335,19 @@ test("AssistantOrchestrator devolve payload estruturado para divisao e explicaca
   } finally {
     restoreListByUser();
   }
+});
+
+test("AssistantOrchestrator usa dados da conta para dicas financeiras com payload visual", async () => {
+  const orchestrator = new AssistantOrchestrator(buildFakeStorage() as any);
+
+  const guidance = await orchestrator.handleMessage({
+    userId: "user-1",
+    text: "me de dicas para economizar",
+    channel: "whatsapp",
+  });
+
+  assert.equal(guidance.handled, true);
+  assert.equal((guidance.payload as any)?.ui_payload?.type, "financial_guidance");
+  assert.equal((guidance.payload as any)?.ui_payload?.chart?.type, "guidance");
+  assert.match(guidance.reply || "", /Transporte|Mercado|separar perto de|ponto de atencao/i);
 });

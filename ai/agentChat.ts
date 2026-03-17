@@ -17,7 +17,11 @@ import type { User } from "@shared/schema";
 import fetch from "node-fetch";
 import { executeAgentActions, type AgentActionResult } from "./agentActionsHandler";
 import { fetchChatHistory, saveChatHistoryMessage, type ChatHistoryRow } from "./chatHistory";
-import { buildFinancialAssistantReply, looksLikeFinanceAssistantQuestion } from "../server/modules/shared/financialAssistant";
+import {
+  buildFinancialAssistantResponse,
+  buildFinancialAssistantReply,
+  looksLikeFinanceAssistantQuestion,
+} from "../server/modules/shared/financialAssistant";
 import { storage } from "../server/storage";
 import { AssistantOrchestrator } from "../server/modules/shared/assistantOrchestrator";
 import { resolveModelForText } from "../server/modules/shared/modelRouter";
@@ -79,8 +83,12 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
   }
 
   if (looksLikeFinanceAssistantQuestion(content)) {
-    const assistantReply = await buildFinancialAssistantReply(storage, userId, content, "internal_chat");
-    const fallbackPayload = { model: modelSelection };
+    const assistantResponse = await buildFinancialAssistantResponse(storage, userId, content, "internal_chat");
+    const assistantReply = assistantResponse.message || await buildFinancialAssistantReply(storage, userId, content, "internal_chat");
+    const fallbackPayload = {
+      ...(assistantResponse.payload || {}),
+      model: modelSelection,
+    };
     const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", assistantReply, fallbackPayload);
     addConversationContext(userId, "assistant", assistantReply);
     return {

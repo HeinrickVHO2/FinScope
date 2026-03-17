@@ -72,6 +72,10 @@ export function resolveModelForIntent(intent: AssistantRouteIntent): ModelSelect
     });
   }
 
+  if (intent.type === "financial_guidance") {
+    return resolveModel("insight", { requiresNarrative: true });
+  }
+
   if (intent.type === "create_goal" || intent.type === "add_goal_contribution" || intent.type === "list_goals" || intent.type === "goal_progress") {
     return resolveModel("goal", { requiresNarrative: true });
   }

@@ -94,6 +94,10 @@ test("parseAssistantRouteIntent identifica resumo, categoria dominante e limites
   assert.deepEqual(parseAssistantRouteIntent("como estao meus investimentos?"), {
     type: "investments_summary",
   });
+
+  assert.deepEqual(parseAssistantRouteIntent("me de dicas para economizar"), {
+    type: "financial_guidance",
+  });
 });
 
 test("parseAssistantRouteIntent identifica alternancia entre metas e investimentos", () => {
@@ -105,5 +109,9 @@ test("parseAssistantRouteIntent identifica alternancia entre metas e investiment
   assert.deepEqual(parseAssistantRouteIntent("ir para investimentos"), {
     type: "switch_financial_view",
     view: "investments",
+  });
+
+  assert.deepEqual(parseAssistantRouteIntent("resuma minhas metas"), {
+    type: "list_goals",
   });
 });

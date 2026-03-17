@@ -240,6 +240,63 @@ export function AssistantRichMessage({ payload }: { payload?: GenericPayload }) 
     );
   }
 
+  if (uiPayload.type === "financial_guidance") {
+    const series = uiPayload.chart?.breakdownSeries || [];
+    const tips = uiPayload.chart?.tips || [];
+    const alerts = uiPayload.chart?.alerts || [];
+
+    return (
+      <Card className="mt-3 overflow-hidden border-primary/20 bg-background">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-xl">{uiPayload.title || "Dicas financeiras"}</CardTitle>
+          {uiPayload.subtitle && <p className="text-sm text-muted-foreground">{uiPayload.subtitle}</p>}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {renderCards(uiPayload.cards)}
+          {!!series.length && (
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,240px),1fr]">
+              <div className="h-56 rounded-xl border bg-muted/30 p-3">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={series} dataKey="value" nameKey="label" innerRadius={44} outerRadius={76} paddingAngle={2}>
+                      {series.map((_: unknown, index: number) => (
+                        <Cell key={`guidance-cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-2">
+                {series.slice(0, 5).map((item: Record<string, any>, index: number) => (
+                  <div key={`${item.label}-${index}`} className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="flex items-center gap-3">
+                      <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
+                      <span className="font-medium">{item.label}</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {formatCurrency(item.value)} · {percentage(Number(item.share || 0) * 100)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {(alerts.length > 0 || tips.length > 0) && (
+            <div className="space-y-2 rounded-xl border bg-muted/20 p-4">
+              {alerts.slice(0, 2).map((item: string, index: number) => (
+                <p key={`alert-${index}`} className="text-sm font-medium text-amber-700">{item}</p>
+              ))}
+              {tips.slice(0, 3).map((item: string, index: number) => (
+                <p key={`tip-${index}`} className="text-sm text-muted-foreground">{item}</p>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (uiPayload.type === "reminder_created" || uiPayload.type === "reminder_paid" || uiPayload.type === "limit_saved" || uiPayload.type === "investment_summary" || uiPayload.type === "navigation") {
     return (
       <Card className="mt-3 overflow-hidden border-primary/20 bg-background">
