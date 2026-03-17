@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -12,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Bell, Clock3, LogOut, TriangleAlert, User } from "lucide-react";
+import { Bell, Clock3, LogOut, TriangleAlert, User, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 
@@ -54,6 +55,7 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const [, setLocation] = useLocation();
   const { logout } = useAuth();
+  const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([]);
   const notificationsQuery = useQuery<NotificationResponse>({
     queryKey: ["/api/notifications"],
     queryFn: async () => {
@@ -67,6 +69,23 @@ export function DashboardHeader({
     await logout();
   };
 
+  const storageKey = `finscope:dismissed-notifications:${userName}`;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      setDismissedNotifications(stored ? JSON.parse(stored) : []);
+    } catch {
+      setDismissedNotifications([]);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(storageKey, JSON.stringify(dismissedNotifications));
+  }, [dismissedNotifications, storageKey]);
+
   const getPlanBadge = () => {
     const badges = {
       pro: { label: "Pro", variant: "default" as const },
@@ -77,9 +96,41 @@ export function DashboardHeader({
 
   const planBadge = getPlanBadge();
   const notifications = notificationsQuery.data?.notifications || [];
-  const unreadCount = notificationsQuery.data?.unreadCount || 0;
-  const groupedNotifications = notificationsQuery.data?.groups || { overdue: [], today: [], week: [] };
-  const summary = notificationsQuery.data?.summary || { overdue: 0, today: 0, week: 0 };
+  const visibleNotifications = useMemo(
+    () => notifications.filter((notification) => !dismissedNotifications.includes(notification.id)),
+    [dismissedNotifications, notifications],
+  );
+  const groupedNotifications = useMemo(
+    () => ({
+      overdue: visibleNotifications.filter((notification) => notification.bucket === "overdue"),
+      today: visibleNotifications.filter((notification) => notification.bucket === "today"),
+      week: visibleNotifications.filter((notification) => notification.bucket === "week"),
+    }),
+    [visibleNotifications],
+  );
+  const summary = useMemo(
+    () => ({
+      overdue: groupedNotifications.overdue.length,
+      today: groupedNotifications.today.length,
+      week: groupedNotifications.week.length,
+    }),
+    [groupedNotifications],
+  );
+  const unreadCount = visibleNotifications.length;
+
+  const dismissNotification = (notificationId: string) => {
+    setDismissedNotifications((current) => (
+      current.includes(notificationId) ? current : [...current, notificationId]
+    ));
+  };
+
+  const clearVisibleNotifications = () => {
+    setDismissedNotifications((current) => {
+      const next = new Set(current);
+      visibleNotifications.forEach((notification) => next.add(notification.id));
+      return Array.from(next);
+    });
+  };
 
   return (
     <header className="flex items-center justify-between gap-4 border-b p-4 bg-background">
@@ -107,7 +158,24 @@ export function DashboardHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notificacoes</DropdownMenuLabel>
+            <DropdownMenuLabel className="flex items-center justify-between gap-3">
+              <span>Notificacoes</span>
+              {visibleNotifications.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    clearVisibleNotifications();
+                  }}
+                >
+                  Limpar
+                </Button>
+              )}
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <div className="grid grid-cols-3 gap-2 px-2 pb-2">
               <div className="rounded-lg border bg-rose-50 px-2 py-2 text-center">
@@ -124,7 +192,7 @@ export function DashboardHeader({
               </div>
             </div>
             <DropdownMenuSeparator />
-            {notifications.length ? (
+            {visibleNotifications.length ? (
               <>
                 {([
                   { key: "overdue", label: "Atrasadas", icon: <TriangleAlert className="h-3.5 w-3.5 text-rose-500" /> },
@@ -155,6 +223,19 @@ export function DashboardHeader({
                             <p className="text-sm font-medium leading-none">{notification.title}</p>
                             <p className="text-xs text-muted-foreground">{notification.message}</p>
                           </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="ml-auto h-7 w-7 shrink-0"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              dismissNotification(notification.id);
+                            }}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
                         </DropdownMenuItem>
                       ))}
                     </div>
