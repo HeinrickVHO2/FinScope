@@ -63,6 +63,11 @@ function parseLocalizedNumber(raw: string) {
   const normalized = raw.trim().replace(/\s+/g, "");
   if (!normalized) return null;
 
+  if (/^-?\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?$/.test(normalized)) {
+    const englishStyleValue = Number(normalized.replace(/,/g, ""));
+    return Number.isFinite(englishStyleValue) ? englishStyleValue : null;
+  }
+
   const lastComma = normalized.lastIndexOf(",");
   const lastDot = normalized.lastIndexOf(".");
   const decimalSeparator = lastComma > lastDot ? "," : ".";
@@ -140,7 +145,7 @@ function extractScaledNumericAmount(text: string) {
 }
 
 function extractPlainNumericAmount(text: string) {
-  const regex = /(?:r\$\s*)?(-?\d{1,3}(?:[.\s]\d{3})*(?:,\d{1,2})|-?\d+(?:[.,]\d{1,2})?)/gi;
+  const regex = /(?:r\$\s*)?(-?\d{1,3}(?:[.,\s]\d{3})+(?:[.,]\d{1,2})?|-?\d+(?:[.,]\d{1,2})?)/gi;
   const matches = Array.from(text.matchAll(regex));
 
   for (let index = matches.length - 1; index >= 0; index -= 1) {

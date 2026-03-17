@@ -17,6 +17,7 @@ import { parseInvoiceCalendarDate, parseInvoiceText, formatInvoiceReplySummary }
 import { FinancialIntentParser } from "./intentParser";
 import { WhatsAppMediaService } from "./media";
 import { WhatsAppMessenger } from "./messenger";
+import { PuppeteerWhatsAppVisualRenderer, type WhatsAppVisualRenderer } from "./chartRenderer";
 import { createDefaultOcrProvider, type OcrProvider } from "./ocr";
 import { AssistantOrchestrator } from "../shared/assistantOrchestrator";
 import { inferExpenseCategory } from "../shared/expenseClassifier";
@@ -183,6 +184,7 @@ export class WhatsAppAgentService {
   private readonly ocrProvider: OcrProvider;
   private readonly messenger: WhatsAppMessenger;
   private readonly mediaService: WhatsAppMediaService;
+  private readonly visualRenderer: WhatsAppVisualRenderer;
   private readonly assistantOrchestrator: AssistantOrchestrator;
   private readonly runtimeInfo = getWhatsAppAgentRuntimeInfo();
   private readonly pendingBindingsByCode = new Map<string, PendingPhoneBinding>();
@@ -196,12 +198,14 @@ export class WhatsAppAgentService {
       ocrProvider?: OcrProvider;
       messenger?: WhatsAppMessenger;
       mediaService?: WhatsAppMediaService;
+      visualRenderer?: WhatsAppVisualRenderer;
     } = {},
   ) {
     this.parser = deps.parser ?? new FinancialIntentParser();
     this.ocrProvider = deps.ocrProvider ?? createDefaultOcrProvider();
     this.messenger = deps.messenger ?? new WhatsAppMessenger();
     this.mediaService = deps.mediaService ?? new WhatsAppMediaService();
+    this.visualRenderer = deps.visualRenderer ?? new PuppeteerWhatsAppVisualRenderer();
     this.assistantOrchestrator = new AssistantOrchestrator(this.storage);
   }
 
@@ -809,8 +813,11 @@ export class WhatsAppAgentService {
       metadata: { mode, uiPayloadType: payload?.ui_payload ? String((payload.ui_payload as Record<string, unknown>).type || "") : null },
     });
     await this.sendReplyToInbound(inbound, reply);
-    for (const followUp of this.buildWhatsAppVisualFollowUps(payload)) {
-      await this.sendReplyToInbound(inbound, followUp);
+    const visualSent = await this.sendVisualPayloadToInbound(inbound, payload);
+    if (!visualSent) {
+      for (const followUp of this.buildWhatsAppVisualFollowUps(payload)) {
+        await this.sendReplyToInbound(inbound, followUp);
+      }
     }
     return { status: "assistant_answered" };
   }
@@ -1688,6 +1695,37 @@ export class WhatsAppAgentService {
         fromPhone: inbound.fromPhone,
         error: error instanceof Error ? error.message : String(error),
       });
+    }
+  }
+
+  private async sendVisualPayloadToInbound(inbound: InboundMessageRecord, payload?: Record<string, unknown> | null) {
+    try {
+      const rendered = await this.visualRenderer.render(payload ?? null);
+      if (!rendered) return false;
+
+      const sent = await this.messenger.sendImageMessage(inbound.fromPhone, rendered);
+      if (!sent) {
+        this.logInternal("warn", "outbound_visual_skipped", "Nao foi possivel enviar o grafico visual no WhatsApp.", {
+          inboundMessageId: inbound.id,
+          fromPhone: inbound.fromPhone,
+          filename: rendered.filename,
+        });
+        return false;
+      }
+
+      this.logInternal("info", "outbound_visual_success", "Grafico visual enviado com sucesso no WhatsApp.", {
+        inboundMessageId: inbound.id,
+        fromPhone: inbound.fromPhone,
+        filename: rendered.filename,
+      });
+      return true;
+    } catch (error) {
+      this.logInternal("warn", "outbound_visual_failed", "Falha secundaria ao renderizar ou enviar grafico visual.", {
+        inboundMessageId: inbound.id,
+        fromPhone: inbound.fromPhone,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
     }
   }
 

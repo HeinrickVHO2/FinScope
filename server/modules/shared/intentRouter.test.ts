@@ -31,6 +31,14 @@ test("parseAssistantRouteIntent identifica meta, aporte e lembrete", () => {
     initialContribution: 3000,
   });
 
+  const goalWithCommaThousands = parseAssistantRouteIntent("Quero juntar dinheiro para comprar um playstation 5 no valor de 3,700 reais. Ja juntei 850.");
+  assert.deepEqual(goalWithCommaThousands, {
+    type: "create_goal",
+    title: "playstation 5",
+    targetValue: 3700,
+    initialContribution: 850,
+  });
+
   const reminder = parseAssistantRouteIntent("Boleto do carro todo dia 12, R$ 1300");
   assert.deepEqual(reminder, {
     type: "create_reminder",

@@ -291,9 +291,21 @@ class FakeStorage {
 
 class FakeMessenger {
   public sentMessages: Array<{ phone: string; text: string }> = [];
+  public sentImages: Array<{ phone: string; filename: string; caption?: string; mimeType: string; size: number }> = [];
 
   async sendTextMessage(phone: string, text: string) {
     this.sentMessages.push({ phone, text });
+    return true;
+  }
+
+  async sendImageMessage(phone: string, payload: { buffer: Buffer; filename?: string; caption?: string; mimeType?: string }) {
+    this.sentImages.push({
+      phone,
+      filename: payload.filename || "chart.png",
+      caption: payload.caption,
+      mimeType: payload.mimeType || "image/png",
+      size: payload.buffer.length,
+    });
     return true;
   }
 }
@@ -338,6 +350,21 @@ function patchMethod<T extends object, K extends keyof T>(target: T, key: K, rep
   target[key] = replacement;
   return () => {
     target[key] = original;
+  };
+}
+
+function buildVisualRenderer(filename = "summary.png") {
+  return {
+    async render(payload?: Record<string, unknown> | null) {
+      const uiPayload = (payload?.ui_payload || null) as Record<string, unknown> | null;
+      if (!uiPayload?.type) return null;
+      return {
+        buffer: Buffer.from("fake-png"),
+        mimeType: "image/png",
+        filename,
+        caption: "Segue o grafico do seu resumo financeiro.",
+      };
+    },
   };
 }
 
@@ -697,7 +724,10 @@ test("WhatsAppAgentService answers monthly summary questions with real user data
   const repository = new FakeRepository();
   const storage = new FakeStorage();
   const messenger = new FakeMessenger();
-  const service = new WhatsAppAgentService(repository as any, storage as any, { messenger: messenger as any });
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    messenger: messenger as any,
+    visualRenderer: buildVisualRenderer("monthly-summary.png") as any,
+  });
 
   await repository.saveVerifiedBinding({
     userId: "user-1",
@@ -746,8 +776,8 @@ test("WhatsAppAgentService answers monthly summary questions with real user data
 
   assert.equal(result.status, "assistant_answered");
   assert.match(messenger.sentMessages[0]?.text || "", /entraram R\$ 5\.000,00/i);
-  assert.ok(messenger.sentMessages.some((item) => /Grafico dos seus gastos/i.test(item.text)));
-  assert.ok(messenger.sentMessages.some((item) => /Divisao por categoria/i.test(item.text)));
+  assert.equal(messenger.sentImages.length, 1);
+  assert.equal(messenger.sentImages[0]?.filename, "monthly-summary.png");
 });
 
 test("WhatsAppAgentService cria meta com aporte inicial quando o usuario ja informa valor guardado", async () => {
@@ -819,6 +849,82 @@ test("WhatsAppAgentService cria meta com aporte inicial quando o usuario ja info
 
     assert.equal(result.status, "assistant_answered");
     assert.match(messenger.sentMessages[0]?.text || "", /3\.000,00|3000/i);
+  } finally {
+    restoreCreateGoal();
+    restoreAddContribution();
+  }
+});
+
+test("WhatsAppAgentService interpreta milhar com virgula em metas e aporte inicial", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, { messenger: messenger as any });
+
+  const restoreCreateGoal = patchMethod(
+    GoalService.prototype,
+    "createGoal",
+    (async (_userId: string, payload: any) => ({
+      id: "goal-2",
+      userId: "user-1",
+      title: payload.title,
+      targetValue: String(payload.targetValue),
+      currentValue: "0",
+      targetDate: null,
+      status: "active",
+      archivedAt: null,
+      completedAt: null,
+      metadata: payload.metadata ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })) as GoalService["createGoal"],
+  );
+
+  const restoreAddContribution = patchMethod(
+    GoalService.prototype,
+    "addContribution",
+    (async ({ amount }: any) => ({
+      goal: {
+        id: "goal-2",
+        userId: "user-1",
+        title: "playstation 5",
+        targetValue: "3700",
+        currentValue: String(amount),
+        targetDate: null,
+        status: "active",
+        archivedAt: null,
+        completedAt: null,
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      contribution: {
+        id: "contrib-2",
+        goalId: "goal-2",
+        userId: "user-1",
+        amount: String(amount),
+        contributedAt: new Date(),
+        note: "Aporte inicial via assistente",
+        createdAt: new Date(),
+      },
+    })) as GoalService["addContribution"],
+  );
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  try {
+    const result = await service.processInboundEvent(buildBaseEvent({
+      providerMessageId: "provider-goal-comma-thousand",
+      text: "Quero juntar dinheiro para comprar um playstation 5 no valor de 3,700 reais. Ja juntei 850.",
+    }));
+
+    assert.equal(result.status, "assistant_answered");
+    assert.match(messenger.sentMessages[0]?.text || "", /3\.700,00|3700/i);
+    assert.match(messenger.sentMessages[0]?.text || "", /850,00|850/i);
   } finally {
     restoreCreateGoal();
     restoreAddContribution();
@@ -927,6 +1033,7 @@ test("WhatsAppAgentService creates invoice suggestion from media and stores evid
     messenger: messenger as any,
     ocrProvider: ocrProvider as any,
     mediaService: new FakeMediaService() as any,
+    visualRenderer: buildVisualRenderer("invoice-summary.png") as any,
   });
 
   await repository.saveVerifiedBinding({
@@ -972,6 +1079,7 @@ test("WhatsAppAgentService ignores non-receipt OCR results instead of hallucinat
     messenger: messenger as any,
     ocrProvider: ocrProvider as any,
     mediaService: new FakeMediaService() as any,
+    visualRenderer: buildVisualRenderer("invoice-summary.png") as any,
   });
 
   await repository.saveVerifiedBinding({
@@ -1116,7 +1224,7 @@ test("WhatsAppAgentService confirms invoice suggestion, persists whatsapp transa
 
   assert.equal(summary.status, "assistant_answered");
   assert.match(messenger.sentMessages[2]?.text || "", /52,52/i);
-  assert.ok(messenger.sentMessages.some((item) => /Grafico dos seus gastos/i.test(item.text)));
+  assert.match(messenger.sentImages.at(-1)?.filename || "", /\.png$/i);
 });
 
 test("WhatsAppAgentService does not trap a new standalone transaction behind an older pending candidate", async () => {
