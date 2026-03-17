@@ -118,7 +118,7 @@ test("AssistantOrchestrator responde resumo e status de limites", async () => {
     });
     assert.equal(summary.handled, true);
     assert.match(summary.reply || "", /Resumo de/i);
-    assert.equal((summary.payload as any)?.topExpense?.category, "Mercado");
+    assert.equal((summary.payload as any)?.data?.topExpense?.category, "Mercado");
 
     const limits = await orchestrator.handleMessage({
       userId: "user-1",
@@ -127,7 +127,7 @@ test("AssistantOrchestrator responde resumo e status de limites", async () => {
     });
     assert.equal(limits.handled, true);
     assert.match(limits.reply || "", /Seus limites ativos/i);
-    assert.equal((limits.payload as any)?.limits?.[0]?.category, "Mercado");
+    assert.equal((limits.payload as any)?.data?.limits?.[0]?.category, "Mercado");
   } finally {
     restoreListByUser();
     restoreBuildStatus();
@@ -229,11 +229,13 @@ test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload
 
     const created = await orchestrator.handleMessage({
       userId: "user-1",
-      text: "Crie uma meta para iPhone 16, preciso de 5399",
+      text: "Quero guardar dinheiro para comprar um Iphone no valor de 5760 reais",
       channel: "internal_chat",
     });
     assert.equal(created.handled, true);
-    assert.equal((created.payload as any)?.route, "/goals");
+    assert.equal((created.payload as any)?.data?.route, "/goals");
+    assert.equal((created.payload as any)?.ui_payload?.type, "goal_progress");
+    assert.equal((created.payload as any)?.model?.tier, "advanced");
 
     const contributed = await orchestrator.handleMessage({
       userId: "user-1",
@@ -242,7 +244,7 @@ test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload
     });
     assert.equal(contributed.handled, true);
     assert.match(contributed.reply || "", /500/);
-    assert.equal((contributed.payload as any)?.route, "/goals");
+    assert.equal((contributed.payload as any)?.data?.route, "/goals");
 
     const listed = await orchestrator.handleMessage({
       userId: "user-1",
@@ -251,7 +253,7 @@ test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload
     });
     assert.equal(listed.handled, true);
     assert.match(listed.reply || "", /Suas metas/i);
-    assert.equal((listed.payload as any)?.view, "goals");
+    assert.equal((listed.payload as any)?.data?.view, "goals");
   } finally {
     restoreCreateGoal();
     restoreGetLatestActiveGoal();
@@ -287,7 +289,7 @@ test("AssistantOrchestrator cria lembrete, marca como pago, resume investimentos
     channel: "internal_chat",
   });
   assert.equal(investments.handled, true);
-  assert.equal((investments.payload as any)?.route, "/investments");
+  assert.equal((investments.payload as any)?.data?.route, "/investments");
   assert.match(investments.reply || "", /investidos/i);
 
   const switchView = await orchestrator.handleMessage({
@@ -296,6 +298,37 @@ test("AssistantOrchestrator cria lembrete, marca como pago, resume investimentos
     channel: "internal_chat",
   });
   assert.equal(switchView.handled, true);
-  assert.equal((switchView.payload as any)?.route, "/goals");
-  assert.equal((switchView.payload as any)?.view, "goals");
+  assert.equal((switchView.payload as any)?.data?.route, "/goals");
+  assert.equal((switchView.payload as any)?.data?.view, "goals");
+});
+
+test("AssistantOrchestrator devolve payload estruturado para divisao e explicacao de aumento", async () => {
+  const restoreListByUser = patchMethod(
+    CategoryLimitService.prototype,
+    "listByUser",
+    (async () => []) as CategoryLimitService["listByUser"],
+  );
+
+  try {
+    const orchestrator = new AssistantOrchestrator(buildFakeStorage() as any);
+
+    const breakdown = await orchestrator.handleMessage({
+      userId: "user-1",
+      text: "me mostra a divisao dos meus gastos",
+      channel: "internal_chat",
+    });
+    assert.equal(breakdown.handled, true);
+    assert.equal((breakdown.payload as any)?.ui_payload?.type, "expense_breakdown");
+    assert.equal((breakdown.payload as any)?.model?.tier, "advanced");
+
+    const increase = await orchestrator.handleMessage({
+      userId: "user-1",
+      text: "por que meus gastos aumentaram?",
+      channel: "whatsapp",
+    });
+    assert.equal(increase.handled, true);
+    assert.match(increase.reply || "", /nao houve aumento|puxou a alta/i);
+  } finally {
+    restoreListByUser();
+  }
 });

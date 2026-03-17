@@ -1,13 +1,31 @@
 import type { IStorage } from "../../storage";
 import { CategoryLimitService } from "./categoryLimitService";
-import { buildFinancialSummaryPayload, formatFinancialSummaryText } from "./financialSummaryService";
+import { buildFinancialSummaryPayload, formatFinancialSummaryText, type FinancialSummaryPayload } from "./financialSummaryService";
 import { GoalService } from "./goalService";
-import { looksLikeAssistantOrchestratorMessage, parseAssistantRouteIntent } from "./intentRouter";
+import { looksLikeAssistantOrchestratorMessage, parseAssistantRouteIntent, type SummaryIntentFocus } from "./intentRouter";
+import { resolveModelForIntent, type ModelSelection } from "./modelRouter";
+
+export type AgentUiPayload = {
+  type: string;
+  title?: string;
+  subtitle?: string;
+  chart?: Record<string, unknown>;
+  cards?: Array<Record<string, unknown>>;
+  progress?: Record<string, unknown>;
+  limits?: Array<Record<string, unknown>>;
+  route?: string;
+  view?: string;
+};
 
 export type AssistantOrchestratorResult = {
   handled: boolean;
+  intent?: string;
+  action?: string;
+  confidence?: number;
   reply?: string;
   payload?: Record<string, unknown>;
+  ui_payload?: AgentUiPayload;
+  model?: ModelSelection;
 };
 
 function formatCurrency(value: number) {
@@ -24,6 +42,92 @@ function resolveNextDueDate(dayOfMonth: number, reference = new Date()) {
     return new Date(reference.getFullYear(), reference.getMonth() + 1, dayOfMonth);
   }
   return candidate;
+}
+
+function buildSummaryUiPayload(payload: FinancialSummaryPayload, focus: SummaryIntentFocus): AgentUiPayload {
+  const cards = [
+    { label: "Entradas", value: payload.totals.income },
+    { label: "Saidas", value: payload.totals.expenses },
+    { label: "Saldo", value: payload.totals.balance },
+    { label: "Variacao", value: payload.comparison.expensesDelta },
+  ];
+
+  if (focus === "category_breakdown") {
+    return {
+      type: "expense_breakdown",
+      title: "Divisao de gastos",
+      subtitle: payload.period.label,
+      cards,
+      chart: {
+        type: "pie",
+        series: payload.categories.map((item) => ({
+          label: item.category,
+          value: item.amount,
+          share: item.share,
+        })),
+      },
+    };
+  }
+
+  if (focus === "largest_expense") {
+    return {
+      type: "largest_expense",
+      title: "Maior gasto",
+      subtitle: payload.period.label,
+      cards,
+      chart: {
+        type: "highlight",
+        item: payload.largestExpense,
+      },
+    };
+  }
+
+  return {
+    type: "financial_summary",
+    title: "Resumo financeiro",
+    subtitle: payload.period.label,
+    cards,
+    chart: {
+      type: "bar",
+      series: payload.dailyExpenses,
+      breakdownSeries: payload.categories.map((item) => ({
+        label: item.category,
+        value: item.amount,
+        share: item.share,
+      })),
+      largestExpense: payload.largestExpense,
+      increaseExplanation: payload.increaseExplanation,
+    },
+  };
+}
+
+function buildResponse(params: {
+  intent: string;
+  action: string;
+  message: string;
+  data?: Record<string, unknown>;
+  uiPayload?: AgentUiPayload;
+  model: ModelSelection;
+  confidence?: number;
+}): AssistantOrchestratorResult {
+  return {
+    handled: true,
+    intent: params.intent,
+    action: params.action,
+    confidence: params.confidence ?? 0.94,
+    reply: params.message,
+    ui_payload: params.uiPayload,
+    model: params.model,
+    payload: {
+      intent: params.intent,
+      action: params.action,
+      confidence: params.confidence ?? 0.94,
+      message: params.message,
+      data: params.data ?? {},
+      ui_payload: params.uiPayload,
+      model: params.model,
+    },
+  };
 }
 
 export class AssistantOrchestrator {
@@ -44,6 +148,8 @@ export class AssistantOrchestrator {
     const intent = parseAssistantRouteIntent(params.text);
     if (!intent) return { handled: false };
 
+    const modelSelection = resolveModelForIntent(intent);
+
     if (intent.type === "summary") {
       const limits = await this.limitService.listByUser(params.userId).catch(() => []);
       const payload = await buildFinancialSummaryPayload({
@@ -55,24 +161,82 @@ export class AssistantOrchestrator {
 
       if (intent.focus === "top_category") {
         if (!payload.topExpense) {
-          return {
-            handled: true,
-            reply: "Ainda nao encontrei gastos suficientes nesse periodo para destacar uma categoria dominante.",
-            payload,
-          };
+          return buildResponse({
+            intent: "summary.top_category",
+            action: "explain_top_category",
+            message: "Ainda nao encontrei gastos suficientes nesse periodo para destacar uma categoria dominante.",
+            data: payload as unknown as Record<string, unknown>,
+            uiPayload: buildSummaryUiPayload(payload, intent.focus),
+            model: modelSelection,
+            confidence: 0.89,
+          });
         }
-        return {
-          handled: true,
-          reply: `No periodo de ${payload.period.label}, ${payload.topExpense.category} foi onde voce mais gastou: ${formatCurrency(payload.topExpense.amount)}.`,
-          payload,
-        };
+
+        return buildResponse({
+          intent: "summary.top_category",
+          action: "explain_top_category",
+          message: `No periodo de ${payload.period.label}, ${payload.topExpense.category} foi onde voce mais gastou: ${formatCurrency(payload.topExpense.amount)}.`,
+          data: payload as unknown as Record<string, unknown>,
+          uiPayload: buildSummaryUiPayload(payload, intent.focus),
+          model: modelSelection,
+        });
       }
 
-      return {
-        handled: true,
-        reply: formatFinancialSummaryText(payload, params.channel),
-        payload,
-      };
+      if (intent.focus === "category_breakdown") {
+        const ranked = payload.categories
+          .slice(0, 4)
+          .map((item) => `${item.category} ${Math.round(item.share * 100)}%`)
+          .join(", ");
+
+        return buildResponse({
+          intent: "summary.category_breakdown",
+          action: "show_category_breakdown",
+          message: ranked
+            ? `Segue a divisao dos seus gastos por categoria. As maiores fatias agora sao: ${ranked}.`
+            : "Ainda nao encontrei gastos suficientes no periodo para montar a divisao por categoria.",
+          data: payload as unknown as Record<string, unknown>,
+          uiPayload: buildSummaryUiPayload(payload, intent.focus),
+          model: modelSelection,
+        });
+      }
+
+      if (intent.focus === "largest_expense") {
+        return buildResponse({
+          intent: "summary.largest_expense",
+          action: "show_largest_expense",
+          message: payload.largestExpense
+            ? `Seu maior gasto no periodo foi ${payload.largestExpense.description}, em ${payload.largestExpense.category}, totalizando ${formatCurrency(payload.largestExpense.amount)}.`
+            : "Ainda nao encontrei um maior gasto no periodo porque nao ha saidas suficientes registradas.",
+          data: payload as unknown as Record<string, unknown>,
+          uiPayload: buildSummaryUiPayload(payload, intent.focus),
+          model: modelSelection,
+        });
+      }
+
+      if (intent.focus === "increase_reason") {
+        const explanation = payload.increaseExplanation
+          || (payload.comparison.expensesDelta > 0
+            ? `Seus gastos subiram ${formatCurrency(payload.comparison.expensesDelta)} no periodo, mas ainda nao houve uma categoria isolada com aumento dominante.`
+            : "Nao houve aumento relevante de gastos em relacao ao periodo anterior.");
+
+        return buildResponse({
+          intent: "summary.increase_reason",
+          action: "explain_spending_change",
+          message: explanation,
+          data: payload as unknown as Record<string, unknown>,
+          uiPayload: buildSummaryUiPayload(payload, "general"),
+          model: modelSelection,
+        });
+      }
+
+      return buildResponse({
+        intent: "summary.general",
+        action: "show_summary",
+        message: formatFinancialSummaryText(payload, params.channel),
+        data: payload as unknown as Record<string, unknown>,
+        uiPayload: buildSummaryUiPayload(payload, intent.focus),
+        model: modelSelection,
+      });
     }
 
     if (intent.type === "limits_status") {
@@ -82,10 +246,19 @@ export class AssistantOrchestrator {
       });
 
       if (!statuses.length) {
-        return {
-          handled: true,
-          reply: "Voce ainda nao definiu limites por categoria. Se quiser, posso criar algo como 'crie um limite para Transporte de 500'.",
-        };
+        return buildResponse({
+          intent: "limits.status",
+          action: "show_limits_empty_state",
+          message: "Voce ainda nao definiu limites por categoria. Se quiser, posso criar algo como 'crie um limite para Transporte de 500'.",
+          data: { limits: [] },
+          uiPayload: {
+            type: "limits_overview",
+            title: "Limites de gastos",
+            limits: [],
+          },
+          model: modelSelection,
+          confidence: 0.91,
+        });
       }
 
       const lines = ["Seus limites ativos:"];
@@ -94,11 +267,25 @@ export class AssistantOrchestrator {
         const statusLabel = item.status === "exceeded" ? "estourado" : item.status === "warning" ? "em alerta" : "controlado";
         lines.push(`- ${item.category}: ${formatCurrency(item.spent)} de ${formatCurrency(item.limit)} (${percent}%, ${statusLabel})`);
       }
-      return {
-        handled: true,
-        reply: lines.join("\n"),
-        payload: { limits: statuses },
-      };
+
+      return buildResponse({
+        intent: "limits.status",
+        action: "show_limits_status",
+        message: lines.join("\n"),
+        data: { limits: statuses },
+        uiPayload: {
+          type: "limits_overview",
+          title: "Limites de gastos",
+          limits: statuses.map((item) => ({
+            category: item.category,
+            spent: item.spent,
+            limit: item.limit,
+            utilization: item.utilization,
+            status: item.status,
+          })),
+        },
+        model: modelSelection,
+      });
     }
 
     if (intent.type === "upsert_limit") {
@@ -109,25 +296,42 @@ export class AssistantOrchestrator {
         scope: intent.scope,
         period: "monthly",
       });
-      return {
-        handled: true,
-        reply: `Limite salvo para ${limit.category}: ${formatCurrency(toNumber(limit.amount))} por mes.`,
-        payload: { limit },
-      };
+
+      return buildResponse({
+        intent: "limits.upsert",
+        action: "save_limit",
+        message: `Limite salvo para ${limit.category}: ${formatCurrency(toNumber(limit.amount))} por mes.`,
+        data: { limit },
+        uiPayload: {
+          type: "limit_saved",
+          title: "Limite definido",
+          cards: [{ category: limit.category, amount: toNumber(limit.amount), scope: limit.scope }],
+        },
+        model: modelSelection,
+      });
     }
 
     if (intent.type === "investments_summary") {
       const summary = await this.storage.getInvestmentsSummary(params.userId);
       if (!summary.byType.length) {
-        return {
-          handled: true,
-          reply: "Voce ainda nao tem investimentos cadastrados. Se quiser, posso te levar para a visao de investimentos.",
-          payload: {
+        return buildResponse({
+          intent: "investments.summary",
+          action: "show_investments_empty_state",
+          message: "Voce ainda nao tem investimentos cadastrados. Se quiser, posso te levar para a visao de investimentos.",
+          data: {
             route: "/investments",
             view: "investments",
             summary,
           },
-        };
+          uiPayload: {
+            type: "navigation",
+            title: "Investimentos",
+            route: "/investments",
+            view: "investments",
+          },
+          model: modelSelection,
+          confidence: 0.9,
+        });
       }
 
       const highlights = summary.byType
@@ -135,28 +339,49 @@ export class AssistantOrchestrator {
         .map((item) => `${item.type}: ${formatCurrency(item.amount)}`)
         .join(", ");
 
-      return {
-        handled: true,
-        reply: `Hoje voce tem ${formatCurrency(summary.totalInvested)} investidos. Maiores posicoes: ${highlights}.`,
-        payload: {
+      return buildResponse({
+        intent: "investments.summary",
+        action: "show_investments_summary",
+        message: `Hoje voce tem ${formatCurrency(summary.totalInvested)} investidos. Maiores posicoes: ${highlights}.`,
+        data: {
           route: "/investments",
           view: "investments",
           summary,
         },
-      };
+        uiPayload: {
+          type: "investment_summary",
+          title: "Investimentos",
+          route: "/investments",
+          view: "investments",
+          cards: summary.byType.slice(0, 4).map((item) => ({
+            label: item.type,
+            value: item.amount,
+            goal: item.goal ?? null,
+          })),
+        },
+        model: modelSelection,
+      });
     }
 
     if (intent.type === "switch_financial_view") {
       const route = intent.view === "goals" ? "/goals" : "/investments";
       const label = intent.view === "goals" ? "Metas" : "Investimentos";
-      return {
-        handled: true,
-        reply: `Certo. A visao mais adequada para isso e ${label}.`,
-        payload: {
+      return buildResponse({
+        intent: "navigation.switch_financial_view",
+        action: "navigate_financial_view",
+        message: `Certo. A visao mais adequada para isso e ${label}.`,
+        data: {
           route,
           view: intent.view,
         },
-      };
+        uiPayload: {
+          type: "navigation",
+          title: label,
+          route,
+          view: intent.view,
+        },
+        model: modelSelection,
+      });
     }
 
     if (intent.type === "create_goal") {
@@ -168,20 +393,44 @@ export class AssistantOrchestrator {
         status: "active",
         metadata: { origin: "assistant" },
       });
-      return {
-        handled: true,
-        reply: `Meta criada: ${goal.title} com objetivo de ${formatCurrency(toNumber(goal.targetValue))}. Quando quiser, me diga algo como 'ja guardei 500 hoje'.`,
-        payload: { goal, route: "/goals", view: "goals" },
-      };
+
+      return buildResponse({
+        intent: "goals.create",
+        action: "create_goal",
+        message: `Meta criada: ${goal.title} com objetivo de ${formatCurrency(toNumber(goal.targetValue))}. Quando quiser, me diga algo como 'ja guardei 500 hoje'.`,
+        data: { goal, route: "/goals", view: "goals" },
+        uiPayload: {
+          type: "goal_progress",
+          title: goal.title,
+          route: "/goals",
+          view: "goals",
+          progress: {
+            current: toNumber(goal.currentValue),
+            target: toNumber(goal.targetValue),
+            percentage: 0,
+          },
+        },
+        model: modelSelection,
+      });
     }
 
     if (intent.type === "add_goal_contribution") {
       const goal = await this.goalService.getLatestActiveGoal(params.userId);
       if (!goal) {
-        return {
-          handled: true,
-          reply: "Nao encontrei uma meta ativa para receber esse aporte. Primeiro crie uma meta, por exemplo: 'crie uma meta para iPhone 16, preciso de 5399'.",
-        };
+        return buildResponse({
+          intent: "goals.contribution",
+          action: "reject_goal_contribution_without_goal",
+          message: "Nao encontrei uma meta ativa para receber esse aporte. Primeiro crie uma meta, por exemplo: 'crie uma meta para iPhone 16, preciso de 5399'.",
+          data: { route: "/goals", view: "goals" },
+          uiPayload: {
+            type: "navigation",
+            title: "Metas",
+            route: "/goals",
+            view: "goals",
+          },
+          model: modelSelection,
+          confidence: 0.9,
+        });
       }
 
       const result = await this.goalService.addContribution({
@@ -191,21 +440,45 @@ export class AssistantOrchestrator {
         note: "Aporte via assistente",
       });
       const progress = toNumber(result.goal.currentValue) / Math.max(1, toNumber(result.goal.targetValue));
-      return {
-        handled: true,
-        reply: `Aporte registrado em ${result.goal.title}: ${formatCurrency(intent.amount)}. Progresso atual: ${Math.round(progress * 100)}% (${formatCurrency(toNumber(result.goal.currentValue))} de ${formatCurrency(toNumber(result.goal.targetValue))}).`,
-        payload: { ...result, route: "/goals", view: "goals" },
-      };
+
+      return buildResponse({
+        intent: "goals.contribution",
+        action: "add_goal_contribution",
+        message: `Aporte registrado em ${result.goal.title}: ${formatCurrency(intent.amount)}. Progresso atual: ${Math.round(progress * 100)}% (${formatCurrency(toNumber(result.goal.currentValue))} de ${formatCurrency(toNumber(result.goal.targetValue))}).`,
+        data: { ...result, route: "/goals", view: "goals" },
+        uiPayload: {
+          type: "goal_progress",
+          title: result.goal.title,
+          route: "/goals",
+          view: "goals",
+          progress: {
+            current: toNumber(result.goal.currentValue),
+            target: toNumber(result.goal.targetValue),
+            percentage: Number((progress * 100).toFixed(2)),
+          },
+        },
+        model: modelSelection,
+      });
     }
 
     if (intent.type === "list_goals" || intent.type === "goal_progress") {
       const goals = await this.goalService.listGoals(params.userId);
       if (!goals.length) {
-        return {
-          handled: true,
-          reply: "Voce ainda nao tem metas cadastradas.",
-          payload: { goals: [], route: "/goals", view: "goals" },
-        };
+        return buildResponse({
+          intent: intent.type === "list_goals" ? "goals.list" : "goals.progress",
+          action: "show_goals_empty_state",
+          message: "Voce ainda nao tem metas cadastradas.",
+          data: { goals: [], route: "/goals", view: "goals" },
+          uiPayload: {
+            type: "goals_list",
+            title: "Metas",
+            route: "/goals",
+            view: "goals",
+            cards: [],
+          },
+          model: modelSelection,
+          confidence: 0.91,
+        });
       }
 
       const lines = ["Suas metas:"];
@@ -213,11 +486,26 @@ export class AssistantOrchestrator {
         const progress = Math.round((toNumber(goal.currentValue) / Math.max(1, toNumber(goal.targetValue))) * 100);
         lines.push(`- ${goal.title}: ${formatCurrency(toNumber(goal.currentValue))} de ${formatCurrency(toNumber(goal.targetValue))} (${progress}%)`);
       }
-      return {
-        handled: true,
-        reply: lines.join("\n"),
-        payload: { goals, route: "/goals", view: "goals" },
-      };
+
+      return buildResponse({
+        intent: intent.type === "list_goals" ? "goals.list" : "goals.progress",
+        action: "show_goals",
+        message: lines.join("\n"),
+        data: { goals, route: "/goals", view: "goals" },
+        uiPayload: {
+          type: "goals_list",
+          title: "Metas",
+          route: "/goals",
+          view: "goals",
+          cards: goals.map((goal) => ({
+            title: goal.title,
+            current: toNumber(goal.currentValue),
+            target: toNumber(goal.targetValue),
+            percentage: Number(((toNumber(goal.currentValue) / Math.max(1, toNumber(goal.targetValue))) * 100).toFixed(2)),
+          })),
+        },
+        model: modelSelection,
+      });
     }
 
     if (intent.type === "create_reminder") {
@@ -233,29 +521,56 @@ export class AssistantOrchestrator {
         status: "pending",
       });
 
-      return {
-        handled: true,
-        reply: `Lembrete criado para ${expense.title}: ${formatCurrency(intent.amount)} todo dia ${intent.dayOfMonth}.`,
-        payload: { reminder: expense },
-      };
+      return buildResponse({
+        intent: "reminders.create",
+        action: "create_reminder",
+        message: intent.amount > 0
+          ? `Lembrete criado para ${expense.title}: ${formatCurrency(intent.amount)} todo dia ${intent.dayOfMonth}.`
+          : `Lembrete criado para ${expense.title} todo dia ${intent.dayOfMonth}.`,
+        data: { reminder: expense },
+        uiPayload: {
+          type: "reminder_created",
+          title: expense.title,
+          cards: [{
+            amount: intent.amount,
+            dayOfMonth: intent.dayOfMonth,
+            recurrenceType: "monthly",
+          }],
+        },
+        model: modelSelection,
+      });
     }
 
     if (intent.type === "mark_reminder_paid") {
       const reminders = await this.storage.getFutureExpenses(params.userId, "ALL", "pending");
       const candidate = [...reminders].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0];
       if (!candidate) {
-        return {
-          handled: true,
-          reply: "Nao encontrei nenhuma conta pendente recente para marcar como paga.",
-        };
+        return buildResponse({
+          intent: "reminders.mark_paid",
+          action: "show_no_recent_reminder",
+          message: "Nao encontrei nenhuma conta pendente recente para marcar como paga.",
+          data: {},
+          model: modelSelection,
+          confidence: 0.9,
+        });
       }
 
       const updated = await this.storage.updateFutureExpenseStatus(candidate.id, params.userId, "paid");
-      return {
-        handled: true,
-        reply: updated ? `Perfeito. Marquei ${updated.title} como paga.` : "Nao consegui atualizar essa conta agora.",
-        payload: { reminder: updated },
-      };
+      return buildResponse({
+        intent: "reminders.mark_paid",
+        action: "mark_reminder_paid",
+        message: updated ? `Perfeito. Marquei ${updated.title} como paga.` : "Nao consegui atualizar essa conta agora.",
+        data: { reminder: updated },
+        uiPayload: updated
+          ? {
+              type: "reminder_paid",
+              title: updated.title,
+              cards: [{ status: "paid" }],
+            }
+          : undefined,
+        model: modelSelection,
+        confidence: updated ? 0.95 : 0.82,
+      });
     }
 
     return { handled: false };

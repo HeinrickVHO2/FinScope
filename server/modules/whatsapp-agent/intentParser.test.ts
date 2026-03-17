@@ -39,3 +39,13 @@ test("FinancialIntentParser infers expense category from merchant-only phrases",
   assert.equal(intent.amount, 110);
   assert.equal(intent.categorySuggestion, "Roupas");
 });
+
+test("FinancialIntentParser nao trata frase de meta como despesa", () => {
+  const parser = new FinancialIntentParser();
+  const intent = parser.parse({ text: "Quero guardar dinheiro para comprar um Iphone no valor de 5760 reais" });
+
+  assert.equal(intent.kind, "unknown");
+  assert.equal(intent.amount, 5760);
+  assert.equal(intent.categorySuggestion, undefined);
+  assert.ok(intent.missingFields.includes("kind"));
+});

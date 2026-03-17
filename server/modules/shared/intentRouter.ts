@@ -1,8 +1,15 @@
 import { parseMonetaryAmountFromNaturalLanguage } from "../whatsapp-agent/amountParser";
 import type { SummaryPeriodKey } from "./financialSummaryService";
 
+export type SummaryIntentFocus =
+  | "general"
+  | "top_category"
+  | "category_breakdown"
+  | "largest_expense"
+  | "increase_reason";
+
 export type AssistantRouteIntent =
-  | { type: "summary"; periodKey: SummaryPeriodKey; focus: "general" | "top_category" }
+  | { type: "summary"; periodKey: SummaryPeriodKey; focus: SummaryIntentFocus }
   | { type: "limits_status" }
   | { type: "upsert_limit"; category: string; amount: number; scope: "PF" | "PJ" | "ALL" }
   | { type: "investments_summary" }
@@ -14,7 +21,7 @@ export type AssistantRouteIntent =
   | { type: "create_reminder"; title: string; amount: number; dayOfMonth: number }
   | { type: "mark_reminder_paid" };
 
-function normalize(text: string) {
+export function normalizeAssistantText(text: string) {
   return text
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -30,18 +37,33 @@ function detectScope(normalized: string): "PF" | "PJ" | "ALL" {
 }
 
 function resolvePeriodKey(normalized: string): SummaryPeriodKey {
-  if (/ultimos 7 dias|ultimos dias|nos ultimos dias|ultima semana/.test(normalized)) return "last_7_days";
+  if (/ultimos 7 dias|ultimos dias|nos ultimos dias/.test(normalized)) return "last_7_days";
   if (/semana passada|ultima semana/.test(normalized)) return "previous_week";
   if (/essa semana|esta semana/.test(normalized)) return "current_week";
   if (/mes passado/.test(normalized)) return "previous_month";
   return "current_month";
 }
 
+function stripLeadingArticle(value: string) {
+  return value.replace(/^(um|uma|o|a|os|as)\s+/i, "").trim();
+}
+
 function parseGoalTitle(rawText: string) {
-  const match = rawText.match(/meta\s+para\s+(.+?)(?:,| preciso| quero| tenho|$)/i);
-  if (match?.[1]) return match[1].trim();
-  const fallback = rawText.match(/juntar\s+.+?\s+para\s+(.+)$/i);
-  if (fallback?.[1]) return fallback[1].trim();
+  const patterns = [
+    /meta\s+para\s+(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
+    /guardar\s+(?:dinheiro\s+)?para\s+(?:comprar\s+)?(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
+    /juntar\s+(?:dinheiro\s+)?para\s+(?:comprar\s+)?(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
+    /objetivo\s+para\s+(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = rawText.match(pattern);
+    if (match?.[1]) {
+      const value = stripLeadingArticle(match[1].trim());
+      if (value) return value;
+    }
+  }
+
   return "Meta financeira";
 }
 
@@ -51,15 +73,18 @@ function parseLimitCategory(rawText: string) {
 }
 
 function parseReminder(rawText: string, normalized: string) {
-  if (!/todo dia|todo mes|mensal/.test(normalized)) return null;
-  const amount = parseMonetaryAmountFromNaturalLanguage(rawText);
+  if (!looksLikeReminderIntent(normalized)) return null;
+
+  const amount = parseMonetaryAmountFromNaturalLanguage(rawText) ?? 0;
   const dayMatch = normalized.match(/dia\s+(\d{1,2})/);
-  if (!amount || !dayMatch) return null;
+  if (!dayMatch) return null;
 
   let title = rawText
     .replace(/todo dia \d{1,2}.*/i, "")
     .replace(/todo mes.*$/i, "")
     .replace(/mensal.*$/i, "")
+    .replace(/me lembra (da|do|de)\s+/i, "")
+    .replace(/me lembre (da|do|de)\s+/i, "")
     .replace(/r\$\s*[\d.,]+/i, "")
     .replace(/,\s*$/, "")
     .trim();
@@ -68,15 +93,49 @@ function parseReminder(rawText: string, normalized: string) {
   return { title, amount, dayOfMonth: Number(dayMatch[1]) };
 }
 
+function isReminderPaidMessage(normalized: string) {
+  return /^(paguei ja|ja paguei|marca como pago|marque como pago|pago ja)$/.test(normalized);
+}
+
+function detectSummaryFocus(normalized: string): SummaryIntentFocus {
+  if (/divisao dos meus gastos|divisao por categoria|gastos por categoria|me mostra a divisao|grafico|pizza/.test(normalized)) {
+    return "category_breakdown";
+  }
+
+  if (/qual foi meu maior gasto|maior gasto|gasto mais alto/.test(normalized)) {
+    return "largest_expense";
+  }
+
+  if (/por que meus gastos aumentaram|o que subiu|o que mudou em relacao|o que mudou em relação|motivo do aumento/.test(normalized)) {
+    return "increase_reason";
+  }
+
+  if (/onde eu gastei mais|categoria|mais gastei/.test(normalized)) {
+    return "top_category";
+  }
+
+  return "general";
+}
+
+export function looksLikeGoalIntent(text: string) {
+  const normalized = normalizeAssistantText(text);
+  return /crie uma meta|criar meta|quero uma meta|meta para|guardar dinheiro para|juntar dinheiro para|guardar para|juntar para|objetivo para/.test(normalized);
+}
+
+export function looksLikeReminderIntent(text: string) {
+  const normalized = normalizeAssistantText(text);
+  return /todo dia|todo mes|mensal|me lembra|me lembre|lembrete/.test(normalized) && /dia\s+\d{1,2}/.test(normalized);
+}
+
 export function parseAssistantRouteIntent(text: string): AssistantRouteIntent | null {
-  const normalized = normalize(text);
+  const normalized = normalizeAssistantText(text);
   if (!normalized) return null;
 
-  if (/quanto eu gastei|resumo|ultimos dias|essa semana|este mes|mes passado/.test(normalized)) {
+  if (/quanto eu gastei|resumo|ultimos dias|essa semana|este mes|mes passado|divisao dos meus gastos|gastos por categoria|maior gasto|o que subiu|o que mudou em relacao|por que meus gastos aumentaram/.test(normalized)) {
     return {
       type: "summary",
       periodKey: resolvePeriodKey(normalized),
-      focus: /onde eu gastei mais|categoria|mais gastei/.test(normalized) ? "top_category" : "general",
+      focus: detectSummaryFocus(normalized),
     };
   }
 
@@ -96,7 +155,7 @@ export function parseAssistantRouteIntent(text: string): AssistantRouteIntent | 
     }
   }
 
-  if (/crie uma meta|criar meta|quero uma meta|meta para/.test(normalized)) {
+  if (looksLikeGoalIntent(normalized)) {
     const targetValue = parseMonetaryAmountFromNaturalLanguage(text);
     if (targetValue) {
       return { type: "create_goal", title: parseGoalTitle(text), targetValue };
@@ -108,11 +167,11 @@ export function parseAssistantRouteIntent(text: string): AssistantRouteIntent | 
     if (amount) return { type: "add_goal_contribution", amount };
   }
 
-  if (/listar metas|minhas metas|quais metas|metas ativas/.test(normalized)) {
+  if (/listar metas|minhas metas|quais metas|metas ativas|me mostra minhas metas/.test(normalized)) {
     return { type: "list_goals" };
   }
 
-  if (/progresso da meta|minha meta|como esta minha meta/.test(normalized)) {
+  if (/progresso da meta|minha meta|como esta minha meta|quanto falta para minha meta/.test(normalized)) {
     return { type: "goal_progress" };
   }
 
@@ -134,7 +193,7 @@ export function parseAssistantRouteIntent(text: string): AssistantRouteIntent | 
     };
   }
 
-  if (/paguei ja|ja paguei|pago|marca como pago/.test(normalized)) {
+  if (isReminderPaidMessage(normalized)) {
     return { type: "mark_reminder_paid" };
   }
 

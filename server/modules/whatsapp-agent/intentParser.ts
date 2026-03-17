@@ -1,12 +1,15 @@
 import type { FinancialIntent } from "./types";
 import { parseMonetaryAmountFromNaturalLanguage } from "./amountParser";
 import { inferExpenseCategory } from "../shared/expenseClassifier";
+import { looksLikeGoalIntent, looksLikeReminderIntent } from "../shared/intentRouter";
 
 function parseAmount(text: string): number | null {
   return parseMonetaryAmountFromNaturalLanguage(text);
 }
 
 function parseType(text: string): "income" | "expense" | "unknown" {
+  if (looksLikeGoalIntent(text) || looksLikeReminderIntent(text)) return "unknown";
+
   const normalized = text.toLowerCase();
   const incomeKeywords = ["recebi", "ganhei", "entrada", "faturamento", "caiu", "freela", "pix recebido"];
   const expenseKeywords = ["gastei", "paguei", "saida", "despesa", "comprei", "pix enviado", "boleto"];

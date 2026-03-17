@@ -1,6 +1,7 @@
 import type { ParsedWhatsAppIntent } from "./types";
 import { parseMonetaryAmountFromNaturalLanguage } from "./amountParser";
 import { inferExpenseCategory } from "../shared/expenseClassifier";
+import { looksLikeGoalIntent, looksLikeReminderIntent } from "../shared/intentRouter";
 
 const removeAccents = (value: string) =>
   value
@@ -74,6 +75,8 @@ export function extractTransactionDateFromText(text: string) {
 }
 
 export function detectIntentType(text: string): "income" | "expense" | null {
+  if (looksLikeGoalIntent(text) || looksLikeReminderIntent(text)) return null;
+
   const normalized = normalizeText(text);
   if (INCOME_KEYWORDS.some((keyword) => normalized.includes(keyword))) return "income";
   if (EXPENSE_KEYWORDS.some((keyword) => normalized.includes(keyword))) return "expense";

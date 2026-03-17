@@ -289,6 +289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     id: row?.id,
     role: row?.role === "assistant" ? "assistant" : "user",
     content: row?.message ?? row?.content,
+    payload: row?.metadata ?? row?.payload ?? null,
     createdAt: row?.created_at || row?.createdAt || new Date().toISOString(),
   });
 
@@ -2287,6 +2288,7 @@ type AiInterpretationResult =
           userMessage: result.userMessage,
           assistantMessage: result.assistantMessage,
           actions: result.actions,
+          payload: result.payload ?? null,
         },
       });
     } catch (error) {

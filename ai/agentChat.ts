@@ -20,6 +20,7 @@ import { fetchChatHistory, saveChatHistoryMessage, type ChatHistoryRow } from ".
 import { buildFinancialAssistantReply, looksLikeFinanceAssistantQuestion } from "../server/modules/shared/financialAssistant";
 import { storage } from "../server/storage";
 import { AssistantOrchestrator } from "../server/modules/shared/assistantOrchestrator";
+import { resolveModelForText } from "../server/modules/shared/modelRouter";
 
 export interface ChatRequest {
   content: string;
@@ -30,7 +31,7 @@ export interface ChatRequest {
 
 export interface ChatResponse {
   userMessage: { id: string; role: string; content: string; createdAt: string };
-  assistantMessage: { id: string; role: string; content: string; createdAt: string };
+  assistantMessage: { id: string; role: string; content: string; createdAt: string; payload?: Record<string, unknown> | null };
   actions: AgentActionResult[];
   payload?: Record<string, unknown>;
 }
@@ -56,6 +57,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
 
   const recentContext = getRecentContext(userId, 6);
   const assistantOrchestrator = new AssistantOrchestrator(storage);
+  const modelSelection = resolveModelForText(content);
 
   const userMessageRow = await saveChatHistoryMessage(userId, "user", content);
   addConversationContext(userId, "user", content);
@@ -66,7 +68,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     channel: "internal_chat",
   });
   if (orchestrated.handled && orchestrated.reply) {
-    const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", orchestrated.reply);
+    const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", orchestrated.reply, orchestrated.payload ?? null);
     addConversationContext(userId, "assistant", orchestrated.reply);
     return {
       userMessage: mapHistoryToResponse(userMessageRow),
@@ -78,12 +80,14 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
 
   if (looksLikeFinanceAssistantQuestion(content)) {
     const assistantReply = await buildFinancialAssistantReply(storage, userId, content, "internal_chat");
-    const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", assistantReply);
+    const fallbackPayload = { model: modelSelection };
+    const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", assistantReply, fallbackPayload);
     addConversationContext(userId, "assistant", assistantReply);
     return {
       userMessage: mapHistoryToResponse(userMessageRow),
       assistantMessage: mapHistoryToResponse(assistantMessageRow),
       actions: [],
+      payload: fallbackPayload,
     };
   }
 
@@ -108,6 +112,9 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
       userMessage: mapHistoryToResponse(userMessageRow),
       assistantMessage: mapHistoryToResponse(assistantQuestion),
       actions: [],
+      payload: {
+        model: modelSelection,
+      },
     };
   }
 
@@ -125,7 +132,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
       Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: OPENAI_MODEL,
+      model: modelSelection.model || OPENAI_MODEL,
       temperature: 0.7,
       response_format: { type: "json_object" },
       messages: [
@@ -182,7 +189,8 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
   }
 
   // 8. SALVAR RESPOSTA DO ASSISTENTE
-  const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", assistantReply);
+  const llmPayload = { model: modelSelection };
+  const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", assistantReply, llmPayload);
 
   // 9. ATUALIZAR MEMÓRIA DE SESSÃO
   addConversationContext(userId, "assistant", assistantReply);
@@ -191,6 +199,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     userMessage: mapHistoryToResponse(userMessageRow),
     assistantMessage: mapHistoryToResponse(assistantMessageRow),
     actions: actionResults,
+    payload: llmPayload,
   };
 }
 
@@ -206,6 +215,7 @@ function mapHistoryToResponse(row: ChatHistoryRow) {
     id: row.id,
     role: row.role,
     content: row.message,
+    payload: row.metadata ?? null,
     createdAt: row.createdAt,
   };
 }

@@ -34,6 +34,17 @@ export type FinancialSummaryPayload = {
     category: string;
     amount: number;
   } | null;
+  largestExpense: {
+    description: string;
+    category: string;
+    amount: number;
+    date: string;
+  } | null;
+  dailyExpenses: Array<{
+    date: string;
+    label: string;
+    amount: number;
+  }>;
   increaseExplanation: string | null;
   limits: Array<{
     category: string;
@@ -165,6 +176,30 @@ function buildCategoryBreakdown(transactions: Transaction[]) {
     .sort((left, right) => right.amount - left.amount);
 }
 
+function buildDailyExpenseSeries(transactions: Transaction[], start: Date, end: Date) {
+  const totals = new Map<string, number>();
+  const cursor = new Date(start);
+
+  while (cursor < end) {
+    const key = cursor.toISOString().slice(0, 10);
+    totals.set(key, 0);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  for (const transaction of transactions) {
+    if (transaction.type !== "saida") continue;
+    const key = new Date(transaction.date).toISOString().slice(0, 10);
+    if (!totals.has(key)) continue;
+    totals.set(key, (totals.get(key) || 0) + Number(transaction.amount || 0));
+  }
+
+  return Array.from(totals.entries()).map(([date, amount]) => ({
+    date,
+    label: new Date(date).toLocaleDateString("pt-BR", { weekday: "short" }),
+    amount: Number(amount.toFixed(2)),
+  }));
+}
+
 function explainExpenseIncrease(
   currentCategories: ReturnType<typeof buildCategoryBreakdown>,
   previousCategories: ReturnType<typeof buildCategoryBreakdown>,
@@ -219,6 +254,9 @@ export async function buildFinancialSummaryPayload(params: {
   const comparisonTotals = summarizeTotals(comparisonTransactions);
   const categories = buildCategoryBreakdown(currentTransactions);
   const previousCategories = buildCategoryBreakdown(comparisonTransactions);
+  const largestExpense = [...currentTransactions]
+    .filter((item) => item.type === "saida")
+    .sort((left, right) => Number(right.amount || 0) - Number(left.amount || 0))[0];
 
   return {
     period: {
@@ -235,6 +273,15 @@ export async function buildFinancialSummaryPayload(params: {
     },
     categories,
     topExpense: categories[0] ? { category: categories[0].category, amount: categories[0].amount } : null,
+    largestExpense: largestExpense
+      ? {
+          description: largestExpense.description,
+          category: largestExpense.category || "Outros",
+          amount: Number(largestExpense.amount || 0),
+          date: new Date(largestExpense.date).toISOString(),
+        }
+      : null,
+    dailyExpenses: buildDailyExpenseSeries(currentTransactions, range.start, range.end),
     increaseExplanation: explainExpenseIncrease(categories, previousCategories),
     limits: buildLimitStatuses(params.limits || [], currentTransactions),
   } satisfies FinancialSummaryPayload;
@@ -254,6 +301,10 @@ export function formatFinancialSummaryText(
 
   if (payload.topExpense) {
     lines.push(`Categoria com maior peso: ${payload.topExpense.category} (${formatCurrency(payload.topExpense.amount)})`);
+  }
+
+  if (payload.largestExpense) {
+    lines.push(`Maior gasto: ${payload.largestExpense.description} (${formatCurrency(payload.largestExpense.amount)})`);
   }
 
   if (payload.comparison.expensesDelta !== 0) {

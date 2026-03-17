@@ -6,12 +6,14 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { MessageCircle, Sparkles, Check } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { AssistantRichMessage } from "@/components/assistant-rich-message";
 
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  payload?: Record<string, unknown> | null;
   status?: "sent" | "pending" | "error";
 };
 
@@ -65,6 +67,7 @@ export default function AIClientPage() {
               id: item.id,
               role: item.role,
               content: item.content,
+              payload: item.payload ?? null,
               createdAt: item.createdAt,
             }))
           );
@@ -108,6 +111,7 @@ export default function AIClientPage() {
         role: "assistant",
         content: "Estou organizando isso para você...",
         createdAt: new Date().toISOString(),
+        payload: null,
         status: "pending",
       };
 
@@ -133,12 +137,13 @@ export default function AIClientPage() {
       const data = await response.json();
       const userMessage = data?.data?.userMessage as ChatMessage | undefined;
       const assistantMessage = data?.data?.assistantMessage as ChatMessage | undefined;
+      const assistantPayload = data?.data?.payload ?? assistantMessage?.payload ?? null;
 
       if (userMessage && assistantMessage) {
         setMessages((prev) =>
           prev.map((message) => {
             if (message.id === tempBotMessage.id) {
-              return assistantMessage;
+              return { ...assistantMessage, payload: assistantPayload };
             }
             if (message.id === tempUserMessage.id) {
               return userMessage;
@@ -290,11 +295,14 @@ export default function AIClientPage() {
                       <span className="animate-bounce inline-block h-2 w-2 rounded-full bg-muted-foreground" style={{ animationDelay: "300ms" }}></span>
                     </div>
                   ) : (
-                    <p className="whitespace-pre-line leading-relaxed">
-                      {message.role === "assistant" && message.content.includes("{")
-                        ? message.content.split("\n\n")[0] || message.content
-                        : message.content}
-                    </p>
+                    <div className="space-y-3">
+                      <p className="whitespace-pre-line leading-relaxed">
+                        {message.role === "assistant" && message.content.includes("{")
+                          ? message.content.split("\n\n")[0] || message.content
+                          : message.content}
+                      </p>
+                      {message.role === "assistant" && <AssistantRichMessage payload={message.payload} />}
+                    </div>
                   )}
                   {message.status === "error" && (
                     <button

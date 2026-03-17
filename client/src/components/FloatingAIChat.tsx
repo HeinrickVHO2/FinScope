@@ -9,12 +9,14 @@ import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { MessageSquareText, X, Sparkles, Loader2 } from "lucide-react";
+import { AssistantRichMessage } from "@/components/assistant-rich-message";
 
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  payload?: Record<string, unknown> | null;
   status?: "sent" | "pending" | "error";
 };
 
@@ -54,6 +56,7 @@ export function FloatingAIChat() {
             id: item.id,
             role: item.role,
             content: item.content,
+            payload: item.payload ?? null,
             createdAt: item.createdAt,
           }))
         );
@@ -110,6 +113,7 @@ export function FloatingAIChat() {
         role: "assistant",
         content: "Estou organizando isso para você...",
         createdAt: new Date().toISOString(),
+        payload: null,
         status: "pending",
       };
       setMessages((prev) => [...prev, tempUserMessage, tempBotMessage]);
@@ -131,12 +135,13 @@ export function FloatingAIChat() {
       const data = await response.json();
       const userMessage = data?.data?.userMessage as ChatMessage | undefined;
       const assistantMessage = data?.data?.assistantMessage as ChatMessage | undefined;
+      const assistantPayload = data?.data?.payload ?? assistantMessage?.payload ?? null;
 
       if (userMessage && assistantMessage) {
         setMessages((prev) =>
           prev.map((message) => {
             if (message.id === tempBotMessage.id) {
-              return assistantMessage;
+              return { ...assistantMessage, payload: assistantPayload };
             }
             if (message.id === tempUserMessage.id) {
               return userMessage;
@@ -246,7 +251,10 @@ export function FloatingAIChat() {
                         <span className="text-[10px] text-rose-500">erro</span>
                       )}
                     </div>
-                    <p className="whitespace-pre-line leading-relaxed">{message.content}</p>
+                    <div className="space-y-3">
+                      <p className="whitespace-pre-line leading-relaxed">{message.content}</p>
+                      {message.role === "assistant" && <AssistantRichMessage payload={message.payload} />}
+                    </div>
                   </div>
                 </div>
               ))

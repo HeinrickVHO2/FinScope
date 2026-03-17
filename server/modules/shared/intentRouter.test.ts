@@ -16,6 +16,13 @@ test("parseAssistantRouteIntent identifica meta, aporte e lembrete", () => {
     amount: 500,
   });
 
+  const naturalGoal = parseAssistantRouteIntent("Quero guardar dinheiro para comprar um Iphone no valor de 5760 reais");
+  assert.deepEqual(naturalGoal, {
+    type: "create_goal",
+    title: "Iphone",
+    targetValue: 5760,
+  });
+
   const reminder = parseAssistantRouteIntent("Boleto do carro todo dia 12, R$ 1300");
   assert.deepEqual(reminder, {
     type: "create_reminder",
@@ -36,6 +43,18 @@ test("parseAssistantRouteIntent identifica resumo, categoria dominante e limites
     type: "summary",
     periodKey: "current_week",
     focus: "top_category",
+  });
+
+  assert.deepEqual(parseAssistantRouteIntent("me mostra a divisao dos meus gastos"), {
+    type: "summary",
+    periodKey: "current_month",
+    focus: "category_breakdown",
+  });
+
+  assert.deepEqual(parseAssistantRouteIntent("por que meus gastos aumentaram?"), {
+    type: "summary",
+    periodKey: "current_month",
+    focus: "increase_reason",
   });
 
   assert.deepEqual(parseAssistantRouteIntent("como estao meus limites de gastos?"), {

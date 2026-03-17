@@ -98,6 +98,7 @@ export const aiChatHistory = pgTable("ai_chat_history", {
   userId: varchar("user_id").notNull(),
   role: text("role").notNull(),
   message: text("message").notNull(),
+  metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

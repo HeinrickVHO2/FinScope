@@ -19,4 +19,5 @@ test("helpers do parser reconhecem tipo, valor e data", () => {
   assert.equal(detectIntentType("recebi 500 do cliente"), "income");
   assert.equal(extractAmountFromText("gastei 89,90"), 89.9);
   assert.match(extractTransactionDateFromText("recebi hoje"), /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(detectIntentType("Quero guardar dinheiro para comprar um Iphone no valor de 5760 reais"), null);
 });

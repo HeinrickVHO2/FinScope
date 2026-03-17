@@ -46,3 +46,6 @@ create table if not exists category_limits (
 
 create unique index if not exists category_limits_user_category_scope_period_idx
   on category_limits(user_id, category, scope, period);
+
+alter table if exists ai_chat_history
+  add column if not exists metadata jsonb;
