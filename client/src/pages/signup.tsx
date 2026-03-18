@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import CaktoCheckoutModal from "@/components/CaktoCheckoutModal";
 import { apiFetch } from "@/lib/api";
+import { PasswordInput } from "@/components/auth/password-input";
+import { PasswordStrengthChecklist } from "@/components/auth/password-strength-checklist";
 
 export default function SignupPage() {
   const [, setLocation] = useLocation();
@@ -23,12 +25,17 @@ export default function SignupPage() {
 
   const form = useForm<InsertUser>({
     resolver: zodResolver(insertUserSchema),
+    mode: "onChange",
     defaultValues: {
       fullName: "",
       email: "",
       password: "",
     },
   });
+
+  const passwordValue = form.watch("password");
+  const emailValue = form.watch("email");
+  const fullNameValue = form.watch("fullName");
 
   async function onSubmit(data: InsertUser) {
     setIsLoading(true);
@@ -145,13 +152,16 @@ export default function SignupPage() {
                     <FormItem>
                       <FormLabel>Senha</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="password" 
-                          placeholder="Mínimo 6 caracteres" 
+                        <PasswordInput
+                          placeholder="Crie uma senha segura"
                           data-testid="input-password"
                           {...field} 
                         />
                       </FormControl>
+                      <PasswordStrengthChecklist
+                        password={passwordValue}
+                        userContext={{ email: emailValue, fullName: fullNameValue }}
+                      />
                       <FormMessage />
                     </FormItem>
                   )}

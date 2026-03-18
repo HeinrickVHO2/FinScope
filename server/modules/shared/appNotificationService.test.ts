@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildBroadcastEmailHtml, buildNotificationFeed } from "./appNotificationService";
+import { buildBroadcastEmailHtml, buildNotificationFeed, resolveAbsoluteNotificationRoute } from "./appNotificationService";
 
 test("buildNotificationFeed combina alertas operacionais e notificacoes globais", () => {
   const feed = buildNotificationFeed({
@@ -60,4 +60,9 @@ test("buildBroadcastEmailHtml inclui CTA quando rota estiver presente", () => {
   assert.match(html, /Promo especial/);
   assert.match(html, /Ver novidade/);
   assert.match(html, /https:\/\/finscope\.com\.br\/novidades/);
+});
+
+test("resolveAbsoluteNotificationRoute converte rota interna para URL absoluta", () => {
+  const url = resolveAbsoluteNotificationRoute("/dashboard", "https://app.finscope.com.br");
+  assert.equal(url, "https://app.finscope.com.br/dashboard");
 });

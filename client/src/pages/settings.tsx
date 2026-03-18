@@ -13,6 +13,9 @@ import { BillingCheckoutSection } from "@/components/BillingCheckoutSection";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { CheckoutPlanId } from "@/constants/checkout-plans";
 import { apiFetch } from "@/lib/api";
+import { PasswordInput } from "@/components/auth/password-input";
+import { PasswordStrengthChecklist } from "@/components/auth/password-strength-checklist";
+import { validatePasswordStrength } from "@shared/password-policy";
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -26,6 +29,12 @@ export default function SettingsPage() {
   const [checkoutIntent, setCheckoutIntent] = useState<"signup" | "upgrade">("signup");
   const [selectedPlanId, setSelectedPlanId] = useState<CheckoutPlanId | null>(null);
   const [confirmField, setConfirmField] = useState<"name" | "email" | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -46,6 +55,10 @@ export default function SettingsPage() {
 
   const currentPlan = user.plan;
   const displayPlan = user.billingStatus === "active" ? user.plan : "pending";
+  const passwordValidation = validatePasswordStrength(newPassword, {
+    email,
+    fullName,
+  });
 
   useEffect(() => {
     const shouldShow = displayPlan === "pending";
@@ -168,6 +181,58 @@ export default function SettingsPage() {
     }
   };
 
+  const handlePasswordUpdate = async () => {
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (!currentPassword.trim()) {
+      setPasswordError("Informe sua senha atual para continuar.");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError("As senhas não coincidem.");
+      return;
+    }
+
+    if (!passwordValidation.isValid) {
+      setPasswordError(passwordValidation.errors[0] || "Sua nova senha ainda não atende aos critérios mínimos.");
+      return;
+    }
+
+    try {
+      setIsUpdatingPassword(true);
+      const response = await apiFetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+          confirmPassword: confirmNewPassword,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Não foi possível atualizar sua senha agora.");
+      }
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setPasswordSuccess("Senha atualizada com sucesso.");
+      toast({
+        title: "Senha atualizada",
+        description: "Sua nova senha já está valendo para os próximos acessos.",
+      });
+    } catch (error) {
+      setPasswordError((error as Error).message || "Não foi possível atualizar sua senha agora.");
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -269,6 +334,68 @@ export default function SettingsPage() {
               )}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-security">
+        <CardHeader>
+          <CardTitle className="font-poppins">Segurança</CardTitle>
+          <CardDescription>Atualize sua senha com uma combinação mais forte e difícil de adivinhar</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="currentPassword">Senha atual</Label>
+            <PasswordInput
+              id="currentPassword"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              disabled={isUpdatingPassword}
+              placeholder="Digite sua senha atual"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="newPassword">Nova senha</Label>
+            <PasswordInput
+              id="newPassword"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              disabled={isUpdatingPassword}
+              placeholder="Crie uma nova senha"
+            />
+          </div>
+
+          <PasswordStrengthChecklist
+            password={newPassword}
+            userContext={{ email, fullName }}
+          />
+
+          <div className="space-y-2">
+            <Label htmlFor="confirmNewPassword">Confirmar nova senha</Label>
+            <PasswordInput
+              id="confirmNewPassword"
+              value={confirmNewPassword}
+              onChange={(event) => setConfirmNewPassword(event.target.value)}
+              disabled={isUpdatingPassword}
+              placeholder="Repita a nova senha"
+            />
+          </div>
+
+          {passwordError && (
+            <p className="text-sm font-medium text-destructive">{passwordError}</p>
+          )}
+
+          {passwordSuccess && (
+            <p className="text-sm font-medium text-emerald-600">{passwordSuccess}</p>
+          )}
+
+          <Button
+            onClick={handlePasswordUpdate}
+            disabled={isUpdatingPassword}
+            className="w-full sm:w-auto"
+          >
+            {isUpdatingPassword ? "Atualizando senha..." : "Atualizar senha"}
+          </Button>
         </CardContent>
       </Card>
 

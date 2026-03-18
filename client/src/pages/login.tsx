@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
+import { PasswordInput } from "@/components/auth/password-input";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -126,8 +127,7 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel>Senha</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="password" 
+                        <PasswordInput
                           placeholder="••••••••" 
                           data-testid="input-password"
                           {...field} 

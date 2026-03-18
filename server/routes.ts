@@ -27,6 +27,9 @@ import { buildBroadcastEmailHtml, buildNotificationFeed } from "./modules/shared
 import { 
   insertUserSchema, 
   loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
   insertAccountSchema,
   updateAccountSchema,
   insertTransactionSchema,
@@ -56,6 +59,10 @@ import { sanitizeUserInput, generateSafeRejectionMessage } from "../ai/sanitizeI
 import { buildConversationalPrompt } from "../ai/conversationalPrompt";
 import { processAgentChat } from "../ai/agentChat";
 import { saveChatHistoryMessage } from "../ai/chatHistory";
+import {
+  buildPasswordUserContext,
+  getPrimaryPasswordSubmissionError,
+} from "./auth/password-validation";
 
 
 // Extend Express session type
@@ -71,6 +78,10 @@ declare global {
       currentUser?: User;
     }
   }
+}
+
+function getFirstZodErrorMessage(error: z.ZodError) {
+  return error.errors[0]?.message || "Dados inválidos";
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -237,11 +248,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const getBroadcastAuthToken = () =>
     process.env.BROADCAST_ADMIN_TOKEN || process.env.FINSCOPE_ADMIN_TOKEN || "";
 
-  const isBroadcastAuthorized = (req: any) => {
+  const ensureBroadcastAuthorized = (req: any, res: any) => {
     const expected = getBroadcastAuthToken();
-    if (!expected) return false;
+    if (!expected) {
+      res.status(503).json({ error: "BROADCAST_ADMIN_TOKEN nao configurado no servidor" });
+      return false;
+    }
     const provided = req.headers["x-broadcast-token"] || req.headers["x-admin-token"] || req.body?.token;
-    return String(provided || "") === expected;
+    if (String(provided || "") !== expected) {
+      res.status(403).json({ error: "Nao autorizado. Envie o header x-broadcast-token com o token correto." });
+      return false;
+    }
+    return true;
   };
 
   const fetchBroadcastNotifications = async () => {
@@ -295,7 +313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       route: notification.route,
       ctaLabel: notification.cta_label,
       kind: notification.kind,
-    });
+    }, process.env.APP_URL || null);
 
     let sent = 0;
     for (const recipient of recipients) {
@@ -1712,54 +1730,43 @@ type AiInterpretationResult =
 
   // ===== AUTH ROUTES =====
 
-    app.post("/api/auth/forgot-password", async (req, res) => {
-    const { email } = req.body;
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = forgotPasswordSchema.parse(req.body);
+      const user = await storage.getUserByEmail(email);
 
-    if (!email) {
-      return res.status(400).json({ error: "Email é obrigatório" });
-    }
+      if (!user) {
+        return res.json({ success: true });
+      }
 
-    const user = await storage.getUserByEmail(email);
+      const token = randomUUID();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    // Não revelar caso o email não exista
-    if (!user) {
-      console.log("[FORGOT] Email não encontrado, retornando sucesso genérico");
+      await supabase.from("password_reset_tokens").insert({
+        user_id: user.id,
+        token,
+        expires_at: expiresAt.toISOString(),
+      });
+
+      const resetLink = `${process.env.APP_URL}/reset-password?token=${token}`;
+      await sendResetEmail(email, resetLink);
+
       return res.json({ success: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: getFirstZodErrorMessage(error) });
+      }
+      return res.status(500).json({ error: "Não foi possível iniciar a recuperação de senha." });
     }
-
-    const token = randomUUID();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-
-    console.log("[FORGOT] Gerando token de reset:", {
-      userId: user.id,
-      token,
-      expiresAt: expiresAt.toISOString(),
-    });
-
-    await supabase.from("password_reset_tokens").insert({
-      user_id: user.id,
-      token,
-      expires_at: expiresAt.toISOString(),
-    });
-
-    const resetLink = `${process.env.APP_URL}/reset-password?token=${token}`;
-    console.log("[FORGOT] Link de reset gerado:", resetLink);
-
-    await sendResetEmail(email, resetLink);
-
-    return res.json({ success: true });
   });
 
 
   app.get("/api/auth/reset-password/validate", async (req, res) => {
     const token = req.query.token?.toString();
 
-    console.log("[RESET VALIDATE] Query recebida:", req.query);
-    console.log("[RESET VALIDATE] Token recebido:", token);
 
     if (!token) {
-      console.log("[RESET VALIDATE] Nenhum token informado");
-      return res.status(400).json({ error: "Token inválido" });
+      return res.status(400).json({ error: "Token inválido." });
     }
 
     const { data: tokenData, error } = await supabase
@@ -1768,93 +1775,124 @@ type AiInterpretationResult =
       .eq("token", token)
       .maybeSingle();
 
-    console.log("[RESET VALIDATE] Resultado Supabase:", {
-      tokenData,
-      error,
-    });
-
     if (error) {
-      console.error("[RESET VALIDATE] Erro Supabase:", error);
-      return res.status(500).json({ error: "Erro ao validar token" });
+      console.error("[RESET VALIDATE] erro ao consultar token:", error);
+      return res.status(500).json({ error: "Erro ao validar token." });
     }
 
     if (!tokenData) {
-      console.log("[RESET VALIDATE] Nenhum registro encontrado para o token");
-      return res.status(400).json({ error: "Token inválido ou expirado" });
+      return res.status(400).json({ error: "Token inválido ou expirado." });
     }
 
     const now = new Date();
     const expires = new Date(tokenData.expires_at);
 
-    console.log("[RESET VALIDATE] Datas:", {
-      agora: now.toISOString(),
-      expiraEm: expires.toISOString(),
-    });
-
     if (expires < now) {
-      console.log("[RESET VALIDATE] Token expirado");
-      return res.status(400).json({ error: "Token inválido ou expirado" });
+      return res.status(400).json({ error: "Token inválido ou expirado." });
     }
 
-    return res.json({ valid: true });
+    const user = await storage.getUser(tokenData.user_id);
+    if (!user) {
+      return res.status(404).json({ error: "Usuário não encontrado." });
+    }
+
+    return res.json({
+      valid: true,
+      passwordContext: buildPasswordUserContext(user),
+    });
   });
 
 
   app.post("/api/auth/reset-password", async (req, res) => {
-  console.log("[RESET POST] Body recebido:", req.body);
+    try {
+      const { token, password, confirmPassword } = resetPasswordSchema.parse(req.body);
 
-  const { token, password, confirmPassword } = req.body;
+      const { data: tokenData, error: tokenError } = await supabase
+        .from("password_reset_tokens")
+        .select("*")
+        .eq("token", token)
+        .maybeSingle();
 
-  if (!token || !password || !confirmPassword) {
-    console.log("[RESET POST] Campo faltando");
-    return res.status(400).json({ error: "Dados inválidos" });
-  }
+      if (!tokenData || tokenError || new Date() > new Date(tokenData.expires_at)) {
+        return res.status(400).json({ error: "Token inválido ou expirado." });
+      }
 
-  if (password !== confirmPassword) {
-    console.log("[RESET POST] As senhas não coincidem!");
-    return res.status(400).json({ error: "As senhas não coincidem" });
-  }
+      const user = await storage.getUser(tokenData.user_id);
+      if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado." });
+      }
 
-  // Verifica token no Supabase
-  const { data: tokenData, error: tokenError } = await supabase
-    .from("password_reset_tokens")
-    .select("*")
-    .eq("token", token)
-    .maybeSingle();
+      const isReusingCurrentPassword = await bcrypt.compare(password, user.password);
+      const passwordError = getPrimaryPasswordSubmissionError({
+        password,
+        confirmPassword,
+        userContext: buildPasswordUserContext(user),
+        disallowCurrentPasswordReuse: isReusingCurrentPassword,
+      });
 
-  console.log("[RESET POST] Token no banco:", tokenData);
+      if (passwordError) {
+        return res.status(400).json({ error: passwordError });
+      }
 
-  if (!tokenData || tokenError) {
-    return res.status(400).json({ error: "Token inválido" });
-  }
+      const updatedUser = await storage.updatePassword(user.id, password);
+      if (!updatedUser) {
+        return res.status(500).json({ error: "Não foi possível atualizar sua senha agora." });
+      }
 
-  const agora = new Date();
-  const expiraEm = new Date(tokenData.expires_at);
+      await supabase
+        .from("password_reset_tokens")
+        .delete()
+        .eq("token", token);
 
-  if (agora > expiraEm) {
-    return res.status(400).json({ error: "Token expirado" });
-  }
+      return res.json({ success: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: getFirstZodErrorMessage(error) });
+      }
+      return res.status(500).json({ error: "Erro ao redefinir senha." });
+    }
+  });
 
-  // Hash da nova senha
-  const hashed = await bcrypt.hash(password, 10);
 
-  // Atualiza o usuário
-  await supabase
-    .from("users")
-    .update({ password: hashed })
-    .eq("id", tokenData.user_id);
+  app.post("/api/auth/change-password", requireAuth, async (req: any, res) => {
+    try {
+      const { currentPassword, newPassword, confirmPassword } = changePasswordSchema.parse(req.body);
+      const currentUser = await storage.getUser(req.session.userId);
 
-  // Remove o token
-  await supabase
-    .from("password_reset_tokens")
-    .delete()
-    .eq("token", token);
+      if (!currentUser) {
+        return res.status(404).json({ error: "Usuário não encontrado." });
+      }
 
-  console.log("[RESET POST] Senha atualizada com sucesso!");
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, currentUser.password);
+      if (!isCurrentPasswordValid) {
+        return res.status(400).json({ error: "A senha atual informada está incorreta." });
+      }
 
-  res.json({ success: true });
-});
+      const isReusingCurrentPassword = await bcrypt.compare(newPassword, currentUser.password);
+      const passwordError = getPrimaryPasswordSubmissionError({
+        password: newPassword,
+        confirmPassword,
+        userContext: buildPasswordUserContext(currentUser),
+        disallowCurrentPasswordReuse: isReusingCurrentPassword,
+      });
 
+      if (passwordError) {
+        return res.status(400).json({ error: passwordError });
+      }
+
+      const updatedUser = await storage.updatePassword(currentUser.id, newPassword);
+      if (!updatedUser) {
+        return res.status(500).json({ error: "Não foi possível atualizar sua senha agora." });
+      }
+
+      return res.json({ success: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: getFirstZodErrorMessage(error) });
+      }
+      return res.status(500).json({ error: "Erro ao atualizar senha." });
+    }
+  });
 
   // Register
   app.post("/api/auth/register", async (req, res) => {
@@ -1892,7 +1930,7 @@ type AiInterpretationResult =
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+        return res.status(400).json({ error: getFirstZodErrorMessage(error) });
       }
       res.status(400).json({ error: (error as Error).message });
     }
@@ -1932,7 +1970,7 @@ type AiInterpretationResult =
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: "Dados inválidos" });
+        return res.status(400).json({ error: getFirstZodErrorMessage(error) });
       }
       res.status(500).json({ error: "Erro interno" });
     }
@@ -2310,8 +2348,8 @@ type AiInterpretationResult =
   });
 
   app.get("/api/admin/broadcast-notifications", async (req: any, res) => {
-    if (!isBroadcastAuthorized(req)) {
-      return res.status(403).json({ error: "Nao autorizado" });
+    if (!ensureBroadcastAuthorized(req, res)) {
+      return;
     }
 
     try {
@@ -2333,8 +2371,8 @@ type AiInterpretationResult =
   });
 
   app.post("/api/admin/broadcast-notifications", async (req: any, res) => {
-    if (!isBroadcastAuthorized(req)) {
-      return res.status(403).json({ error: "Nao autorizado" });
+    if (!ensureBroadcastAuthorized(req, res)) {
+      return;
     }
 
     try {

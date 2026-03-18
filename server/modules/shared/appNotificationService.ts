@@ -132,16 +132,32 @@ export function buildNotificationFeed({
   };
 }
 
-export function buildBroadcastEmailHtml(notification: Pick<AppNotification, "title" | "message" | "route" | "ctaLabel" | "kind">) {
+export function resolveAbsoluteNotificationRoute(route?: string | null, appUrl?: string | null) {
+  if (!route) return undefined;
+  if (/^https?:\/\//i.test(route)) return route;
+  if (!appUrl) return undefined;
+
+  try {
+    return new URL(route.startsWith("/") ? route : `/${route}`, appUrl).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+export function buildBroadcastEmailHtml(
+  notification: Pick<AppNotification, "title" | "message" | "route" | "ctaLabel" | "kind">,
+  appUrl?: string | null,
+) {
   const accent = notification.kind === "global_promotion"
     ? "#ea580c"
     : notification.kind === "global_alert"
       ? "#dc2626"
       : "#2563eb";
-  const cta = notification.route
+  const absoluteRoute = resolveAbsoluteNotificationRoute(notification.route, appUrl);
+  const cta = absoluteRoute
     ? `
       <div style="margin-top:24px;">
-        <a href="${notification.route}" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:600;">
+        <a href="${absoluteRoute}" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:600;">
           ${notification.ctaLabel || "Abrir no FinScope"}
         </a>
       </div>

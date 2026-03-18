@@ -3,6 +3,7 @@ import { pgTable, text, varchar, timestamp, decimal, boolean, integer, jsonb } f
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { uuid, numeric } from "drizzle-orm/pg-core";
+import { validatePasswordStrength } from "./password-policy";
 
 // Users table with plan and trial information
 export const users = pgTable("users", {
@@ -163,9 +164,9 @@ export const investmentTransactions = pgTable("investment_transactions", {
 });
 
 // Insert schemas with validation
-export const insertUserSchema = createInsertSchema(users, {
+const baseInsertUserSchema = createInsertSchema(users, {
   email: z.string().email("Email inválido"),
-  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
+  password: z.string(),
   fullName: z.string().min(2, "Nome deve ter no mínimo 2 caracteres"),
 }).omit({
   id: true,
@@ -175,6 +176,21 @@ export const insertUserSchema = createInsertSchema(users, {
   caktoSubscriptionId: true,
   billingStatus: true,
   createdAt: true,
+});
+
+export const insertUserSchema = baseInsertUserSchema.superRefine((data, ctx) => {
+  const passwordValidation = validatePasswordStrength(data.password, {
+    email: data.email,
+    fullName: data.fullName,
+  });
+
+  passwordValidation.errors.forEach((message) => {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["password"],
+      message,
+    });
+  });
 });
 
 export const insertAccountSchema = createInsertSchema(accounts, {
@@ -425,6 +441,38 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Senha é obrigatória"),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Informe um e-mail válido."),
+}).strict();
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Token inválido."),
+  password: z.string().min(1, "Informe a nova senha."),
+  confirmPassword: z.string().min(1, "Confirme a nova senha."),
+}).strict().superRefine((data, ctx) => {
+  if (data.password !== data.confirmPassword) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "As senhas não coincidem.",
+    });
+  }
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Informe sua senha atual."),
+  newPassword: z.string().min(1, "Informe a nova senha."),
+  confirmPassword: z.string().min(1, "Confirme a nova senha."),
+}).strict().superRefine((data, ctx) => {
+  if (data.newPassword !== data.confirmPassword) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "As senhas não coincidem.",
+    });
+  }
+});
+
 // User profile update schema
 export const updateUserProfileSchema = z.object({
   fullName: z.string().min(2, "Nome deve ter no mínimo 2 caracteres").optional(),
@@ -434,6 +482,9 @@ export const updateUserProfileSchema = z.object({
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
+export type ChangePasswordData = z.infer<typeof changePasswordSchema>;
 
 export type InsertAccount = z.infer<typeof insertAccountSchema> & {userId: string;};
 export type UpdateAccount = z.infer<typeof updateAccountSchema>;

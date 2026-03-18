@@ -184,6 +184,32 @@ export class SupabaseStorage implements IStorage {
     };
   }
 
+  async updatePassword(userId: string, password: string): Promise<User | undefined> {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const { data, error } = await supabase
+      .from("users")
+      .update({ password: hashedPassword })
+      .eq("id", userId)
+      .select()
+      .single();
+
+    if (error || !data) return undefined;
+
+    return {
+      id: data.id,
+      email: data.email,
+      password: data.password,
+      fullName: data.full_name,
+      plan: data.plan,
+      trialStart: data.trial_start ? new Date(data.trial_start) : null,
+      trialEnd: data.trial_end ? new Date(data.trial_end) : null,
+      caktoSubscriptionId: data.cakto_subscription_id || null,
+      billingStatus: data.billing_status || "pending",
+      createdAt: new Date(data.created_at),
+    };
+  }
+
   async updateUser(id: string, updates: Partial<Omit<User, 'id' | 'password' | 'createdAt'>>): Promise<User | undefined> {
     const updateData: any = {};
     if (updates.email !== undefined) updateData.email = updates.email;

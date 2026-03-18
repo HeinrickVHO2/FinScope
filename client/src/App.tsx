@@ -44,7 +44,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useRequireAuth();
   const [location, setLocation] = useLocation();
   const currentPath = location.split("?")[0];
-  const allowedBillingPaths = ["/billing-required", "/settings/billing", "/whatsapp-agent"];
+  const allowedBillingPaths = ["/billing-required", "/settings", "/settings/billing", "/whatsapp-agent"];
 
   useEffect(() => {
     if (

@@ -61,6 +61,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updatePassword(userId: string, password: string): Promise<User | undefined>;
   updateUser(id: string, updates: Partial<Omit<User, 'id' | 'password' | 'createdAt'>>): Promise<User | undefined>;
   verifyPassword(email: string, password: string): Promise<User | undefined>;
 
@@ -229,6 +230,16 @@ export class MemStorage {
 
     this.users.set(id, user);
     return user;
+  }
+
+  async updatePassword(userId: string, password: string): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const updatedUser = { ...user, password: hashedPassword };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
   }
 
   async updateUser(id: string, updates: Partial<Omit<User, 'id' | 'password' | 'createdAt'>>): Promise<User | undefined> {
