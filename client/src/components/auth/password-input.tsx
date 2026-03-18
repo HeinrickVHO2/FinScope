@@ -1,7 +1,6 @@
 import { forwardRef, useState, type ComponentProps } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type PasswordInputProps = Omit<ComponentProps<typeof Input>, "type"> & {
@@ -20,16 +19,14 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           className={cn("pr-12", className)}
           {...props}
         />
-        <Button
+        <button
           type="button"
-          variant="ghost"
-          size="icon"
-          className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
+          className="absolute inset-y-0 right-0 flex items-center justify-center px-3 text-muted-foreground transition-colors hover:text-foreground"
           onClick={() => setIsVisible((current) => !current)}
           aria-label={isVisible ? "Ocultar senha" : "Mostrar senha"}
         >
           {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </Button>
+        </button>
       </div>
     );
   },
