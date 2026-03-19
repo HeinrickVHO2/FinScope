@@ -686,6 +686,10 @@ function formatBulletList(items: string[]) {
   return items.map((item) => `• ${item}`).join("\n");
 }
 
+function formatSection(title: string, items: string[]) {
+  return [title, ...items.map((item) => `• ${item}`)].join("\n");
+}
+
 export function formatStructuredFinancialSummary(summary: StructuredFinancialSummary, channel: AssistantChannel) {
   const topCategory = summary.topCategories[0] || null;
   const mainTip = summary.tips[0] || "Continue acompanhando as categorias com maior peso.";
@@ -700,12 +704,11 @@ export function formatStructuredFinancialSummary(summary: StructuredFinancialSum
   const lines = [
     `${channel === "whatsapp" ? "📊" : "✨"} Resumo financeiro de ${summary.periodLabel}${scopeLabel(summary.scope)}`,
     "",
-    "💰 Visao geral",
-    ...formatBulletList([
+    formatSection("💰 Visão geral", [
       `Entradas: ${formatCurrency(summary.totalEntries)}`,
-      `Saidas: ${formatCurrency(summary.totalExits)}`,
+      `Saídas: ${formatCurrency(summary.totalExits)}`,
       `Saldo: ${formatCurrency(summary.balance)}`,
-    ]).split("\n"),
+    ]),
   ];
 
   if (topCategory || summary.largestExpense) {
@@ -719,7 +722,7 @@ export function formatStructuredFinancialSummary(summary: StructuredFinancialSum
   }
 
   lines.push("");
-  lines.push("📈 Comparacao");
+  lines.push("📈 Comparação");
   lines.push(`• Despesas ${describeDelta(summary.comparison.expensesDelta, "subiram", "cairam")}`);
   lines.push(`• Saldo ${describeDelta(summary.comparison.netDelta, "melhorou", "piorou")}`);
 
@@ -729,7 +732,7 @@ export function formatStructuredFinancialSummary(summary: StructuredFinancialSum
 
   if (channel !== "whatsapp") {
     lines.push("");
-    lines.push("🔁 Recorrencias");
+    lines.push("🔁 Recorrências");
     lines.push(...formatBulletList(recurringItems.slice(0, 3)).split("\n"));
   }
 
@@ -739,7 +742,7 @@ export function formatStructuredFinancialSummary(summary: StructuredFinancialSum
   }
 
   lines.push("");
-  lines.push("💡 Proximo passo");
+  lines.push("💡 Próximo passo");
   lines.push(`• ${mainTip}`);
 
   if (summary.savingsSuggestion > 0) {
@@ -762,8 +765,8 @@ export async function buildFinancialAssistantResponse(
   const intent = classifyAssistantIntent(text);
   if (!intent) {
     const message = channel === "whatsapp"
-      ? "👋 Posso te ajudar com:\n• resumo do mes\n• gastos por categoria\n• controle de gastos\n• reserva sugerida\n• duvidas simples sobre reserva, CDB e poupanca"
-      : "👋 Posso te ajudar com:\n• resumo financeiro\n• gastos por categoria\n• pontos de exagero\n• sugestao de reserva\n• orientacoes praticas para organizar melhor o caixa";
+      ? "👋 Posso te ajudar com:\n• resumo do mês\n• gastos por categoria\n• controle de gastos\n• reserva sugerida\n• dúvidas simples sobre reserva, CDB e poupança"
+      : "👋 Posso te ajudar com:\n• resumo financeiro\n• gastos por categoria\n• pontos de exagero\n• sugestão de reserva\n• orientações práticas para organizar melhor o caixa";
     return { message };
   }
 
@@ -774,8 +777,8 @@ export async function buildFinancialAssistantResponse(
   if (intent.type === "help") {
     return {
       message: channel === "whatsapp"
-        ? "🤖 Posso fazer isso por voce:\n• registrar gastos e recebimentos\n• resumir seu mes\n• mostrar categorias com mais peso\n• sugerir ajustes com base nos seus dados"
-        : "🤖 Posso te ajudar com:\n• registrar movimentacoes\n• resumir o mes com dados reais\n• mostrar recorrencias e categorias pesadas\n• sugerir ajustes e reserva de forma pratica",
+        ? "🤖 Posso fazer isso por você:\n• registrar gastos e recebimentos\n• resumir seu mês\n• mostrar categorias com mais peso\n• sugerir ajustes com base nos seus dados"
+        : "🤖 Posso te ajudar com:\n• registrar movimentações\n• resumir o mês com dados reais\n• mostrar recorrências e categorias pesadas\n• sugerir ajustes e reserva de forma prática",
     };
   }
 
@@ -786,8 +789,8 @@ export async function buildFinancialAssistantResponse(
 
   if (!summary.transactionCount) {
     const message = channel === "whatsapp"
-      ? `📭 Ainda nao encontrei movimentacoes suficientes${scopeLabel(intent.scope)} neste mes.\n\nMe mande alguns gastos ou entradas e eu monto um resumo mais util.`
-      : `📭 Ainda nao encontrei movimentacoes suficientes${scopeLabel(intent.scope)} neste mes.\n\nAssim que voce registrar mais lancamentos, eu consigo montar uma analise mais confiavel.`;
+      ? `📭 Ainda não encontrei movimentações suficientes${scopeLabel(intent.scope)} neste mês.\n\nMe mande alguns gastos ou entradas e eu monto um resumo mais útil.`
+      : `📭 Ainda não encontrei movimentações suficientes${scopeLabel(intent.scope)} neste mês.\n\nAssim que você registrar mais lançamentos, eu consigo montar uma análise mais confiável.`;
     return buildAssistantPayload({
       intent: "assistant.no_data",
       action: "show_empty_financial_state",
@@ -809,8 +812,8 @@ export async function buildFinancialAssistantResponse(
 
   if (intent.type === "cash_flow") {
     const message = channel === "whatsapp"
-      ? `💸 Fluxo do periodo${scopeLabel(intent.scope)}\n\n• Entradas: ${formatCurrency(summary.totalEntries)}\n• Saidas: ${formatCurrency(summary.totalExits)}\n• Saldo parcial: ${formatCurrency(summary.balance)}`
-      : `💸 Fluxo do periodo${scopeLabel(intent.scope)}\n\n• Entradas: ${formatCurrency(summary.totalEntries)}\n• Saidas: ${formatCurrency(summary.totalExits)}\n• Saldo parcial: ${formatCurrency(summary.balance)}`;
+      ? `💸 Fluxo do período${scopeLabel(intent.scope)}\n\n• Entradas: ${formatCurrency(summary.totalEntries)}\n• Saídas: ${formatCurrency(summary.totalExits)}\n• Saldo parcial: ${formatCurrency(summary.balance)}`
+      : `💸 Fluxo do período${scopeLabel(intent.scope)}\n\n• Entradas: ${formatCurrency(summary.totalEntries)}\n• Saídas: ${formatCurrency(summary.totalExits)}\n• Saldo parcial: ${formatCurrency(summary.balance)}`;
     return buildAssistantPayload({
       intent: "assistant.cash_flow",
       action: "show_cash_flow",
@@ -823,7 +826,7 @@ export async function buildFinancialAssistantResponse(
   if (intent.type === "net_balance") {
     const message = channel === "whatsapp"
       ? `💰 Saldo atual${scopeLabel(intent.scope)}\n\n• Saldo parcial: ${formatCurrency(summary.balance)}`
-      : `💰 Saldo atual${scopeLabel(intent.scope)}\n\n• Saldo parcial: ${formatCurrency(summary.balance)}\n• Vs. mes anterior: ${summary.comparison.netDelta >= 0 ? "melhorou" : "piorou"} ${formatCurrency(Math.abs(summary.comparison.netDelta))}`;
+      : `💰 Saldo atual${scopeLabel(intent.scope)}\n\n• Saldo parcial: ${formatCurrency(summary.balance)}\n• Vs. mês anterior: ${summary.comparison.netDelta >= 0 ? "melhorou" : "piorou"} ${formatCurrency(Math.abs(summary.comparison.netDelta))}`;
     return buildAssistantPayload({
       intent: "assistant.net_balance",
       action: "show_net_balance",
@@ -844,10 +847,10 @@ export async function buildFinancialAssistantResponse(
     const matchedTotal = matchedTransactions.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
     const message = matchedTotal <= 0
-      ? `📂 Ainda nao encontrei gastos de ${intent.categoryLabel.toLowerCase()}${scopeLabel(intent.scope)} neste mes.`
+      ? `📂 Ainda não encontrei gastos de ${intent.categoryLabel.toLowerCase()}${scopeLabel(intent.scope)} neste mês.`
       : channel === "whatsapp"
-        ? `📂 Gastos com ${intent.categoryLabel.toLowerCase()}${scopeLabel(intent.scope)}\n\n• Total no mes: ${formatCurrency(matchedTotal)}`
-        : `📂 Gastos com ${intent.categoryLabel.toLowerCase()}${scopeLabel(intent.scope)}\n\n• Total no mes: ${formatCurrency(matchedTotal)}\n• Participacao nas saidas: ${summary.totalExits > 0 ? Math.round((matchedTotal / summary.totalExits) * 100) : 0}%`;
+        ? `📂 Gastos com ${intent.categoryLabel.toLowerCase()}${scopeLabel(intent.scope)}\n\n• Total no mês: ${formatCurrency(matchedTotal)}`
+        : `📂 Gastos com ${intent.categoryLabel.toLowerCase()}${scopeLabel(intent.scope)}\n\n• Total no mês: ${formatCurrency(matchedTotal)}\n• Participação nas saídas: ${summary.totalExits > 0 ? Math.round((matchedTotal / summary.totalExits) * 100) : 0}%`;
 
     return buildAssistantPayload({
       intent: "assistant.category_total",
@@ -868,7 +871,7 @@ export async function buildFinancialAssistantResponse(
       ? channel === "whatsapp"
         ? `🧾 Categorias com maior peso${scopeLabel(intent.scope)}\n\n${rankedItems.map((item) => `• ${item}`).join("\n")}`
         : `🧾 Categorias com maior peso${scopeLabel(intent.scope)}\n\n${ranked}`
-      : `📭 Ainda nao encontrei saidas suficientes${scopeLabel(intent.scope)} neste mes para destacar categorias.`;
+      : `📭 Ainda não encontrei saídas suficientes${scopeLabel(intent.scope)} neste mês para destacar categorias.`;
 
     return buildAssistantPayload({
       intent: "assistant.top_categories",
@@ -884,7 +887,7 @@ export async function buildFinancialAssistantResponse(
       ? channel === "whatsapp"
         ? `🔁 Recorrencias com mais peso${scopeLabel(intent.scope)}\n\n${summary.recurringExpenses.map((item) => `• ${item.label} (${formatCurrency(item.amount)})`).join("\n")}`
         : `🔁 Gastos recorrentes com mais peso${scopeLabel(intent.scope)}\n\n${summary.recurringExpenses.map((item) => `• ${item.label} (${formatCurrency(item.amount)})`).join("\n")}`
-      : `📭 Ainda nao identifiquei gastos recorrentes relevantes${scopeLabel(intent.scope)} neste periodo.`;
+      : `📭 Ainda não identifiquei gastos recorrentes relevantes${scopeLabel(intent.scope)} neste período.`;
 
     return buildAssistantPayload({
       intent: "assistant.recurring_spending",
@@ -897,16 +900,16 @@ export async function buildFinancialAssistantResponse(
 
   if (intent.type === "spending_health") {
     const message = summary.totalEntries <= 0 && summary.totalExits > 0
-      ? `⚠️ So encontrei saidas${scopeLabel(intent.scope)} neste mes.\n\nVale revisar se faltam entradas registradas antes de concluir que voce esta exagerando.`
+      ? `⚠️ Só encontrei saídas${scopeLabel(intent.scope)} neste mês.\n\nVale revisar se faltam entradas registradas antes de concluir que você está exagerando.`
       : summary.totalEntries > 0 && (summary.totalExits / summary.totalEntries) >= 0.9
         ? topCategory
-          ? `⚠️ Voce esta perto do limite${scopeLabel(intent.scope)}.\n\n• As saidas ja consomem ${Math.round((summary.totalExits / summary.totalEntries) * 100)}% das entradas\n• Maior pressao: ${topCategory.category}`
-          : `⚠️ Voce esta perto do limite${scopeLabel(intent.scope)}.\n\n• As saidas ja consomem cerca de ${Math.round((summary.totalExits / summary.totalEntries) * 100)}% das entradas`
+          ? `⚠️ Você está perto do limite${scopeLabel(intent.scope)}.\n\n• As saídas já consomem ${Math.round((summary.totalExits / summary.totalEntries) * 100)}% das entradas\n• Maior pressão: ${topCategory.category}`
+          : `⚠️ Você está perto do limite${scopeLabel(intent.scope)}.\n\n• As saídas já consomem cerca de ${Math.round((summary.totalExits / summary.totalEntries) * 100)}% das entradas`
         : summary.totalEntries > 0 && (summary.totalExits / summary.totalEntries) >= 0.7
           ? topCategory
-            ? `✅ Seu mes esta relativamente equilibrado${scopeLabel(intent.scope)}.\n\n• Ponto de atencao: ${topCategory.category}`
-            : `✅ Seu mes esta relativamente equilibrado${scopeLabel(intent.scope)}.\n\nVale observar as categorias variaveis para nao apertar o fechamento.`
-          : `✅ Seu ritmo de gastos esta controlado${scopeLabel(intent.scope)} neste mes.`;
+            ? `✅ Seu mês está relativamente equilibrado${scopeLabel(intent.scope)}.\n\n• Ponto de atenção: ${topCategory.category}`
+            : `✅ Seu mês está relativamente equilibrado${scopeLabel(intent.scope)}.\n\nVale observar as categorias variáveis para não apertar o fechamento.`
+          : `✅ Seu ritmo de gastos está controlado${scopeLabel(intent.scope)} neste mês.`;
 
     return buildAssistantPayload({
       intent: "assistant.spending_health",
@@ -920,11 +923,11 @@ export async function buildFinancialAssistantResponse(
   if (intent.type === "savings_capacity") {
     const message = summary.savingsSuggestion <= 0
       ? channel === "whatsapp"
-        ? `🛟 Reserva sugerida${scopeLabel(intent.scope)}\n\n• Agora eu nao separaria uma reserva nova\n• Primeiro vale recuperar folga no caixa`
-        : `🛟 Reserva sugerida${scopeLabel(intent.scope)}\n\n• Agora eu nao recomendaria separar uma reserva nova\n• Primeiro vale ajustar as categorias mais pesadas e recuperar folga no caixa`
+        ? `🛟 Reserva sugerida${scopeLabel(intent.scope)}\n\n• Agora eu não separaria uma reserva nova\n• Primeiro vale recuperar folga no caixa`
+        : `🛟 Reserva sugerida${scopeLabel(intent.scope)}\n\n• Agora eu não recomendaria separar uma reserva nova\n• Primeiro vale ajustar as categorias mais pesadas e recuperar folga no caixa`
       : channel === "whatsapp"
-        ? `🛟 Reserva sugerida${scopeLabel(intent.scope)}\n\n• Voce pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mes`
-        : `🛟 Reserva sugerida${scopeLabel(intent.scope)}\n\n• Voce pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mes\n• Eu faria isso depois de proteger recorrencias e compromissos pendentes`;
+        ? `🛟 Reserva sugerida${scopeLabel(intent.scope)}\n\n• Você pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mês`
+        : `🛟 Reserva sugerida${scopeLabel(intent.scope)}\n\n• Você pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mês\n• Eu faria isso depois de proteger recorrências e compromissos pendentes`;
 
     return buildAssistantPayload({
       intent: "assistant.savings_capacity",
@@ -945,11 +948,11 @@ export async function buildFinancialAssistantResponse(
         : `💡 Para economizar mais no dia a dia${scopeLabel(intent.scope)}\n\n• Crie um teto semanal simples\n• Revise pequenas compras antes que elas se acumulem`
       : summary.balance <= 0
         ? topCategory
-          ? `💡 Seu fluxo do mes esta apertado${scopeLabel(intent.scope)}.\n\n• Comece revisando ${topCategory.category} (${formatCurrency(topCategory.amount)})\n• Corte recorrencias pouco uteis antes de criar novas metas`
-          : `💡 Seu fluxo do mes esta apertado${scopeLabel(intent.scope)}.\n\n• Revise gastos variaveis\n• Reavalie recorrencias antes de pensar em novas metas`
+          ? `💡 Seu fluxo do mês está apertado${scopeLabel(intent.scope)}.\n\n• Comece revisando ${topCategory.category} (${formatCurrency(topCategory.amount)})\n• Corte recorrências pouco úteis antes de criar novas metas`
+          : `💡 Seu fluxo do mês está apertado${scopeLabel(intent.scope)}.\n\n• Revise gastos variáveis\n• Reavalie recorrências antes de pensar em novas metas`
         : topCategory
-          ? `💡 Para economizar mais${scopeLabel(intent.scope)}\n\n• Ataque primeiro ${topCategory.category}${recurringText}\n• Mantendo esse ajuste, voce pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mes`
-          : `💡 Para economizar mais${scopeLabel(intent.scope)}\n\n• Revise gastos variaveis\n• Crie um teto semanal simples\n• Separe uma parte do saldo para reserva`;
+          ? `💡 Para economizar mais${scopeLabel(intent.scope)}\n\n• Ataque primeiro ${topCategory.category}${recurringText}\n• Mantendo esse ajuste, você pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mês`
+          : `💡 Para economizar mais${scopeLabel(intent.scope)}\n\n• Revise gastos variáveis\n• Crie um teto semanal simples\n• Separe uma parte do saldo para reserva`;
 
     return buildAssistantPayload({
       intent: "assistant.guidance",
@@ -962,8 +965,8 @@ export async function buildFinancialAssistantResponse(
 
   return {
     message: channel === "whatsapp"
-      ? "👋 Posso te ajudar com resumo do mes, categorias com mais peso e sugestoes de economia baseadas nos seus dados."
-      : "👋 Posso te ajudar com resumo financeiro, categorias com maior peso e sugestoes praticas baseadas nas suas movimentacoes.",
+      ? "👋 Posso te ajudar com resumo do mês, categorias com mais peso e sugestões de economia baseadas nos seus dados."
+      : "👋 Posso te ajudar com resumo financeiro, categorias com maior peso e sugestões práticas baseadas nas suas movimentações.",
   };
 }
 

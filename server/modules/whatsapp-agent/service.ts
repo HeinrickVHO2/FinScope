@@ -655,7 +655,7 @@ export class WhatsAppAgentService {
           userId,
           billingStatus: user?.billingStatus ?? null,
         });
-        await this.sendReplyToInbound(inbound, "📌 Seu numero ja esta vinculado.\n\nPara usar o assistente, a assinatura precisa estar ativa.");
+        await this.sendReplyToInbound(inbound, "📌 Seu número já está vinculado.\n\nPara usar o assistente, a assinatura precisa estar ativa.");
         return { status: "blocked_inactive_subscription" };
       }
 
@@ -729,7 +729,7 @@ export class WhatsAppAgentService {
         });
         await this.sendReplyToInbound(
           inbound,
-          "👋 Oi! Posso te ajudar com:\n• gastos e recebimentos\n• notas fiscais\n• duvidas simples sobre seu financeiro\n\nSe quiser, me mande algo como:\n• paguei 50 de gasolina",
+          "👋 Oi! Posso te ajudar com:\n• gastos e recebimentos\n• notas fiscais\n• dúvidas simples sobre seu financeiro\n\nSe quiser, me mande algo como:\n• paguei 50 de gasolina",
         );
         return { status: "assistant_answered" };
       }
@@ -920,7 +920,7 @@ export class WhatsAppAgentService {
         message: "Nao foi possivel interpretar a nota fiscal com seguranca.",
         metadata: { mediaItems: mediaSummary.length, ocrSignals },
       });
-      await this.sendReplyToInbound(inbound, "🧾 Recebi sua nota, mas nao consegui interpretar tudo com seguranca.\n\nSe quiser, me mande:\n• o valor total em texto\n• ou o estabelecimento");
+      await this.sendReplyToInbound(inbound, "🧾 Recebi sua nota, mas não consegui interpretar tudo com segurança.\n\nSe quiser, me mande:\n• o valor total em texto\n• ou o estabelecimento");
       return { status: "needs_clarification" };
     }
 
@@ -1002,7 +1002,7 @@ export class WhatsAppAgentService {
     await this.sendReplyToInbound(
       inbound,
       resolution.selectedAccount
-        ? `🧾 Nota entendida\n\n• ${summary}\n• Conta sugerida: ${accountLabel(resolution.selectedAccount)}\n\nPosso lancar?`
+        ? `🧾 Nota entendida\n\n• ${summary}\n• Conta sugerida: ${accountLabel(resolution.selectedAccount)}\n\nPosso lançar?`
         : `🧾 Nota entendida\n\n• ${summary}\n\nAntes de salvar, me diga em qual conta devo lancar:\n${this.formatAccountOptions(resolution.accountOptions)}`,
     );
 
@@ -1040,7 +1040,7 @@ export class WhatsAppAgentService {
           confidence: intent.confidence,
         },
       });
-      await this.sendReplyToInbound(inbound, "⚠️ Nao consegui identificar o valor e o tipo com seguranca.\n\nMe mande algo como:\n• paguei 10 no lanche");
+      await this.sendReplyToInbound(inbound, "⚠️ Não consegui identificar o valor e o tipo com segurança.\n\nMe mande algo como:\n• paguei 10 no lanche");
       return { status: "needs_clarification" };
     }
 
@@ -1119,7 +1119,7 @@ export class WhatsAppAgentService {
       });
       await this.sendReplyToInbound(
         inbound,
-        `🤔 Entendi a ideia do lancamento:\n• ${this.describeIntent(intent)}\n\nPara eu nao errar, confirme:\n• valor\n• categoria\n• ou em qual conta foi`,
+        `🤔 Entendi a ideia do lançamento:\n\n${this.formatIntentDetails(intent)}\n\nPara eu não errar, confirme:\n• valor\n• categoria\n• ou em qual conta foi`,
       );
       return { status: "needs_clarification" };
     }
@@ -1144,7 +1144,7 @@ export class WhatsAppAgentService {
       });
       await this.sendReplyToInbound(
         inbound,
-        `🧾 Ja entendi o lancamento:\n• ${this.describeIntent(intent)}\n\nAntes de registrar, me diga em qual conta devo lancar:\n${this.formatAccountOptions(resolution.accountOptions)}`,
+        `🧾 Já entendi o lançamento:\n\n${this.formatIntentDetails(intent)}\n\nAntes de registrar, me diga em qual conta devo lançar:\n${this.formatAccountOptions(resolution.accountOptions)}`,
       );
       return { status: "awaiting_account_selection" };
     }
@@ -1158,8 +1158,8 @@ export class WhatsAppAgentService {
         finalStatus: WHATSAPP_CANDIDATE_STATUS.AUTO_CREATED_PENDING_REVIEW,
         inboundStatus: "auto_created_pending_review",
         reviewNote: "auto_created",
-        successReply: `✅ Lancamento registrado\n\n• ${this.describeIntent(intent)}\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nVoce pode revisar depois em Lancamentos do WhatsApp.`,
-        fallbackReply: `⚠️ Entendi ${this.describeIntent(intent)}, mas nao consegui registrar automaticamente agora.\n\nPosso deixar isso pendente para sua confirmacao na conta ${accountLabel(resolution.selectedAccount)}.`,
+        successReply: `✅ Lançamento registrado\n\n${this.formatIntentDetails(intent)}\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nVocê pode revisar depois em Lançamentos do WhatsApp.`,
+        fallbackReply: `⚠️ Entendi o lançamento abaixo, mas não consegui registrar automaticamente agora.\n\n${this.formatIntentDetails(intent)}\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nPosso deixar isso pendente para sua confirmação?`,
       });
       if (autoCreateResult) {
         return { status: "auto_created_pending_review" };
@@ -1197,10 +1197,10 @@ export class WhatsAppAgentService {
       },
     });
 
-    const extra = suppressed ? " Voce pediu para eu nao automatizar lancamentos parecidos, entao vou esperar sua confirmacao." : "";
+    const extra = suppressed ? "\n\nℹ️ Você pediu para eu não automatizar lançamentos parecidos, então vou esperar sua confirmação." : "";
     await this.sendReplyToInbound(
       inbound,
-      `✅ Lancamento pronto para confirmar\n\n• ${this.describeIntent(intent)}\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nPosso confirmar?${extra}`,
+      `✅ Lançamento pronto para confirmar\n\n${this.formatIntentDetails(intent)}\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nPosso confirmar?${extra}`,
     );
     return { status: "awaiting_user_confirmation" };
   }
@@ -1226,7 +1226,7 @@ export class WhatsAppAgentService {
     if (candidate.status === WHATSAPP_CANDIDATE_STATUS.AWAITING_ACCOUNT_SELECTION) {
       const selectedAccount = await this.matchAccountFromReply(user.id, text, candidate);
       if (!selectedAccount) {
-        await this.sendReplyToInbound(inbound, `🏦 Ainda nao identifiquei a conta.\n\nEscolha uma destas opcoes:\n${this.formatAccountOptionsFromEvidence(candidate)}`);
+        await this.sendReplyToInbound(inbound, `🏦 Ainda não identifiquei a conta.\n\nEscolha uma destas opções:\n${this.formatAccountOptionsFromEvidence(candidate)}`);
         return { status: "awaiting_account_selection" };
       }
 
@@ -1240,7 +1240,7 @@ export class WhatsAppAgentService {
         }),
       });
 
-      await this.sendReplyToInbound(inbound, `🏦 Conta definida\n\n• Conta: ${accountLabel(selectedAccount)}\n• Lancamento: ${this.describeCandidate(candidate)}\n\nPosso confirmar?`);
+      await this.sendReplyToInbound(inbound, `🏦 Conta definida\n\n${this.formatCandidateDetails(candidate)}\n• Conta: ${accountLabel(selectedAccount)}\n\nPosso confirmar?`);
       return { status: "awaiting_user_confirmation" };
     }
 
@@ -1252,7 +1252,7 @@ export class WhatsAppAgentService {
           userId: user.id,
           status: WHATSAPP_CANDIDATE_STATUS.IGNORED,
         });
-        await this.sendReplyToInbound(inbound, "👌 Certo. Nao vou registrar esse lancamento.");
+        await this.sendReplyToInbound(inbound, "👌 Certo. Não vou registrar esse lançamento.");
         return { status: "ignored" };
       }
 
@@ -1264,13 +1264,13 @@ export class WhatsAppAgentService {
           finalStatus: WHATSAPP_CANDIDATE_STATUS.CONFIRMED,
           inboundStatus: "confirmed_via_whatsapp",
           reviewNote: "confirmed_in_chat",
-          successReply: `✅ Confirmado\n\n• Registrei ${this.describeCandidate(candidate)}\n• Origem: WhatsApp`,
-          fallbackReply: "⚠️ Entendi a confirmacao, mas nao consegui concluir o registro agora.\n\nVou manter esse lancamento pendente para revisar sem perder o contexto.",
+          successReply: `✅ Confirmado\n\n${this.formatCandidateDetails(candidate)}\n• Origem: WhatsApp`,
+          fallbackReply: "⚠️ Entendi a confirmação, mas não consegui concluir o registro agora.\n\nVou manter esse lançamento pendente para revisar sem perder o contexto.",
         });
         return { status: confirmed ? "confirmed_via_whatsapp" : "awaiting_user_confirmation" };
       }
 
-      await this.sendReplyToInbound(inbound, "✅ Se estiver certo, responda:\n• sim\n\n❌ Se quiser cancelar, responda:\n• nao");
+      await this.sendReplyToInbound(inbound, "✅ Se estiver certo, responda:\n• sim\n\n❌ Se quiser cancelar, responda:\n• não");
       return { status: "awaiting_user_confirmation" };
     }
 
@@ -1324,8 +1324,8 @@ export class WhatsAppAgentService {
       await this.sendReplyToInbound(
         inbound,
         resolution.selectedAccount
-          ? `✅ Agora entendi melhor o lancamento\n\n• ${this.describeIntent(intent)}\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nPosso confirmar agora?`
-          : `🧾 Agora entendi melhor o lancamento\n\n• ${this.describeIntent(intent)}\n\nAgora so preciso saber em qual conta devo lancar:\n${this.formatAccountOptions(resolution.accountOptions)}`,
+          ? `✅ Agora entendi melhor o lançamento\n\n${this.formatIntentDetails(intent)}\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nPosso confirmar agora?`
+          : `🧾 Agora entendi melhor o lançamento\n\n${this.formatIntentDetails(intent)}\n\nAgora só preciso saber em qual conta devo lançar:\n${this.formatAccountOptions(resolution.accountOptions)}`,
       );
       return { status: resolution.selectedAccount ? "awaiting_user_confirmation" : "awaiting_account_selection" };
     }
@@ -1621,9 +1621,30 @@ export class WhatsAppAgentService {
     return `${action} de ${formatCurrencyBRL(amount)} em ${categoryFromIntent(kind, intent.categorySuggestion, (intent as any).description)}`;
   }
 
+  private formatIntentDetails(intent: { kind: "income" | "expense" | "unknown"; amount: number | null; categorySuggestion?: string }) {
+    const amount = intent.amount === null ? 0 : intent.amount;
+    const kind = intent.kind === "income" ? "income" : "expense";
+    const typeLabel = intent.kind === "income" ? "Entrada" : "Gasto";
+    const category = categoryFromIntent(kind, intent.categorySuggestion, (intent as any).description);
+    return [
+      `• Tipo: ${typeLabel}`,
+      `• Valor: ${formatCurrencyBRL(amount)}`,
+      `• Categoria: ${category}`,
+    ].join("\n");
+  }
+
   private describeCandidate(candidate: CandidateRecord) {
     const action = candidate.proposed_type === "income" ? "uma entrada" : "um gasto";
     return `${action} de ${formatCurrencyBRL(Number(candidate.amount))}`;
+  }
+
+  private formatCandidateDetails(candidate: CandidateRecord) {
+    const typeLabel = candidate.proposed_type === "income" ? "Entrada" : "Gasto";
+    return [
+      `• Tipo: ${typeLabel}`,
+      `• Valor: ${formatCurrencyBRL(Number(candidate.amount))}`,
+      `• Categoria: ${candidate.category_suggestion || "Outros"}`,
+    ].join("\n");
   }
 
   private formatAccountOptions(accounts: Account[]) {
@@ -1820,7 +1841,7 @@ export class WhatsAppAgentService {
 
     if (!user || user.billingStatus !== "active") {
       this.clearPendingBinding(pending.userId, pending.code);
-      await this.sendReplyToInbound(inbound, "📌 Seu numero foi identificado, mas a assinatura precisa estar ativa para concluir o vinculo.");
+      await this.sendReplyToInbound(inbound, "📌 Seu número foi identificado, mas a assinatura precisa estar ativa para concluir o vínculo.");
       return { status: "blocked_inactive_subscription" };
     }
 
@@ -1850,7 +1871,7 @@ export class WhatsAppAgentService {
       },
     });
 
-    await this.sendReplyToInbound(inbound, "✅ Numero confirmado com sucesso!\n\nAgora voce ja pode mandar:\n• gastos e recebimentos\n• notas fiscais\n• perguntas sobre seu financeiro");
+    await this.sendReplyToInbound(inbound, "✅ Número confirmado com sucesso!\n\nAgora você já pode mandar:\n• gastos e recebimentos\n• notas fiscais\n• perguntas sobre seu financeiro");
     this.clearPendingBinding(pending.userId, pending.code);
     return { status: "binding_confirmed" };
   }

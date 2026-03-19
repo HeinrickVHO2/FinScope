@@ -82,6 +82,10 @@ function signedCurrency(value: number) {
   return `${prefix}${formatCurrency(Math.abs(value))}`;
 }
 
+function section(title: string, items: string[]) {
+  return [title, ...items.map((item) => `• ${item}`)].join("\n");
+}
+
 function rangeForPeriod(key: SummaryPeriodKey, reference = new Date()): SummaryPeriodRange {
   const today = startOfDay(reference);
   const weekDay = today.getDay() || 7;
@@ -296,18 +300,18 @@ export function formatFinancialSummaryText(
   payload: FinancialSummaryPayload,
   channel: "whatsapp" | "internal_chat",
 ) {
-  const lines = [
-    `📊 *Resumo de ${payload.period.label}*`,
-    "",
-    "💰 Visao geral",
-    `• Entradas: ${formatCurrency(payload.totals.income)}`,
-    `• Saidas: ${formatCurrency(payload.totals.expenses)}`,
-    `• Saldo: ${formatCurrency(payload.totals.balance)}`,
-  ];
+  const lines = [`📊 Resumo de ${payload.period.label}`];
+
+  lines.push("");
+  lines.push(section("💰 Visão geral", [
+    `Entradas: ${formatCurrency(payload.totals.income)}`,
+    `Saídas: ${formatCurrency(payload.totals.expenses)}`,
+    `Saldo: ${formatCurrency(payload.totals.balance)}`,
+  ]));
 
   if (payload.comparison.expensesDelta !== 0 || payload.comparison.balanceDelta !== 0) {
     lines.push("");
-    lines.push("📈 Comparacao");
+    lines.push("📈 Comparação");
     if (payload.comparison.expensesDelta !== 0) {
       lines.push(`• Despesas: ${signedCurrency(payload.comparison.expensesDelta)}`);
     }
