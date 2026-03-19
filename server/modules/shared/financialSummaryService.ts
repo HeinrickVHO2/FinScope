@@ -77,6 +77,11 @@ function formatCurrency(value: number) {
   return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function signedCurrency(value: number) {
+  const prefix = value > 0 ? "+" : value < 0 ? "-" : "";
+  return `${prefix}${formatCurrency(Math.abs(value))}`;
+}
+
 function rangeForPeriod(key: SummaryPeriodKey, reference = new Date()): SummaryPeriodRange {
   const today = startOfDay(reference);
   const weekDay = today.getDay() || 7;
@@ -292,42 +297,57 @@ export function formatFinancialSummaryText(
   channel: "whatsapp" | "internal_chat",
 ) {
   const lines = [
-    `Resumo de ${payload.period.label}`,
-    `Neste periodo, entraram ${formatCurrency(payload.totals.income)} e sairam ${formatCurrency(payload.totals.expenses)}.`,
-    `Entradas: ${formatCurrency(payload.totals.income)}`,
-    `Saidas: ${formatCurrency(payload.totals.expenses)}`,
-    `Saldo: ${formatCurrency(payload.totals.balance)}`,
+    `📊 *Resumo de ${payload.period.label}*`,
+    "",
+    "💰 Visao geral",
+    `• Entradas: ${formatCurrency(payload.totals.income)}`,
+    `• Saidas: ${formatCurrency(payload.totals.expenses)}`,
+    `• Saldo: ${formatCurrency(payload.totals.balance)}`,
   ];
 
-  if (payload.topExpense) {
-    lines.push(`Categoria com maior peso: ${payload.topExpense.category} (${formatCurrency(payload.topExpense.amount)})`);
+  if (payload.comparison.expensesDelta !== 0 || payload.comparison.balanceDelta !== 0) {
+    lines.push("");
+    lines.push("📈 Comparacao");
+    if (payload.comparison.expensesDelta !== 0) {
+      lines.push(`• Despesas: ${signedCurrency(payload.comparison.expensesDelta)}`);
+    }
+    if (payload.comparison.balanceDelta !== 0) {
+      lines.push(`• Saldo: ${signedCurrency(payload.comparison.balanceDelta)}`);
+    }
   }
 
-  if (payload.largestExpense) {
-    lines.push(`Maior gasto: ${payload.largestExpense.description} (${formatCurrency(payload.largestExpense.amount)})`);
+  if (payload.topExpense || payload.largestExpense) {
+    lines.push("");
+    lines.push("🔎 Destaques");
+    if (payload.topExpense) {
+      lines.push(`• Categoria com maior peso: ${payload.topExpense.category} (${formatCurrency(payload.topExpense.amount)})`);
+    }
+    if (payload.largestExpense) {
+      lines.push(`• Maior gasto: ${payload.largestExpense.description} (${formatCurrency(payload.largestExpense.amount)})`);
+    }
   }
 
-  if (payload.comparison.expensesDelta !== 0) {
-    const direction = payload.comparison.expensesDelta > 0 ? "subiram" : "cairam";
-    lines.push(`Em relacao ao periodo anterior, suas despesas ${direction} ${formatCurrency(Math.abs(payload.comparison.expensesDelta))}.`);
+  if (payload.increaseExplanation) {
+    lines.push("");
+    lines.push(`⚠️ ${payload.increaseExplanation}`);
   }
-
-  if (payload.increaseExplanation) lines.push(payload.increaseExplanation);
 
   if (payload.limits.length) {
     const critical = payload.limits
       .filter((item) => item.status !== "ok")
       .sort((left, right) => right.utilization - left.utilization)[0];
     if (critical) {
-      lines.push(`Limite em destaque: ${critical.category} em ${Math.round(critical.utilization * 100)}% (${formatCurrency(critical.spent)} de ${formatCurrency(critical.limit)}).`);
+      lines.push("");
+      lines.push("🚦 Limite em destaque");
+      lines.push(`• ${critical.category}: ${Math.round(critical.utilization * 100)}% usado (${formatCurrency(critical.spent)} de ${formatCurrency(critical.limit)})`);
     }
   }
 
-  if (channel === "internal_chat" && payload.categories.length) {
+  if (payload.categories.length) {
     lines.push("");
-    lines.push("Categorias:");
-    for (const category of payload.categories.slice(0, 5)) {
-      lines.push(`- ${category.category}: ${formatCurrency(category.amount)} (${Math.round(category.share * 100)}%)`);
+    lines.push(channel === "whatsapp" ? "🧾 Categorias" : "🧾 Top categorias");
+    for (const category of payload.categories.slice(0, channel === "whatsapp" ? 3 : 5)) {
+      lines.push(`• ${category.category}: ${formatCurrency(category.amount)} (${Math.round(category.share * 100)}%)`);
     }
   }
 

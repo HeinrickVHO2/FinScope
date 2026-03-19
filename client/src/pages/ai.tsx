@@ -296,7 +296,7 @@ export default function AIClientPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <p className="whitespace-pre-line leading-relaxed">
+                      <p className="whitespace-pre-wrap break-words leading-relaxed">
                         {message.role === "assistant" && message.content.includes("{")
                           ? message.content.split("\n\n")[0] || message.content
                           : message.content}

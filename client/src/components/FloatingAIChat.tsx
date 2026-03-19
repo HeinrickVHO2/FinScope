@@ -252,7 +252,7 @@ export function FloatingAIChat() {
                       )}
                     </div>
                     <div className="space-y-3">
-                      <p className="whitespace-pre-line leading-relaxed">{message.content}</p>
+                      <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
                       {message.role === "assistant" && <AssistantRichMessage payload={message.payload} />}
                     </div>
                   </div>

@@ -33,6 +33,10 @@ function formatCurrency(value: number) {
   return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function bulletLines(items: string[]) {
+  return items.map((item) => `• ${item}`).join("\n");
+}
+
 function toNumber(value: string | number | null | undefined) {
   return Number(Number(value || 0).toFixed(2));
 }
@@ -267,7 +271,10 @@ export class AssistantOrchestrator {
         return buildResponse({
           intent: "summary.top_category",
           action: "explain_top_category",
-          message: `No periodo de ${payload.period.label}, ${payload.topExpense.category} foi onde voce mais gastou: ${formatCurrency(payload.topExpense.amount)}.`,
+          message: `🧾 Categoria dominante em ${payload.period.label}\n\n${bulletLines([
+            `${payload.topExpense.category} liderou seus gastos`,
+            `Total: ${formatCurrency(payload.topExpense.amount)}`,
+          ])}`,
           data: payload as unknown as Record<string, unknown>,
           uiPayload: buildSummaryUiPayload(payload, intent.focus),
           model: modelSelection,
@@ -284,8 +291,10 @@ export class AssistantOrchestrator {
           intent: "summary.category_breakdown",
           action: "show_category_breakdown",
           message: ranked
-            ? `Segue a divisao dos seus gastos por categoria. As maiores fatias agora sao: ${ranked}.`
-            : "Ainda nao encontrei gastos suficientes no periodo para montar a divisao por categoria.",
+            ? `📊 Divisao dos seus gastos por categoria\n\n${bulletLines([
+              `Principais fatias agora: ${ranked}`,
+            ])}`
+            : "📭 Ainda nao encontrei gastos suficientes no periodo para montar a divisao por categoria.",
           data: payload as unknown as Record<string, unknown>,
           uiPayload: buildSummaryUiPayload(payload, intent.focus),
           model: modelSelection,
@@ -297,8 +306,12 @@ export class AssistantOrchestrator {
           intent: "summary.largest_expense",
           action: "show_largest_expense",
           message: payload.largestExpense
-            ? `Seu maior gasto no periodo foi ${payload.largestExpense.description}, em ${payload.largestExpense.category}, totalizando ${formatCurrency(payload.largestExpense.amount)}.`
-            : "Ainda nao encontrei um maior gasto no periodo porque nao ha saidas suficientes registradas.",
+            ? `💥 Maior gasto do periodo\n\n${bulletLines([
+              `${payload.largestExpense.description}`,
+              `Categoria: ${payload.largestExpense.category}`,
+              `Valor: ${formatCurrency(payload.largestExpense.amount)}`,
+            ])}`
+            : "📭 Ainda nao encontrei um maior gasto no periodo porque nao ha saidas suficientes registradas.",
           data: payload as unknown as Record<string, unknown>,
           uiPayload: buildSummaryUiPayload(payload, intent.focus),
           model: modelSelection,
@@ -359,7 +372,7 @@ export class AssistantOrchestrator {
         return buildResponse({
           intent: "guidance.financial",
           action: "show_financial_guidance",
-          message: [weeklyMessage, ...followUps].join(" "),
+          message: `💡 Plano rapido para o dia a dia\n\n${bulletLines([weeklyMessage, ...followUps])}`,
           data: { summary },
           uiPayload: buildGuidanceUiPayload(summary),
           model: modelSelection,
@@ -388,7 +401,7 @@ export class AssistantOrchestrator {
       return buildResponse({
         intent: "guidance.financial",
         action: "show_financial_guidance",
-        message: messageParts.join(" "),
+        message: `💡 Ajustes recomendados agora\n\n${bulletLines(messageParts)}`,
         data: { summary },
         uiPayload: buildGuidanceUiPayload(summary),
         model: modelSelection,
@@ -405,7 +418,7 @@ export class AssistantOrchestrator {
         return buildResponse({
           intent: "limits.status",
           action: "show_limits_empty_state",
-          message: "Voce ainda nao definiu limites por categoria. Se quiser, posso criar algo como 'crie um limite para Transporte de 500'.",
+          message: "🚦 Voce ainda nao definiu limites por categoria.\n\nSe quiser, posso criar algo como:\n• crie um limite para Transporte de 500",
           data: { limits: [] },
           uiPayload: {
             type: "limits_overview",
@@ -427,7 +440,7 @@ export class AssistantOrchestrator {
       return buildResponse({
         intent: "limits.status",
         action: "show_limits_status",
-        message: lines.join("\n"),
+        message: `🚦 Seus limites ativos\n\n${lines.slice(1).map((line) => line.replace(/^- /, "• ")).join("\n")}`,
         data: { limits: statuses },
         uiPayload: {
           type: "limits_overview",
@@ -456,7 +469,10 @@ export class AssistantOrchestrator {
       return buildResponse({
         intent: "limits.upsert",
         action: "save_limit",
-        message: `Limite salvo para ${limit.category}: ${formatCurrency(toNumber(limit.amount))} por mes.`,
+        message: `✅ Limite salvo\n\n${bulletLines([
+          `Categoria: ${limit.category}`,
+          `Valor mensal: ${formatCurrency(toNumber(limit.amount))}`,
+        ])}`,
         data: { limit },
         uiPayload: {
           type: "limit_saved",
@@ -473,7 +489,7 @@ export class AssistantOrchestrator {
         return buildResponse({
           intent: "investments.summary",
           action: "show_investments_empty_state",
-          message: "Voce ainda nao tem investimentos cadastrados. Se quiser, posso te levar para a visao de investimentos.",
+          message: "📭 Voce ainda nao tem investimentos cadastrados.\n\nSe quiser, posso te levar para a visao de investimentos.",
           data: {
             route: "/investments",
             view: "investments",
@@ -498,7 +514,10 @@ export class AssistantOrchestrator {
       return buildResponse({
         intent: "investments.summary",
         action: "show_investments_summary",
-        message: `Hoje voce tem ${formatCurrency(summary.totalInvested)} investidos. Maiores posicoes: ${highlights}.`,
+        message: `📈 Panorama dos investimentos\n\n${bulletLines([
+          `Total investido: ${formatCurrency(summary.totalInvested)}`,
+          `Maiores posicoes: ${highlights}`,
+        ])}`,
         data: {
           route: "/investments",
           view: "investments",
@@ -525,7 +544,7 @@ export class AssistantOrchestrator {
       return buildResponse({
         intent: "navigation.switch_financial_view",
         action: "navigate_financial_view",
-        message: `Certo. A visao mais adequada para isso e ${label}.`,
+        message: `🧭 Melhor caminho agora\n\n• A visao mais adequada para isso e ${label}.`,
         data: {
           route,
           view: intent.view,
@@ -566,7 +585,12 @@ export class AssistantOrchestrator {
       return buildResponse({
         intent: "goals.create",
         action: "create_goal",
-        message: `Meta criada: ${goal.title} com objetivo de ${formatCurrency(toNumber(goal.targetValue))}.${initialContributionMessage} Progresso atual: ${Math.round(progress * 100)}% (${formatCurrency(toNumber(goal.currentValue))} de ${formatCurrency(toNumber(goal.targetValue))}).`,
+        message: `🎯 Meta criada com sucesso\n\n${bulletLines([
+          `${goal.title}`,
+          `Objetivo: ${formatCurrency(toNumber(goal.targetValue))}`,
+          `${initialContributionMessage.trim() || `Valor atual: ${formatCurrency(toNumber(goal.currentValue))}`}`,
+          `Progresso: ${Math.round(progress * 100)}%`,
+        ])}`,
         data: { goal, contribution: goalResult?.contribution ?? null, route: "/goals", view: "goals" },
         uiPayload: buildGoalProgressUiPayload(goal),
         model: modelSelection,
@@ -579,7 +603,7 @@ export class AssistantOrchestrator {
         return buildResponse({
           intent: "goals.contribution",
           action: "reject_goal_contribution_without_goal",
-          message: "Nao encontrei uma meta ativa para receber esse aporte. Primeiro crie uma meta, por exemplo: 'crie uma meta para iPhone 16, preciso de 5399'.",
+          message: "📭 Nao encontrei uma meta ativa para receber esse aporte.\n\nExemplo:\n• crie uma meta para iPhone 16, preciso de 5399",
           data: { route: "/goals", view: "goals" },
           uiPayload: {
             type: "navigation",
@@ -603,7 +627,12 @@ export class AssistantOrchestrator {
       return buildResponse({
         intent: "goals.contribution",
         action: "add_goal_contribution",
-        message: `Aporte registrado em ${result.goal.title}: ${formatCurrency(intent.amount)}. Progresso atual: ${Math.round(progress * 100)}% (${formatCurrency(toNumber(result.goal.currentValue))} de ${formatCurrency(toNumber(result.goal.targetValue))}).`,
+        message: `💸 Aporte registrado\n\n${bulletLines([
+          `Meta: ${result.goal.title}`,
+          `Aporte: ${formatCurrency(intent.amount)}`,
+          `Progresso: ${Math.round(progress * 100)}%`,
+          `${formatCurrency(toNumber(result.goal.currentValue))} de ${formatCurrency(toNumber(result.goal.targetValue))}`,
+        ])}`,
         data: { ...result, route: "/goals", view: "goals" },
         uiPayload: buildGoalProgressUiPayload(result.goal),
         model: modelSelection,
@@ -616,7 +645,7 @@ export class AssistantOrchestrator {
         return buildResponse({
           intent: intent.type === "list_goals" ? "goals.list" : "goals.progress",
           action: "show_goals_empty_state",
-          message: "Voce ainda nao tem metas cadastradas.",
+          message: "📭 Voce ainda nao tem metas cadastradas.",
           data: { goals: [], route: "/goals", view: "goals" },
           uiPayload: {
             type: "goals_list",
@@ -639,7 +668,7 @@ export class AssistantOrchestrator {
       return buildResponse({
         intent: intent.type === "list_goals" ? "goals.list" : "goals.progress",
         action: "show_goals",
-        message: lines.join("\n"),
+        message: `🎯 Suas metas\n\n${lines.slice(1).map((line) => line.replace(/^- /, "• ")).join("\n")}`,
         data: { goals, route: "/goals", view: "goals" },
         uiPayload: buildGoalsListUiPayload(goals),
         model: modelSelection,
@@ -662,7 +691,11 @@ export class AssistantOrchestrator {
       return buildResponse({
         intent: "payables.create",
         action: "create_payable",
-        message: `Conta a pagar criada: ${expense.title} com vencimento em ${expense.dueDate.toLocaleDateString("pt-BR")} no valor de ${formatCurrency(toNumber(expense.amount))}.`,
+        message: `🧾 Conta a pagar criada\n\n${bulletLines([
+          `${expense.title}`,
+          `Vencimento: ${expense.dueDate.toLocaleDateString("pt-BR")}`,
+          `Valor: ${formatCurrency(toNumber(expense.amount))}`,
+        ])}`,
         data: { payable: expense, route: "/future-expenses" },
         uiPayload: {
           type: "reminder_created",
@@ -697,8 +730,14 @@ export class AssistantOrchestrator {
         intent: "reminders.create",
         action: "create_reminder",
         message: intent.amount > 0
-          ? `Lembrete criado para ${expense.title}: ${formatCurrency(intent.amount)} todo dia ${intent.dayOfMonth}.`
-          : `Lembrete criado para ${expense.title} todo dia ${intent.dayOfMonth}.`,
+          ? `⏰ Lembrete criado\n\n${bulletLines([
+              `${expense.title}`,
+              `${formatCurrency(intent.amount)} todo dia ${intent.dayOfMonth}`,
+            ])}`
+          : `⏰ Lembrete criado\n\n${bulletLines([
+              `${expense.title}`,
+              `Todo dia ${intent.dayOfMonth}`,
+            ])}`,
         data: { reminder: expense },
         uiPayload: {
           type: "reminder_created",
@@ -722,7 +761,7 @@ export class AssistantOrchestrator {
         return buildResponse({
           intent: "reminders.mark_paid",
           action: "show_no_recent_reminder",
-          message: "Nao encontrei nenhuma conta pendente recente para marcar como paga.",
+          message: "📭 Nao encontrei nenhuma conta pendente recente para marcar como paga.",
           data: {},
           model: modelSelection,
           confidence: 0.9,
@@ -733,7 +772,7 @@ export class AssistantOrchestrator {
       return buildResponse({
         intent: "reminders.mark_paid",
         action: "mark_reminder_paid",
-        message: updated ? `Perfeito. Marquei ${updated.title} como paga.` : "Nao consegui atualizar essa conta agora.",
+        message: updated ? `✅ Conta atualizada\n\n• ${updated.title} foi marcada como paga.` : "⚠️ Nao consegui atualizar essa conta agora.",
         data: { reminder: updated },
         uiPayload: updated
           ? {
