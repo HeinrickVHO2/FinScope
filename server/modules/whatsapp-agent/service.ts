@@ -453,7 +453,10 @@ export class WhatsAppAgentService {
     const candidate = await this.repository.getCandidateById(params.candidateId, params.userId);
     if (!candidate || !candidate.persisted_transaction_id) throw new Error("Lancamento automatico nao encontrado.");
 
-    const updated = await this.storage.updateTransaction(candidate.persisted_transaction_id, params.patch);
+    const normalizedPatch = params.patch.date
+      ? { ...params.patch, date: this.normalizeCalendarDate(params.patch.date) }
+      : params.patch;
+    const updated = await this.storage.updateTransaction(candidate.persisted_transaction_id, normalizedPatch);
     if (!updated) throw new Error("Nao foi possivel atualizar a transacao.");
 
     if (candidate.inbound_message_id) {
@@ -1656,8 +1659,19 @@ export class WhatsAppAgentService {
     return options.map((item, index) => `${index + 1}. ${item.name} ${item.type}`).join("\n");
   }
 
+  private normalizeCalendarDate(value: Date | string) {
+    const source = value instanceof Date ? value.toISOString() : String(value);
+    const match = source.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0, 0));
+    }
+
+    const parsed = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  }
+
   private parseInvoiceDate(value: string) {
-    return parseInvoiceCalendarDate(value) ?? new Date();
+    return parseInvoiceCalendarDate(value) ?? this.normalizeCalendarDate(value);
   }
 
   private pickInvoiceCategory(invoice: ReturnType<typeof parseInvoiceText>) {

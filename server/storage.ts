@@ -53,8 +53,21 @@ const startOfToday = () => {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 };
 
+const normalizeCalendarDate = (value: Date | string | null | undefined) => {
+  if (!value) return new Date();
+
+  const source = value instanceof Date ? value.toISOString() : String(value);
+  const match = source.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0, 0));
+  }
+
+  const parsed = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
 const isFutureExpenseOverdue = (expense: Pick<FutureExpense, "status" | "dueDate">) =>
-  expense.status === "pending" && new Date(expense.dueDate).getTime() < startOfToday().getTime();
+  expense.status === "pending" && normalizeCalendarDate(expense.dueDate).getTime() < startOfToday().getTime();
 
 export interface IStorage {
   // User operations
@@ -525,7 +538,7 @@ export class MemStorage {
     for (const [id, expense] of this.futureExpenses.entries()) {
       if (expense.userId !== userId) continue;
       if (expense.status !== "pending") continue;
-      if (new Date(expense.dueDate).getTime() >= today) continue;
+      if (normalizeCalendarDate(expense.dueDate).getTime() >= today) continue;
       this.futureExpenses.set(id, { ...expense, status: "overdue" });
     }
 
@@ -543,6 +556,7 @@ export class MemStorage {
 
   async createFutureExpense(expense: InsertFutureExpense): Promise<FutureExpense> {
     const id = randomUUID();
+    const normalizedDueDate = normalizeCalendarDate(expense.dueDate);
     const record: FutureExpense = {
       id,
       userId: expense.userId,
@@ -550,12 +564,12 @@ export class MemStorage {
       title: expense.title,
       category: expense.category,
       amount: expense.amount.toString(),
-      dueDate: expense.dueDate,
+      dueDate: normalizedDueDate,
       isRecurring: Boolean(expense.isRecurring),
       recurrenceType: expense.recurrenceType ?? null,
       status: expense.status || (isFutureExpenseOverdue({
         status: "pending",
-        dueDate: expense.dueDate,
+        dueDate: normalizedDueDate,
       }) ? "overdue" : "pending"),
       createdAt: new Date(),
     };

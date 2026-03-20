@@ -60,13 +60,18 @@ function looksLikeMerchant(line: string) {
 }
 
 function normalizeInvoiceDateToken(raw: string) {
-  const match = raw.match(/(\d{2})\/(\d{2})\/(\d{2,4})/);
-  if (!match) return null;
+  const brMatch = raw.match(/(\d{2})[\/.-](\d{2})[\/.-](\d{2,4})/);
+  if (brMatch) {
+    const day = brMatch[1];
+    const month = brMatch[2];
+    const year = brMatch[3].length === 2 ? `20${brMatch[3]}` : brMatch[3];
+    return `${day}/${month}/${year}`;
+  }
 
-  const day = match[1];
-  const month = match[2];
-  const year = match[3].length === 2 ? `20${match[3]}` : match[3];
-  return `${day}/${month}/${year}`;
+  const isoMatch = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!isoMatch) return null;
+
+  return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
 }
 
 function scoreInvoiceDateLine(line: string) {
@@ -87,7 +92,7 @@ export function extractInvoiceDate(text: string) {
   const candidates: InvoiceDateCandidate[] = [];
 
   lines.forEach((line, index) => {
-    const matches = Array.from(line.matchAll(/\b(\d{2}\/\d{2}\/\d{2,4})\b/g));
+    const matches = Array.from(line.matchAll(/\b(\d{2}[\/.-]\d{2}[\/.-]\d{2,4}|\d{4}-\d{2}-\d{2})\b/g));
     matches.forEach((match) => {
       const normalized = normalizeInvoiceDateToken(match[1]);
       if (!normalized) return;

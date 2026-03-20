@@ -37,3 +37,10 @@ test("parseInvoiceCalendarDate keeps invoice day stable when converted to ISO", 
   assert.ok(parsed);
   assert.equal(parsed?.toISOString().slice(0, 10), "2026-03-14");
 });
+
+test("parseInvoiceCalendarDate accepts ISO invoice dates without shifting the day", () => {
+  const parsed = parseInvoiceCalendarDate("2026-03-14");
+
+  assert.ok(parsed);
+  assert.equal(parsed?.toISOString().slice(0, 10), "2026-03-14");
+});

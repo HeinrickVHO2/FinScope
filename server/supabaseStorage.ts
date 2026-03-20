@@ -35,8 +35,21 @@ const startOfToday = () => {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 };
 
+const normalizeCalendarDate = (value: Date | string | null | undefined) => {
+  if (!value) return new Date();
+
+  const source = value instanceof Date ? value.toISOString() : String(value);
+  const match = source.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0, 0));
+  }
+
+  const parsed = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
 const isFutureExpenseOverdue = (expense: { status: string; dueDate: Date }) =>
-  expense.status === "pending" && expense.dueDate.getTime() < startOfToday().getTime();
+  expense.status === "pending" && normalizeCalendarDate(expense.dueDate).getTime() < startOfToday().getTime();
 
 export class SupabaseStorage implements IStorage {
   private mapFutureExpenseRow(row: any): FutureExpense {
@@ -47,7 +60,7 @@ export class SupabaseStorage implements IStorage {
       title: row.title,
       category: row.category,
       amount: row.amount?.toString() ?? "0",
-      dueDate: row.due_date ? new Date(row.due_date) : new Date(),
+      dueDate: normalizeCalendarDate(row.due_date),
       isRecurring: Boolean(row.is_recurring),
       recurrenceType: row.recurrence_type,
       status: row.status,
@@ -1067,7 +1080,7 @@ export class SupabaseStorage implements IStorage {
 
     const { data: pendingRows } = await overdueQuery;
     const overdueIds = (pendingRows || [])
-      .filter((row) => row?.due_date && new Date(row.due_date).getTime() < startOfToday().getTime())
+      .filter((row) => row?.due_date && normalizeCalendarDate(row.due_date).getTime() < startOfToday().getTime())
       .map((row) => row.id)
       .filter(Boolean);
 
@@ -1098,9 +1111,10 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createFutureExpense(expense: InsertFutureExpense): Promise<FutureExpense> {
+    const normalizedDueDate = normalizeCalendarDate(expense.dueDate);
     const normalizedStatus = expense.status || (isFutureExpenseOverdue({
       status: "pending",
-      dueDate: expense.dueDate,
+      dueDate: normalizedDueDate,
     }) ? "overdue" : "pending");
 
     const { data, error } = await supabase
@@ -1111,7 +1125,7 @@ export class SupabaseStorage implements IStorage {
         title: expense.title,
         category: expense.category,
         amount: expense.amount,
-        due_date: expense.dueDate.toISOString(),
+        due_date: normalizedDueDate.toISOString(),
         is_recurring: expense.isRecurring ?? false,
         recurrence_type: expense.recurrenceType ?? null,
         status: normalizedStatus,

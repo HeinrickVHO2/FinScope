@@ -40,6 +40,26 @@ import { CalendarClock, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 type Scope = "PF" | "PJ";
 type StatusFilter = "pending" | "paid" | "overdue";
 
+function parseDateInputValue(value: string) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0, 0));
+}
+
+function formatDateInputValue(value: Date | string | null | undefined) {
+  if (!value) return "";
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
+}
+
+function formatCalendarDatePtBr(value: Date | string | null | undefined) {
+  const iso = formatDateInputValue(value);
+  if (!iso) return "-";
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 const CATEGORY_OPTIONS = [
   "Aluguel",
   "Boletos",
@@ -125,8 +145,7 @@ export default function FutureExpensesPage() {
   });
 
   const invalidateExpenses = () => {
-    queryClient.invalidateQueries({ queryKey: ["future-expenses", scopeFilter, statusFilter] });
-    queryClient.invalidateQueries({ queryKey: ["future-expenses", scopeFilter, "all-statuses"] });
+    queryClient.invalidateQueries({ queryKey: ["future-expenses", scopeFilter] });
     queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
   };
 
@@ -320,7 +339,7 @@ export default function FutureExpensesPage() {
                       </div>
                       <p className="text-sm text-muted-foreground">
                         Vencimento:{" "}
-                        {expense.dueDate ? new Date(expense.dueDate).toLocaleDateString("pt-BR") : "-"}
+                        {formatCalendarDatePtBr(expense.dueDate)}
                       </p>
                       {expense.isRecurring && (
                         <p className="text-xs text-muted-foreground">
@@ -438,8 +457,8 @@ export default function FutureExpensesPage() {
                         <FormControl>
                           <Input
                             type="date"
-                            value={field.value ? new Date(field.value).toISOString().split("T")[0] : ""}
-                            onChange={(e) => field.onChange(new Date(e.target.value))}
+                            value={formatDateInputValue(field.value)}
+                            onChange={(e) => field.onChange(parseDateInputValue(e.target.value) ?? undefined)}
                           />
                         </FormControl>
                         <FormMessage />
