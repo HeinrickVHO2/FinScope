@@ -34,7 +34,14 @@ function formatCurrency(value: number) {
 }
 
 function bulletLines(items: string[]) {
-  return items.map((item) => `• ${item}`).join("\n");
+  return items.filter(Boolean).map((item) => `• ${item}`).join("\n\n");
+}
+
+function formatTopicBlocks(sections: Array<{ title: string; body: string | null | undefined }>) {
+  return sections
+    .filter((section) => section.body && String(section.body).trim())
+    .map((section) => `*${section.title}*\n${section.body}`)
+    .join("\n\n");
 }
 
 function toNumber(value: string | number | null | undefined) {
@@ -123,7 +130,7 @@ function buildGuidanceUiPayload(summary: Awaited<ReturnType<typeof buildStructur
     subtitle: summary.periodLabel,
     cards: [
       { label: "Entradas", value: summary.totalEntries },
-      { label: "Saidas", value: summary.totalExits },
+      { label: "Saídas", value: summary.totalExits },
       { label: "Saldo", value: summary.balance },
       { label: "Reserva sugerida", value: summary.savingsSuggestion },
     ],
@@ -143,15 +150,15 @@ function buildGuidanceUiPayload(summary: Awaited<ReturnType<typeof buildStructur
 function buildSummaryUiPayload(payload: FinancialSummaryPayload, focus: SummaryIntentFocus): AgentUiPayload {
   const cards = [
     { label: "Entradas", value: payload.totals.income },
-    { label: "Saidas", value: payload.totals.expenses },
+    { label: "Saídas", value: payload.totals.expenses },
     { label: "Saldo", value: payload.totals.balance },
-    { label: "Variacao", value: payload.comparison.expensesDelta },
+    { label: "Variação", value: payload.comparison.expensesDelta },
   ];
 
   if (focus === "category_breakdown") {
     return {
       type: "expense_breakdown",
-      title: "Divisao de gastos",
+        title: "Divisão de gastos",
       subtitle: payload.period.label,
       cards,
       chart: {
@@ -348,7 +355,7 @@ export class AssistantOrchestrator {
       const summary = await buildStructuredFinancialSummary(this.storage, params.userId, "ALL");
       const topCategory = summary.topCategories[0] || null;
       const primaryTip = summary.tips[0]
-        || "Acompanhe semanalmente as categorias com maior peso para evitar concentracao no fim do mes.";
+        || "Acompanhe semanalmente as categorias com maior peso para evitar concentração no fim do mês.";
       const supportTip = summary.tips[1] || null;
       const attentionPoint = summary.alerts[0] || summary.observations[0] || null;
       const normalizedText = params.text
@@ -358,50 +365,48 @@ export class AssistantOrchestrator {
 
       if (/durante a semana|na semana|dia a dia|cotidiano|rotina/.test(normalizedText)) {
         const weeklyMessage = topCategory
-          ? `Para economizar mais no dia a dia, comece criando um teto semanal para ${topCategory.category}, que hoje e a categoria com maior peso da sua conta. ${primaryTip}`
-          : `Para economizar mais no dia a dia, monte um teto semanal simples para gastos variaveis e revise no fim da semana o que se repetiu.`;
-
-        const followUps = [];
-        if (summary.savingsSuggestion > 0) {
-          followUps.push(`Se mantiver esse ajuste, voce consegue separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mes.`);
-        }
-        if (attentionPoint) {
-          followUps.push(`Ponto de atencao: ${attentionPoint}`);
-        }
+          ? `Comece criando um teto semanal para ${topCategory.category}, que hoje é a categoria com maior peso da sua conta.`
+          : "Monte um teto semanal simples para gastos variáveis e revise no fim da semana o que se repetiu.";
 
         return buildResponse({
           intent: "guidance.financial",
           action: "show_financial_guidance",
-          message: `💡 Plano rapido para o dia a dia\n\n${bulletLines([weeklyMessage, ...followUps])}`,
+          message: `💡 Plano rápido para o dia a dia\n\n${formatTopicBlocks([
+            { title: "Foco da semana", body: weeklyMessage },
+            { title: "Ajuste recomendado", body: primaryTip },
+            {
+              title: "Economia possível",
+              body: summary.savingsSuggestion > 0
+                ? `Se mantiver esse ajuste, você consegue separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mês.`
+                : null,
+            },
+            { title: "Ponto de atenção", body: attentionPoint },
+          ])}`,
           data: { summary },
           uiPayload: buildGuidanceUiPayload(summary),
           model: modelSelection,
         });
       }
 
-      const messageParts = [
-        topCategory
-          ? `Hoje o maior ponto de atencao da sua conta e ${topCategory.category}, com ${formatCurrency(topCategory.amount)} no periodo.`
-          : `Revise primeiro as categorias com maior peso do mes para proteger seu caixa.`,
-        primaryTip,
-      ];
-
-      if (summary.savingsSuggestion > 0) {
-        messageParts.push(`Mantendo esse ritmo, voce pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mes.`);
-      }
-
-      if (attentionPoint) {
-        messageParts.push(`Ponto de atencao: ${attentionPoint}`);
-      }
-
-      if (supportTip) {
-        messageParts.push(`Acao extra: ${supportTip}`);
-      }
+      const mainFocus = topCategory
+        ? `Hoje o maior ponto de atenção da sua conta é ${topCategory.category}, com ${formatCurrency(topCategory.amount)} no período.`
+        : "Revise primeiro as categorias com maior peso do mês para proteger seu caixa.";
 
       return buildResponse({
         intent: "guidance.financial",
         action: "show_financial_guidance",
-        message: `💡 Ajustes recomendados agora\n\n${bulletLines(messageParts)}`,
+        message: `💡 Ajustes recomendados agora\n\n${formatTopicBlocks([
+          { title: "Principal foco", body: mainFocus },
+          { title: "Ajuste recomendado", body: primaryTip },
+          {
+            title: "Economia possível",
+            body: summary.savingsSuggestion > 0
+              ? `Mantendo esse ritmo, você pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mês.`
+              : null,
+          },
+          { title: "Ponto de atenção", body: attentionPoint },
+          { title: "Próximo passo", body: supportTip },
+        ])}`,
         data: { summary },
         uiPayload: buildGuidanceUiPayload(summary),
         model: modelSelection,

@@ -227,13 +227,13 @@ export class WhatsAppAgentService {
       plan: user.plan,
       instructions: user.billingStatus === "active"
         ? [
-            "Informe seu numero.",
-            "Copie o codigo gerado.",
-            "Envie esse codigo para o WhatsApp do FinScope.",
-            "Depois disso, o assistente passa a responder e registrar lancamentos.",
+            "Informe seu número.",
+            "Copie o código gerado.",
+            "Envie esse código para o WhatsApp do FinScope.",
+            "Depois disso, o assistente passa a responder e registrar lançamentos.",
           ]
         : [
-            "Este recurso fica disponivel para assinantes ativos.",
+            "Este recurso fica disponível para assinantes ativos.",
             "Ative sua assinatura para conectar o WhatsApp e usar o assistente.",
           ],
       businessPhone,
@@ -251,11 +251,11 @@ export class WhatsAppAgentService {
   async startBinding(userId: string, phoneRaw: string) {
     await this.assertActiveSubscriber(userId);
     const phone = normalizePhone(phoneRaw);
-    if (!phone) throw new Error("Informe um numero valido com DDD.");
+    if (!phone) throw new Error("Informe um número válido com DDD.");
 
     const existingBinding = await this.repository.getBindingByPhone(phone);
     if (existingBinding && existingBinding.user_id !== userId && existingBinding.is_verified !== false) {
-      throw new Error("Esse numero ja esta conectado a outra conta.");
+      throw new Error("Esse número já está conectado a outra conta.");
     }
 
     const pending: PendingPhoneBinding = {
@@ -1158,8 +1158,8 @@ export class WhatsAppAgentService {
         finalStatus: WHATSAPP_CANDIDATE_STATUS.AUTO_CREATED_PENDING_REVIEW,
         inboundStatus: "auto_created_pending_review",
         reviewNote: "auto_created",
-        successReply: `✅ Lançamento registrado\n\n${this.formatIntentDetails(intent)}\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nVocê pode revisar depois em Lançamentos do WhatsApp.`,
-        fallbackReply: `⚠️ Entendi o lançamento abaixo, mas não consegui registrar automaticamente agora.\n\n${this.formatIntentDetails(intent)}\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nPosso deixar isso pendente para sua confirmação?`,
+        successReply: `✅ Lançamento registrado\n\n${this.formatIntentDetails(intent)}\n\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nVocê pode revisar depois em Lançamentos do WhatsApp.`,
+        fallbackReply: `⚠️ Entendi o lançamento abaixo, mas não consegui registrar automaticamente agora.\n\n${this.formatIntentDetails(intent)}\n\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nPosso deixar isso pendente para sua confirmação?`,
       });
       if (autoCreateResult) {
         return { status: "auto_created_pending_review" };
@@ -1200,7 +1200,7 @@ export class WhatsAppAgentService {
     const extra = suppressed ? "\n\nℹ️ Você pediu para eu não automatizar lançamentos parecidos, então vou esperar sua confirmação." : "";
     await this.sendReplyToInbound(
       inbound,
-      `✅ Lançamento pronto para confirmar\n\n${this.formatIntentDetails(intent)}\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nPosso confirmar?${extra}`,
+      `✅ Lançamento pronto para confirmar\n\n${this.formatIntentDetails(intent)}\n\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nPosso confirmar?${extra}`,
     );
     return { status: "awaiting_user_confirmation" };
   }
@@ -1240,7 +1240,7 @@ export class WhatsAppAgentService {
         }),
       });
 
-      await this.sendReplyToInbound(inbound, `🏦 Conta definida\n\n${this.formatCandidateDetails(candidate)}\n• Conta: ${accountLabel(selectedAccount)}\n\nPosso confirmar?`);
+      await this.sendReplyToInbound(inbound, `🏦 Conta definida\n\n${this.formatCandidateDetails(candidate)}\n\n• Conta: ${accountLabel(selectedAccount)}\n\nPosso confirmar?`);
       return { status: "awaiting_user_confirmation" };
     }
 
@@ -1324,7 +1324,7 @@ export class WhatsAppAgentService {
       await this.sendReplyToInbound(
         inbound,
         resolution.selectedAccount
-          ? `✅ Agora entendi melhor o lançamento\n\n${this.formatIntentDetails(intent)}\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nPosso confirmar agora?`
+          ? `✅ Agora entendi melhor o lançamento\n\n${this.formatIntentDetails(intent)}\n\n• Conta: ${accountLabel(resolution.selectedAccount)}\n\nPosso confirmar agora?`
           : `🧾 Agora entendi melhor o lançamento\n\n${this.formatIntentDetails(intent)}\n\nAgora só preciso saber em qual conta devo lançar:\n${this.formatAccountOptions(resolution.accountOptions)}`,
       );
       return { status: resolution.selectedAccount ? "awaiting_user_confirmation" : "awaiting_account_selection" };
@@ -1630,7 +1630,7 @@ export class WhatsAppAgentService {
       `• Tipo: ${typeLabel}`,
       `• Valor: ${formatCurrencyBRL(amount)}`,
       `• Categoria: ${category}`,
-    ].join("\n");
+    ].join("\n\n");
   }
 
   private describeCandidate(candidate: CandidateRecord) {
@@ -1644,7 +1644,7 @@ export class WhatsAppAgentService {
       `• Tipo: ${typeLabel}`,
       `• Valor: ${formatCurrencyBRL(Number(candidate.amount))}`,
       `• Categoria: ${candidate.category_suggestion || "Outros"}`,
-    ].join("\n");
+    ].join("\n\n");
   }
 
   private formatAccountOptions(accounts: Account[]) {

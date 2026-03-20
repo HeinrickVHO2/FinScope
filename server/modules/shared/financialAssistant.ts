@@ -298,7 +298,7 @@ function buildDailyExpenseSeries(transactions: Transaction[], start: Date, end: 
 function buildSummaryCards(summary: StructuredFinancialSummary) {
   return [
     { label: "Entradas", value: summary.totalEntries },
-    { label: "Saidas", value: summary.totalExits },
+    { label: "Saídas", value: summary.totalExits },
     { label: "Saldo", value: summary.balance },
     { label: "Reserva sugerida", value: summary.savingsSuggestion },
   ];
@@ -334,7 +334,7 @@ function buildMonthlySummaryUiPayload(summary: StructuredFinancialSummary, trans
   };
 }
 
-function buildBreakdownUiPayload(summary: StructuredFinancialSummary, title = "Divisao de gastos"): AssistantUiPayload {
+function buildBreakdownUiPayload(summary: StructuredFinancialSummary, title = "Divisão de gastos"): AssistantUiPayload {
   return {
     type: "expense_breakdown",
     title,
@@ -575,50 +575,50 @@ export async function buildStructuredFinancialSummary(
   const tips: string[] = [];
 
   if (!currentTransactions.length) {
-    observations.push("Ainda nao encontrei movimentacoes suficientes neste periodo para montar um diagnostico mais profundo.");
+    observations.push("Ainda não encontrei movimentações suficientes neste período para montar um diagnóstico mais profundo.");
   }
 
   if (totalEntries <= 0 && totalExits > 0) {
-    observations.push("Neste periodo so encontrei saidas. Vale conferir se faltam entradas registradas antes de tirar conclusoes definitivas.");
+    observations.push("Neste período só encontrei saídas. Vale conferir se faltam entradas registradas antes de tirar conclusões definitivas.");
   }
 
   if (totalEntries > 0 && totalExits > totalEntries) {
-    alerts.push(`Suas saidas do periodo ja ultrapassaram as entradas em ${formatCurrency(totalExits - totalEntries)}.`);
+    alerts.push(`Suas saídas do período já ultrapassaram as entradas em ${formatCurrency(totalExits - totalEntries)}.`);
   }
 
   if (dominantCategory && dominantCategory.share >= 0.45) {
-    alerts.push(`A categoria ${dominantCategory.category} concentra ${Math.round(dominantCategory.share * 100)}% das suas saidas do periodo.`);
+    alerts.push(`A categoria ${dominantCategory.category} concentra ${Math.round(dominantCategory.share * 100)}% das suas saídas do período.`);
   }
 
   if (recurringExpenses.length) {
-    observations.push(`Identifiquei recorrencias com mais peso em ${recurringExpenses[0].label} e outras despesas repetidas.`);
+    observations.push(`Identifiquei recorrências com mais peso em ${recurringExpenses[0].label} e outras despesas repetidas.`);
   }
 
   if (previousTransactions.length) {
     const expensesDelta = totalExits - previousExpenses;
     if (expensesDelta > 0) {
-      observations.push(`Suas despesas subiram ${formatCurrency(expensesDelta)} em relacao ao mes anterior.`);
+      observations.push(`Suas despesas subiram ${formatCurrency(expensesDelta)} em relação ao mês anterior.`);
     } else if (expensesDelta < 0) {
-      observations.push(`Suas despesas cairam ${formatCurrency(Math.abs(expensesDelta))} em relacao ao mes anterior.`);
+      observations.push(`Suas despesas caíram ${formatCurrency(Math.abs(expensesDelta))} em relação ao mês anterior.`);
     }
   }
 
   if (balance <= 0) {
     if (dominantCategory) {
-      tips.push(`Comece revisando ${dominantCategory.category}, que ja soma ${formatCurrency(dominantCategory.amount)} no periodo.`);
+      tips.push(`Comece revisando ${dominantCategory.category}, que já soma ${formatCurrency(dominantCategory.amount)} no período.`);
     }
-    tips.push("Reduza primeiro gastos variaveis e recorrencias pouco uteis antes de cortar itens essenciais.");
+    tips.push("Reduza primeiro gastos variáveis e recorrências pouco úteis antes de cortar itens essenciais.");
   } else {
     if (dominantCategory) {
-      tips.push(`Seu maior ponto de atencao continua sendo ${dominantCategory.category}. Um teto simples nessa categoria pode proteger seu saldo.`);
+      tips.push(`Seu maior ponto de atenção continua sendo ${dominantCategory.category}. Um teto simples nessa categoria pode proteger seu saldo.`);
     }
     if (savingsSuggestion > 0) {
-      tips.push(`Se mantiver esse ritmo, voce pode separar perto de ${formatCurrency(savingsSuggestion)} neste mes sem forcar demais o caixa.`);
+      tips.push(`Se mantiver esse ritmo, você pode separar perto de ${formatCurrency(savingsSuggestion)} neste mês sem forçar demais o caixa.`);
     }
   }
 
   if (!tips.length) {
-    tips.push("Acompanhe as categorias mais pesadas ao longo da semana para evitar concentracao no fim do mes.");
+    tips.push("Acompanhe as categorias mais pesadas ao longo da semana para evitar concentração no fim do mês.");
   }
 
   const sourceTotals = new Map<string, { count: number; amount: number }>();
@@ -696,10 +696,10 @@ export function formatStructuredFinancialSummary(summary: StructuredFinancialSum
   const mainAlert = summary.alerts[0] || summary.observations[0] || null;
   const categoryItems = summary.topCategories.length
     ? summary.topCategories.map((item) => `${item.category}: ${formatCurrency(item.amount)}`)
-    : ["Ainda nao houve saidas suficientes para destacar categorias."];
+    : ["Ainda não houve saídas suficientes para destacar categorias."];
   const recurringItems = summary.recurringExpenses.length
     ? summary.recurringExpenses.map((item) => `${item.label}: ${formatCurrency(item.amount)} (${item.frequencyLabel})`)
-    : ["Ainda nao identifiquei recorrencias relevantes neste periodo."];
+    : ["Ainda não identifiquei recorrências relevantes neste período."];
 
   const lines = [
     `${channel === "whatsapp" ? "📊" : "✨"} Resumo financeiro de ${summary.periodLabel}${scopeLabel(summary.scope)}`,
@@ -723,7 +723,7 @@ export function formatStructuredFinancialSummary(summary: StructuredFinancialSum
 
   lines.push("");
   lines.push("📈 Comparação");
-  lines.push(`• Despesas ${describeDelta(summary.comparison.expensesDelta, "subiram", "cairam")}`);
+  lines.push(`• Despesas ${describeDelta(summary.comparison.expensesDelta, "subiram", "caíram")}`);
   lines.push(`• Saldo ${describeDelta(summary.comparison.netDelta, "melhorou", "piorou")}`);
 
   lines.push("");
@@ -944,15 +944,15 @@ export async function buildFinancialAssistantResponse(
       : "";
     const message = /durante a semana|na semana|dia a dia|cotidiano|rotina/.test(normalizedText)
       ? topCategory
-        ? `💡 Para economizar mais no dia a dia${scopeLabel(intent.scope)}\n\n• Crie um teto curto para ${topCategory.category}\n• Revise pequenas compras da rotina\n• Feche a semana conferindo gastos repetidos`
-        : `💡 Para economizar mais no dia a dia${scopeLabel(intent.scope)}\n\n• Crie um teto semanal simples\n• Revise pequenas compras antes que elas se acumulem`
+        ? `💡 Para economizar mais no dia a dia${scopeLabel(intent.scope)}\n\n*Foco da semana*\nCrie um teto curto para ${topCategory.category}.\n\n*Ação prática*\nRevise pequenas compras da rotina e feche a semana conferindo gastos repetidos.`
+        : `💡 Para economizar mais no dia a dia${scopeLabel(intent.scope)}\n\n*Foco da semana*\nCrie um teto semanal simples.\n\n*Ação prática*\nRevise pequenas compras antes que elas se acumulem.`
       : summary.balance <= 0
         ? topCategory
-          ? `💡 Seu fluxo do mês está apertado${scopeLabel(intent.scope)}.\n\n• Comece revisando ${topCategory.category} (${formatCurrency(topCategory.amount)})\n• Corte recorrências pouco úteis antes de criar novas metas`
-          : `💡 Seu fluxo do mês está apertado${scopeLabel(intent.scope)}.\n\n• Revise gastos variáveis\n• Reavalie recorrências antes de pensar em novas metas`
+          ? `💡 Seu fluxo do mês está apertado${scopeLabel(intent.scope)}.\n\n*Principal foco*\nComece revisando ${topCategory.category} (${formatCurrency(topCategory.amount)}).\n\n*Próximo ajuste*\nCorte recorrências pouco úteis antes de criar novas metas.`
+          : `💡 Seu fluxo do mês está apertado${scopeLabel(intent.scope)}.\n\n*Principal foco*\nRevise gastos variáveis.\n\n*Próximo ajuste*\nReavalie recorrências antes de pensar em novas metas.`
         : topCategory
-          ? `💡 Para economizar mais${scopeLabel(intent.scope)}\n\n• Ataque primeiro ${topCategory.category}${recurringText}\n• Mantendo esse ajuste, você pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mês`
-          : `💡 Para economizar mais${scopeLabel(intent.scope)}\n\n• Revise gastos variáveis\n• Crie um teto semanal simples\n• Separe uma parte do saldo para reserva`;
+          ? `💡 Ajustes recomendados agora${scopeLabel(intent.scope)}\n\n*Principal foco*\nAtaque primeiro ${topCategory.category}${recurringText}.\n\n*Economia possível*\nMantendo esse ajuste, você pode separar perto de ${formatCurrency(summary.savingsSuggestion)} neste mês.`
+          : `💡 Ajustes recomendados agora${scopeLabel(intent.scope)}\n\n*Principal foco*\nRevise gastos variáveis.\n\n*Próximo passo*\nCrie um teto semanal simples e separe uma parte do saldo para reserva.`;
 
     return buildAssistantPayload({
       intent: "assistant.guidance",

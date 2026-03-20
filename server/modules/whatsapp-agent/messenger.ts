@@ -12,7 +12,13 @@ export class WhatsAppMessenger {
   async sendTextMessage(phone: string, text: string) {
     const config = getWhatsAppMetaConfig();
     const normalizedPhone = normalizePhone(phone).replace(/\D+/g, "");
-    const sanitizedText = String(text || "").replace(/\s+/g, " ").trim().slice(0, 1000);
+    const sanitizedText = String(text || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]{2,}/g, " ")
+      .trim()
+      .slice(0, 1000);
     const configStatus = {
       hasAccessToken: Boolean(config.accessToken),
       hasPhoneNumberId: Boolean(config.phoneNumberId),
