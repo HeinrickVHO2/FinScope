@@ -26,13 +26,6 @@ export function LockedAiReport({ onUpgrade }: LockedAiReportProps) {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6">
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 px-6 text-center backdrop-blur-sm">
-            <Lock className="mb-3 h-8 w-8 text-slate-500" />
-            <p className="text-base font-semibold text-slate-800">Prévia bloqueada</p>
-            <p className="text-sm text-muted-foreground">
-              Receba previsões, alertas e insights premium com ajuda da IA avançada.
-            </p>
-          </div>
           <div className="pointer-events-none select-none space-y-4 opacity-50">
             <div className="h-4 w-2/3 rounded-full bg-slate-200" />
             <div className="grid gap-3 md:grid-cols-3">
@@ -46,6 +39,15 @@ export function LockedAiReport({ onUpgrade }: LockedAiReportProps) {
                   <div className="h-3 w-4/5 rounded-full bg-slate-100" />
                 </div>
               ))}
+            </div>
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <div className="max-w-sm rounded-2xl border border-slate-200 bg-white/92 px-6 py-5 text-center shadow-sm backdrop-blur-sm">
+              <Lock className="mx-auto mb-3 h-8 w-8 text-slate-500" />
+              <p className="text-base font-semibold text-slate-800">Prévia bloqueada</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Receba previsões, alertas e insights premium com ajuda da IA avançada.
+              </p>
             </div>
           </div>
         </div>
