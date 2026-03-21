@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Link } from "wouter";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Bot, CalendarClock, CheckCircle2, LayoutDashboard, MessageCircleMore } from "lucide-react";
 
@@ -22,51 +21,24 @@ function Frame({ children }: { children: ReactNode }) {
   );
 }
 
-function ProductImage({
-  src,
-  alt,
-  className = "",
-}: {
-  src: string;
-  alt: string;
-  className?: string;
-}) {
-  return (
-    <Frame>
-      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Produto em contexto real</p>
-          <p className="text-sm font-medium text-slate-800">Captura da plataforma</p>
-        </div>
-        <div className="rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
-          FinScope
-        </div>
-      </div>
-      <div className="bg-slate-50">
-        <img src={src} alt={alt} className={className} />
-      </div>
-    </Frame>
-  );
-}
-
 function AiAssistantPreview() {
   return (
     <Frame>
       <div className="border-b border-slate-200 px-5 py-4">
         <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Assistente com IA</p>
-        <p className="mt-1 text-sm text-slate-600">Transforme mensagens naturais em registros e metas.</p>
+        <p className="mt-1 text-sm text-slate-600">Registros e metas sem sair da conversa.</p>
       </div>
 
       <div className="space-y-4 bg-slate-50 p-5">
-        <div className="max-w-[72%] rounded-2xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-          Perfeito! Meta registrada com o valor total e o que você já guardou.
+        <div className="max-w-[46%] rounded-2xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+          Perfeito! Meta de R$ 60 mil para comprar o carro.
         </div>
 
-        <div className="ml-auto max-w-[78%] rounded-2xl rounded-tr-md bg-primary px-4 py-3 text-sm text-white shadow-sm">
+        <div className="ml-auto max-w-[66%] rounded-2xl rounded-tr-md bg-primary px-4 py-3 text-sm text-white shadow-sm">
           quero comprar uma geladeira de 8 mil reais, já guardei 580 reais.
         </div>
 
-        <div className="max-w-[82%] rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="max-w-[48%] rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             Meta criada com sucesso
@@ -75,14 +47,14 @@ function AiAssistantPreview() {
           <div className="mt-4 space-y-2 text-sm text-slate-700">
             <p>Geladeira</p>
             <p>Objetivo: R$ 8.000,00</p>
-            <p>Guardado até agora: R$ 580,00</p>
+            <p>Já deixei registrado que você já guardou R$ 580,00.</p>
             <p>Progresso: 7%</p>
           </div>
 
           <div className="mt-4 rounded-2xl border border-primary/15 bg-primary/[0.03] p-4">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-slate-900">Geladeira</p>
+                <p className="text-sm font-semibold text-slate-900">geladeira</p>
                 <p className="text-xs text-slate-500">Acompanhe a evolução do objetivo</p>
               </div>
               <p className="text-3xl font-bold text-slate-900">7%</p>
@@ -91,6 +63,10 @@ function AiAssistantPreview() {
               <div className="h-full w-[7%] rounded-full bg-gradient-to-r from-primary to-emerald-400" />
             </div>
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-400">
+          Ex.: Recebi 3.500 de salário
         </div>
       </div>
     </Frame>
@@ -102,16 +78,17 @@ function WhatsAppPreview() {
     <Frame>
       <div className="border-b border-slate-200 px-5 py-4">
         <p className="text-xs uppercase tracking-[0.2em] text-slate-500">WhatsApp</p>
-        <p className="mt-1 text-sm text-slate-600">Receba resumos e contexto sem sair da conversa.</p>
+        <p className="mt-1 text-sm text-slate-600">Resumo prático sem abrir outra tela.</p>
       </div>
 
       <div className="space-y-4 bg-[#f7f1e7] p-5">
-        <div className="ml-auto max-w-[72%] rounded-2xl rounded-tr-md bg-[#dcf8c6] px-4 py-3 text-sm text-slate-900 shadow-sm">
+        <div className="ml-auto max-w-[42%] rounded-2xl rounded-tr-md bg-[#dcf8c6] px-4 py-3 text-sm text-slate-900 shadow-sm">
           faça um resumo dos meus últimos 7 dias
         </div>
 
-        <div className="max-w-[80%] rounded-2xl rounded-tl-md border border-[#e7ded0] bg-white px-4 py-4 shadow-sm">
-          <p className="text-sm font-semibold text-slate-900">Resumo dos últimos 7 dias</p>
+        <div className="max-w-[64%] rounded-2xl rounded-tl-md border border-[#e7ded0] bg-white px-4 py-4 shadow-sm">
+          <p className="text-sm font-semibold text-slate-900">Resumo de últimos 7 dias</p>
+
           <div className="mt-3 space-y-3 text-sm text-slate-700">
             <div>
               <p className="font-medium text-slate-900">Visão geral</p>
@@ -119,6 +96,13 @@ function WhatsAppPreview() {
               <p>Saídas: R$ 1.086,05</p>
               <p>Saldo: R$ 583,95</p>
             </div>
+
+            <div>
+              <p className="font-medium text-slate-900">Comparação</p>
+              <p>Despesas: +R$ 724,10</p>
+              <p>Saldo: +R$ 945,90</p>
+            </div>
+
             <div>
               <p className="font-medium text-slate-900">Destaques</p>
               <p>Categoria com maior peso: Investimentos</p>
@@ -126,22 +110,22 @@ function WhatsAppPreview() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-white p-3">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Entradas</p>
-                <p className="mt-1 text-lg font-semibold text-emerald-600">R$ 1.670</p>
+          <div className="mt-4 w-[220px] rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-white p-2.5">
+                <p className="text-[11px] text-slate-500">Entradas</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">R$ 1.670,00</p>
               </div>
-              <div className="rounded-xl bg-white p-3">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Saídas</p>
-                <p className="mt-1 text-lg font-semibold text-slate-900">R$ 1.086</p>
+              <div className="rounded-xl bg-white p-2.5">
+                <p className="text-[11px] text-slate-500">Saídas</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">R$ 1.086,05</p>
               </div>
             </div>
-            <div className="mt-3 flex h-28 items-end gap-2">
-              {[38, 24, 18, 16, 22, 28, 76].map((value, index) => (
+            <div className="mt-3 flex h-20 items-end gap-1.5">
+              {[30, 24, 12, 16, 14, 10, 52].map((value, index) => (
                 <div key={index} className="flex-1">
                   <div
-                    className="w-full rounded-t-xl bg-gradient-to-t from-primary to-emerald-400"
+                    className="w-full rounded-t-lg bg-gradient-to-t from-primary to-emerald-400"
                     style={{ height: `${value}%` }}
                   />
                 </div>
@@ -154,89 +138,256 @@ function WhatsAppPreview() {
   );
 }
 
+function DashboardPreview() {
+  return (
+    <Frame>
+      <div className="grid min-h-[440px] grid-cols-[108px_1fr] bg-slate-50">
+        <aside className="border-r border-slate-200 bg-white px-3 py-5">
+          <div className="mb-6 text-sm font-semibold text-primary">FINSCOPE</div>
+          <div className="space-y-2 text-[11px] text-slate-500">
+            {["Início", "Minha empresa", "Contas a pagar", "WhatsApp", "Assistente", "Metas", "Configurações"].map((item, index) => (
+              <div
+                key={item}
+                className={`rounded-xl px-3 py-2 ${index === 0 ? "bg-slate-100 font-medium text-slate-900" : ""}`}
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <div className="relative p-5">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Suas finanças em um só lugar</p>
+              <h3 className="mt-2 font-poppins text-2xl font-bold text-slate-900">Visão geral</h3>
+            </div>
+            <div className="flex gap-2">
+              {["Conta Pessoal", "Minha empresa", "Visão Total"].map((item) => (
+                <div key={item} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-700">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+            <p className="text-sm text-slate-500">Resumo do período</p>
+            <h4 className="mt-1 text-xl font-semibold text-slate-900">Finanças Pessoais</h4>
+            <div className="mt-4 grid grid-cols-4 gap-3">
+              {[
+                ["Saldo", "R$ 2.945,01"],
+                ["Receitas", "R$ 0,00"],
+                ["Despesas", "R$ 4.040,00"],
+                ["Fluxo", "R$ -4.040,00"],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs text-slate-500">{label}</p>
+                  <p className="mt-2 text-xl font-semibold text-slate-900">{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[24px] border border-primary/10 bg-primary/[0.03] p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-primary">✦</span>
+              <h4 className="text-xl font-semibold text-slate-900">Resumo inteligente do mês</h4>
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              {["Foco em economia", "Foco em dívidas", "Foco em investimentos"].map((item, index) => (
+                <div key={item} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-medium text-slate-900">{item}</p>
+                  <div className="mt-4 flex justify-end">
+                    <div className={`h-7 w-14 rounded-full ${index === 1 ? "bg-primary" : "bg-slate-300"} p-1`}>
+                      <div className={`h-5 w-5 rounded-full bg-white ${index === 1 ? "ml-auto" : ""}`} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="absolute bottom-5 right-5 w-[280px] rounded-[24px] border border-slate-200 bg-white shadow-2xl">
+            <div className="border-b border-slate-200 px-4 py-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Finscope IA</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900">Assistente com IA</p>
+              <p className="mt-1 text-sm text-slate-500">Registre gastos, receitas e contas futuras sem sair da tela.</p>
+            </div>
+            <div className="space-y-3 px-4 py-4">
+              <div className="rounded-2xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                Anotado! R$ 3.900,00 pela compra do relógio na conta pessoal.
+              </div>
+              <div className="ml-auto rounded-2xl rounded-tr-md bg-primary px-4 py-3 text-sm text-white">
+                Recebi meu salário de 6200 reais
+              </div>
+              <div className="rounded-2xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                Isso é da sua conta pessoal ou da sua empresa?
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+function AccountsPayablePreview() {
+  return (
+    <Frame>
+      <div className="grid min-h-[430px] grid-cols-[108px_1fr] bg-slate-50">
+        <aside className="border-r border-slate-200 bg-white px-3 py-5">
+          <div className="mb-6 text-sm font-semibold text-primary">FINSCOPE</div>
+          <div className="space-y-2 text-[11px] text-slate-500">
+            {["Início", "Minha empresa", "Contas a pagar", "WhatsApp", "Transações", "Metas", "Configurações"].map((item, index) => (
+              <div
+                key={item}
+                className={`rounded-xl px-3 py-2 ${index === 2 ? "bg-slate-100 font-medium text-slate-900" : ""}`}
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <div className="p-5">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Agenda financeira</p>
+            <h3 className="mt-2 font-poppins text-2xl font-bold text-slate-900">Contas a pagar</h3>
+            <p className="mt-2 text-sm text-slate-600">Tudo o que foi registrado como pagamentos e recebimentos futuros.</p>
+          </div>
+
+          <div className="mt-5 grid grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4">
+              <p className="text-sm text-rose-500">Previsto a pagar</p>
+              <p className="mt-2 text-3xl font-semibold text-rose-600">R$ 0,00</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+              <p className="text-sm text-emerald-600">Previsto a receber</p>
+              <p className="mt-2 text-3xl font-semibold text-emerald-700">R$ 0,00</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-sm text-slate-500">Saldo futuro estimado</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">R$ 0,00</p>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-[26px] border border-slate-200 bg-white p-5">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Planejado vs realizado</p>
+            <h4 className="mt-2 text-2xl font-semibold text-slate-900">Como suas contas estão indo no mês</h4>
+            <p className="mt-2 text-sm text-slate-600">
+              Comparamos o que estava previsto com o que realmente entrou e saiu neste mês.
+            </p>
+
+            <div className="mt-5 grid grid-cols-4 gap-3">
+              {[
+                ["Previsto para sair", "R$ 0,00"],
+                ["Saiu de verdade", "R$ 4.040,00"],
+                ["Diferença", "R$ 4.040,00"],
+                ["Aderência ao plano", "100%"],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs text-slate-500">{label}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 grid grid-cols-[1.05fr_1fr] gap-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <p className="text-2xl font-semibold text-slate-900">Você gastou 0% a mais que o planejado.</p>
+                <p className="mt-3 text-lg text-slate-500">Você ultrapassou R$ 4.040,00 do previsto.</p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex h-[180px] items-end justify-between gap-3">
+                  <div className="flex h-full flex-1 items-end">
+                    <div className="w-full rounded-t-xl bg-slate-300" style={{ height: "4%" }} />
+                  </div>
+                  <div className="flex h-full flex-1 items-end">
+                    <div className="w-full rounded-t-xl bg-primary" style={{ height: "72%" }} />
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-between text-sm text-slate-500">
+                  <span>Receitas</span>
+                  <span>Despesas</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
 const showcases: ShowcaseItem[] = [
   {
     eyebrow: "Assistente com IA",
-    title: "Escreva do seu jeito e deixe a plataforma transformar isso em ação",
+    title: "Converse de forma natural e transforme isso em registro com contexto",
     description:
-      "O FinScope entende pedidos naturais para registrar movimentações, criar metas e responder com contexto visual dentro da própria conversa.",
+      "A plataforma entende pedidos do dia a dia para criar metas, registrar valores e devolver a resposta com contexto suficiente para você acompanhar a evolução.",
     bullets: [
-      "Cria metas com valor total e progresso inicial",
-      "Registra gastos, entradas e contas futuras sem fluxo travado",
-      "Mantém a resposta clara, com contexto suficiente para você seguir",
+      "Interpreta objetivo, valor total e quanto já foi guardado",
+      "Mantém a conversa útil, sem te jogar em fluxo quebrado",
+      "Mostra o progresso da meta logo na própria resposta",
     ],
     icon: Bot,
     render: () => <AiAssistantPreview />,
   },
   {
-    eyebrow: "WhatsApp com contexto",
-    title: "Peça um resumo no WhatsApp e receba leitura prática do período",
+    eyebrow: "WhatsApp",
+    title: "Peça um resumo e receba uma leitura prática do período no chat",
     description:
-      "Quando você precisa de uma visão rápida, o resumo chega pronto com entradas, saídas, saldo e destaques do que puxou o resultado.",
+      "Para revisões rápidas, o FinScope entrega um resumo curto, com visão geral, comparação e destaques do que puxou o resultado.",
     bullets: [
-      "Resumo dos últimos dias em linguagem direta",
-      "Destaques de categoria e maior gasto no mesmo retorno",
-      "Ótimo para revisar o período sem abrir outra tela",
+      "Entradas, saídas e saldo no mesmo retorno",
+      "Destaques de categoria e maior gasto",
+      "Formato fácil de bater o olho e seguir",
     ],
     icon: MessageCircleMore,
     reverse: true,
     render: () => <WhatsAppPreview />,
   },
   {
-    eyebrow: "Visão geral",
-    title: "Painel principal limpo, com os números que realmente importam",
+    eyebrow: "Painel principal",
+    title: "Veja o mês em um painel limpo, com IA presente sem poluir a leitura",
     description:
-      "A home da plataforma entrega saldo, receitas, despesas, fluxo de caixa e visão do mês sem excesso de elementos competindo pela atenção.",
+      "A visão geral combina saldo, receitas, despesas, fluxo e um resumo inteligente do mês, com o assistente disponível no mesmo contexto.",
     bullets: [
-      "Leitura imediata do mês",
-      "Área central para acompanhar movimentações recentes",
-      "Estrutura clara para usar no desktop e no celular",
+      "Resumo financeiro centralizado",
+      "Preferências de leitura com foco por tema",
+      "Assistente acessível sem tirar atenção do painel",
     ],
     icon: LayoutDashboard,
-    render: () => (
-      <ProductImage
-        src="/landing/dashboard-overview.png"
-        alt="Dashboard do FinScope com resumo financeiro e categorias"
-        className="h-full w-full object-cover object-left-top"
-      />
-    ),
+    render: () => <DashboardPreview />,
   },
   {
-    eyebrow: "Planejamento do mês",
-    title: "Contas previstas e comparativo do planejado versus realizado no mesmo fluxo",
+    eyebrow: "Contas previstas",
+    title: "Acompanhe o planejado versus realizado e enxergue o impacto no mês",
     description:
-      "Além do histórico, a plataforma mostra o que ainda precisa ser pago ou recebido e compara o plano com o que de fato aconteceu no mês.",
+      "A área de contas a pagar organiza previsões, mostra saldo futuro estimado e compara o plano com o que realmente saiu ou entrou.",
     bullets: [
-      "Previsto a pagar, previsto a receber e saldo futuro estimado",
-      "Comparação do planejado com o realizado",
+      "Visão de previsto a pagar e a receber",
+      "Comparação clara do planejado com o realizado",
       "Leitura mais previsível da rotina financeira",
     ],
     icon: CalendarClock,
     reverse: true,
-    render: () => (
-      <ProductImage
-        src="/landing/planned-cashflow.png"
-        alt="Tela do FinScope com valores previstos e comparação do mês"
-        className="h-full w-full object-cover object-top"
-      />
-    ),
+    render: () => <AccountsPayablePreview />,
   },
 ];
 
 export function DemoSection() {
   return (
     <section id="demo" className="border-t border-slate-200 bg-slate-50 py-16 text-slate-900">
-      <div className="mx-auto max-w-6xl space-y-12 px-4">
-        <div className="space-y-4 text-center">
-          <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary">
-            Plataforma em contexto real
-          </Badge>
+      <div className="mx-auto max-w-6xl space-y-8 px-4">
+        <div className="space-y-3 text-center">
           <h2 className="font-poppins text-3xl font-bold md:text-4xl">
-            Capturas distribuídas com a copy certa, sem poluição visual
+            Veja como o FinScope aparece no uso real do dia a dia
           </h2>
           <p className="mx-auto max-w-3xl text-slate-600">
-            Em vez de empilhar telas soltas, a landing agora apresenta cada parte do produto no ponto em que ela
-            faz sentido: IA, WhatsApp, visão geral e planejamento do mês.
+            Cada área abaixo mostra uma parte importante do produto sem empilhar telas soltas nem exagerar na apresentação.
           </p>
         </div>
 
