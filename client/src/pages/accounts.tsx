@@ -154,12 +154,7 @@ export default function AccountsPage() {
         <div>
           <h1 className="text-3xl font-poppins font-bold" data-testid="text-accounts-title">Contas</h1>
           <p className="text-muted-foreground" data-testid="text-accounts-subtitle">
-            Organize suas contas pessoais e empresariais em um só lugar
-            {planLimit !== Infinity && (
-              <span className="ml-2">
-                ({accounts.length}/{planLimit} em uso)
-              </span>
-            )}
+            Organize suas contas pessoais e empresariais em um so lugar
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -271,9 +266,9 @@ export default function AccountsPage() {
         <Card className="bg-muted/30 border-dashed">
           <CardContent className="flex items-center justify-between p-6">
             <div>
-              <h3 className="font-semibold mb-1">Limite de contas atingido</h3>
+              <h3 className="font-semibold mb-1">Mais recursos no Premium</h3>
               <p className="text-sm text-muted-foreground">
-                Você chegou ao limite de contas do seu plano. No Premium, você libera contas ilimitadas e uma rotina com menos restrições.
+                No Premium, voce libera Minha empresa, WhatsApp e relatorios mais completos para uma rotina com menos trabalho manual.
               </p>
               <p className="mt-1 text-sm font-medium text-primary">{BILLING_PLANS.premium.commercialCopy.dailyPriceLabel}</p>
             </div>
@@ -370,3 +365,5 @@ export default function AccountsPage() {
     </>
   );
 }
+
+

@@ -41,7 +41,7 @@ export type BillingPlanConfig = {
 };
 
 const formatPriceLabel = (priceCents: number) =>
-  `R$ ${(priceCents / 100).toFixed(2).replace(".", ",")}/mês`;
+  `R$ ${(priceCents / 100).toFixed(2).replace(".", ",")}/mes`;
 
 export const BILLING_PLANS: Record<BillingPlanId, BillingPlanConfig> = {
   pro: {
@@ -50,30 +50,30 @@ export const BILLING_PLANS: Record<BillingPlanId, BillingPlanConfig> = {
     shortName: "Pro",
     priceCents: 1990,
     priceLabel: formatPriceLabel(1990),
-    monthlyLabel: "R$ 19,90/mês",
-    description: "Controle essencial com IA básica para registrar gastos, entradas e acompanhar sua rotina com clareza.",
-    marketingHeadline: "Controle essencial com IA básica",
+    monthlyLabel: "R$ 19,90/mes",
+    description: "Controle essencial com IA basica para registrar gastos, entradas e acompanhar sua rotina com clareza.",
+    marketingHeadline: "Controle essencial com IA basica",
     accountsLimit: 3,
     checkout: {
       productEnvKeys: ["CAKTO_PRODUCT_PRO_ID", "CAKTO_PLAN_PRO_ID"],
       checkoutUrlEnvKey: "CAKTO_CHECKOUT_PRO_URL",
     },
     features: [
-      "Até 3 contas",
+      "Conta pessoal com controle essencial",
       "Painel financeiro completo",
-      "IA básica para registrar gastos e entradas",
-      "Resumos financeiros genéricos para acompanhar o mês",
-      "Relatório PDF básico",
+      "IA basica para registrar gastos e entradas",
+      "Resumos financeiros genericos para acompanhar o mes",
+      "Relatorio PDF basico",
     ],
     modalHighlights: [
-      "IA básica para registrar movimentações e resumir o mês",
-      "PDF básico para acompanhar o histórico",
+      "IA basica para registrar movimentacoes e resumir o mes",
+      "PDF basico para acompanhar o historico",
       "Estrutura ideal para quem quer controle sem complexidade",
     ],
-    comparisonSummary: "Ideal para organizar a operação do dia a dia com controle essencial.",
+    comparisonSummary: "Ideal para organizar a operacao do dia a dia com controle essencial.",
     commercialCopy: {
       priceSupport: "Controle essencial para organizar sua rotina financeira com praticidade.",
-      checkoutSupport: "Organize gastos, entradas e resumos do mês sem adicionar complexidade.",
+      checkoutSupport: "Organize gastos, entradas e resumos do mes sem adicionar complexidade.",
       upsellSupport: "Boa escolha para quem quer clareza e rotina financeira bem organizada.",
     },
     featureFlags: {
@@ -92,9 +92,9 @@ export const BILLING_PLANS: Record<BillingPlanId, BillingPlanConfig> = {
     shortName: "Premium",
     priceCents: 3990,
     priceLabel: formatPriceLabel(3990),
-    monthlyLabel: "R$ 39,90/mês",
-    description: "Automação, relatórios avançados e inteligência ampliada para quem quer menos trabalho manual e mais visibilidade financeira.",
-    marketingHeadline: "Automação, relatórios avançados e inteligência ampliada",
+    monthlyLabel: "R$ 39,90/mes",
+    description: "Automacao, relatorios avancados e inteligencia ampliada para quem quer menos trabalho manual e mais visibilidade financeira.",
+    marketingHeadline: "Automacao, relatorios avancados e inteligencia ampliada",
     recommended: true,
     badge: "Mais popular",
     accountsLimit: Number.POSITIVE_INFINITY,
@@ -103,23 +103,23 @@ export const BILLING_PLANS: Record<BillingPlanId, BillingPlanConfig> = {
       checkoutUrlEnvKey: "CAKTO_CHECKOUT_PREMIUM_URL",
     },
     features: [
-      "Contas ilimitadas",
-      "Minha empresa com visão dedicada",
+      "Operacao mais automatizada",
+      "Minha empresa com visao dedicada",
       "Agent de WhatsApp exclusivo para registrar pelo chat",
-      "IA avançada com análises, interpretações e insights premium",
-      "Relatórios PDF avançados, mais completos e profissionais",
+      "IA avancada com analises, interpretacoes e insights premium",
+      "Relatorios PDF avancados, mais completos e profissionais",
     ],
     modalHighlights: [
-      "Relatórios mais completos, prontos para compartilhar",
-      "Agent de WhatsApp exclusivo para automação de lançamentos",
-      "IA com análises mais úteis, dicas e interpretações avançadas",
+      "Relatorios mais completos, prontos para compartilhar",
+      "Agent de WhatsApp exclusivo para automacao de lancamentos",
+      "IA com analises mais uteis, dicas e interpretacoes avancadas",
     ],
-    comparisonSummary: "Ideal para quem quer operação mais automatizada e leitura financeira mais profunda.",
+    comparisonSummary: "Ideal para quem quer operacao mais automatizada e leitura financeira mais profunda.",
     commercialCopy: {
       dailyPriceLabel: "Menos de R$ 1,33 por dia",
-      priceSupport: "Mais automação para sua rotina financeira por um custo baixo no dia a dia.",
-      checkoutSupport: "Por cerca de R$ 1,33 por dia, você libera WhatsApp, relatórios avançados e menos trabalho manual.",
-      upsellSupport: "Automatize registros, ganhe relatórios mais completos e tenha uma experiência mais inteligente no dia a dia.",
+      priceSupport: "Mais automacao para sua rotina financeira por um custo baixo no dia a dia.",
+      checkoutSupport: "Por cerca de R$ 1,33 por dia, voce libera WhatsApp, relatorios avancados e menos trabalho manual.",
+      upsellSupport: "Automatize registros, ganhe relatorios mais completos e tenha uma experiencia mais inteligente no dia a dia.",
     },
     featureFlags: {
       businessArea: true,
