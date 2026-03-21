@@ -25,7 +25,7 @@ import {
 import { storage } from "../server/storage";
 import { AssistantOrchestrator } from "../server/modules/shared/assistantOrchestrator";
 import { resolveModelForText } from "../server/modules/shared/modelRouter";
-import { getInternalAiMode } from "../shared/plans";
+import { canUseBusinessArea, getInternalAiMode } from "../shared/plans";
 
 export interface ChatRequest {
   content: string;
@@ -63,6 +63,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
   const recentContext = getRecentContext(userId, 6);
   const assistantOrchestrator = new AssistantOrchestrator(storage);
   const internalAiMode = getInternalAiMode(user.plan);
+  const supportsBusinessArea = canUseBusinessArea(user.plan);
   let modelSelection = resolveModelForText(content);
 
   const userMessageRow = await saveChatHistoryMessage(userId, "user", content);
@@ -71,8 +72,15 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
 
   let effectiveContent = content;
   const pendingBaseMessage = session.pendingTransactionMessage || session.lastUserMessage;
-  const explicitAccountType = detectAccountTypeFromText(content);
+  const explicitAccountType = supportsBusinessArea ? detectAccountTypeFromText(content) : "PF";
   let resolvedAccountType = explicitAccountType ?? (shouldReuseLastAccountType(content) ? session.lastAccountType : null);
+
+  if (!supportsBusinessArea && session.awaitingAccountType) {
+    updateSessionMemory(userId, {
+      awaitingAccountType: false,
+      lastAccountType: "PF",
+    });
+  }
 
   if (session.awaitingTransactionAmount) {
     const inferred = explicitAccountType ?? session.lastAccountType ?? detectAccountTypeFromText(pendingBaseMessage) ?? "PF";
@@ -105,7 +113,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     });
   }
 
-  if (session.awaitingAccountType) {
+  if (supportsBusinessArea && session.awaitingAccountType) {
     const answerType = detectAccountTypeFromText(content) ?? detectAccountTypeFromAnswer(content);
     if (!answerType) {
       const question = "Isso é da sua conta pessoal ou da sua empresa?";
@@ -195,7 +203,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     };
   }
 
-  if (!resolvedAccountType && looksLikeTransactionStatement(effectiveContent)) {
+  if (supportsBusinessArea && !resolvedAccountType && looksLikeTransactionStatement(effectiveContent)) {
     const question = "Isso é da sua conta pessoal ou da sua empresa?";
     updateSessionMemory(userId, {
       awaitingAccountType: true,
