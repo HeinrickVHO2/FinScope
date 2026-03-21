@@ -55,6 +55,9 @@ export default function UpgradeModal({
               {currentPlan.name}
             </Badge>
             <p className="font-poppins text-lg font-semibold">{currentPlan.priceLabel}</p>
+            {currentPlan.commercialCopy.dailyPriceLabel ? (
+              <p className="text-xs font-medium text-primary">{currentPlan.commercialCopy.dailyPriceLabel}</p>
+            ) : null}
             <p className="text-sm text-muted-foreground">{currentPlan.comparisonSummary}</p>
           </div>
           <div className="flex items-center justify-center text-muted-foreground">
@@ -64,8 +67,16 @@ export default function UpgradeModal({
             <p className="text-xs uppercase tracking-wide text-primary">Plano alvo</p>
             <Badge className="w-fit">{nextPlan.name}</Badge>
             <p className="font-poppins text-lg font-semibold">{nextPlan.priceLabel}</p>
+            {nextPlan.commercialCopy.dailyPriceLabel ? (
+              <p className="text-xs font-medium text-primary">{nextPlan.commercialCopy.dailyPriceLabel}</p>
+            ) : null}
             <p className="text-sm text-muted-foreground">{nextPlan.comparisonSummary}</p>
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+          <p className="text-sm font-semibold text-slate-900">{nextPlan.commercialCopy.upsellSupport}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{nextPlan.commercialCopy.checkoutSupport}</p>
         </div>
 
         <div className="space-y-3">

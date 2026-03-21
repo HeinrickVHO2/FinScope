@@ -10,7 +10,7 @@ import { useLocation } from "wouter";
 import { ArrowDownRight, ArrowUpRight, BarChart3, Building2, Lock, TrendingUp } from "lucide-react";
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Bar, Tooltip, Legend } from "recharts";
 import UpgradeModal from "@/components/UpgradeModal";
-import { canUseBusinessArea } from "@shared/plans";
+import { BILLING_PLANS, canUseBusinessArea } from "@shared/plans";
 
 export default function MinhaEmpresaPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -115,14 +115,15 @@ export default function MinhaEmpresaPage() {
               </div>
               <h3 className="text-2xl font-semibold font-poppins">Recurso exclusivo do Premium</h3>
               <p className="max-w-xl text-muted-foreground">
-                Ative o Premium para acompanhar a área Minha empresa com relatórios e visão dedicada.
+                Ative o Premium para acompanhar a área Minha empresa com visão dedicada, relatórios mais completos e menos trabalho manual.
               </p>
+              <p className="text-sm font-medium text-primary">{BILLING_PLANS.premium.commercialCopy.dailyPriceLabel}</p>
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => setLocation("/settings")} data-testid="button-learn-more">
                   Conhecer planos
                 </Button>
                 <Button onClick={() => setIsUpgradeModalOpen(true)} data-testid="button-upgrade">
-                  Fazer upgrade
+                  Ver Premium
                 </Button>
               </div>
             </CardContent>

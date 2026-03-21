@@ -18,7 +18,7 @@ export default function BillingSettingsPage() {
 
   return (
     <>
-      <div className="p-6 space-y-6">
+      <div className="space-y-6 p-6">
         <Button
           variant="ghost"
           className="flex items-center gap-2"
@@ -30,12 +30,12 @@ export default function BillingSettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="font-poppins text-2xl flex items-center gap-3">
+            <CardTitle className="flex items-center gap-3 font-poppins text-2xl">
               <CreditCard className="h-5 w-5 text-primary" />
               Confirme seu pagamento
             </CardTitle>
             <CardDescription>
-              Revise os planos disponíveis e conclua o pagamento nesta mesma página.
+              Revise os planos disponíveis, compare o valor do Premium e conclua o pagamento nesta mesma página.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">

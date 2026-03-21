@@ -11,7 +11,7 @@ import UpgradeModal from "@/components/UpgradeModal";
 import { FileDown, Loader2, Lock } from "lucide-react";
 import { useDashboardView } from "@/context/dashboard-view";
 import { apiFetch } from "@/lib/api";
-import { canUseAdvancedPdf } from "@shared/plans";
+import { BILLING_PLANS, canUseAdvancedPdf } from "@shared/plans";
 
 const REPORT_TYPES = [
   {
@@ -249,15 +249,18 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
         <p className="text-sm text-slate-500">
           Essa funcionalidade é exclusiva do Premium. Ative o plano para gerar relatórios mais completos, com gráficos e observações automáticas.
         </p>
+        <p className="text-sm font-medium text-primary">
+          {BILLING_PLANS.premium.commercialCopy.dailyPriceLabel} para ter relatórios mais profissionais e prontos para compartilhar.
+        </p>
       </div>
       <div className="rounded-2xl border border-primary/40 bg-primary/5 p-4 text-sm text-primary">
-        Upgrade instantâneo com 10 dias de garantia total.
+        {BILLING_PLANS.premium.commercialCopy.checkoutSupport}
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
         <Button variant="ghost" onClick={() => onOpenChange(false)}>
           Agora não
         </Button>
-        <Button onClick={() => setIsUpgradeModalOpen(true)}>Ver Premium</Button>
+        <Button onClick={() => setIsUpgradeModalOpen(true)}>Desbloquear no Premium</Button>
       </div>
     </div>
   );

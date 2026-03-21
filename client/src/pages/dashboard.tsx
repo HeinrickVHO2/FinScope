@@ -14,7 +14,7 @@ import UpgradeModal from "@/components/UpgradeModal";
 import { useDashboardView, type DashboardScope } from "@/context/dashboard-view";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend, LineChart, Line } from "recharts";
 import { AiReportCard } from "@/components/AiReportCard";
-import { canUseAdvancedPdf, canUseBasicPdf, canUseBusinessArea } from "@shared/plans";
+import { BILLING_PLANS, canUseAdvancedPdf, canUseBasicPdf, canUseBusinessArea } from "@shared/plans";
 import { exportBasicPdf, resolveTransactionPeriodLabel } from "@/lib/pdf-export";
 
 interface DashboardMetrics {
@@ -758,8 +758,9 @@ function LockedCard({ onUpgrade }: { onUpgrade: () => void }) {
       </div>
       <h3 className="text-2xl font-semibold">Minha empresa está bloqueada</h3>
       <p className="text-muted-foreground max-w-2xl mx-auto">
-        Atualize para o plano Premium e acompanhe o caixa da sua empresa com relatórios e visão dedicada.
+        Atualize para o plano Premium e acompanhe o caixa da sua empresa com visão dedicada, relatórios mais completos e menos esforço manual.
       </p>
+      <p className="text-sm font-medium text-primary">{BILLING_PLANS.premium.commercialCopy.dailyPriceLabel}</p>
       <Button onClick={onUpgrade} className="mt-2">Desbloquear com Premium</Button>
     </section>
   );

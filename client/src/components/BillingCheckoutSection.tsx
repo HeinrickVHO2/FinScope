@@ -202,6 +202,11 @@ export function BillingCheckoutSection({
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Plano atual</p>
                   <p className="mt-2 font-poppins text-lg font-semibold">{currentPlanOption.name}</p>
                   <p className="text-sm text-muted-foreground">{currentPlanOption.price}</p>
+                  {currentPlanOption.commercialCopy.dailyPriceLabel ? (
+                    <p className="mt-1 text-xs font-medium text-primary">
+                      {currentPlanOption.commercialCopy.dailyPriceLabel}
+                    </p>
+                  ) : null}
                   <p className="mt-2 text-sm text-muted-foreground">{currentPlanOption.comparisonSummary}</p>
                 </div>
                 <div className="flex items-center justify-center text-muted-foreground">
@@ -211,6 +216,11 @@ export function BillingCheckoutSection({
                   <p className="text-xs uppercase tracking-wide text-primary">Plano alvo</p>
                   <p className="mt-2 font-poppins text-lg font-semibold">{selectedPlanOption.name}</p>
                   <p className="text-sm text-muted-foreground">{selectedPlanOption.price}</p>
+                  {selectedPlanOption.commercialCopy.dailyPriceLabel ? (
+                    <p className="mt-1 text-xs font-medium text-primary">
+                      {selectedPlanOption.commercialCopy.dailyPriceLabel}
+                    </p>
+                  ) : null}
                   <p className="mt-2 text-sm text-muted-foreground">{selectedPlanOption.comparisonSummary}</p>
                 </div>
               </div>
@@ -237,6 +247,9 @@ export function BillingCheckoutSection({
                       <div>
                         <p className="font-poppins text-lg font-semibold">{plan.name}</p>
                         <p className="text-sm text-muted-foreground">{plan.price}</p>
+                        {plan.commercialCopy.dailyPriceLabel ? (
+                          <p className="mt-1 text-xs font-medium text-primary">{plan.commercialCopy.dailyPriceLabel}</p>
+                        ) : null}
                       </div>
                       <div className="flex gap-1">
                         {plan.badge ? (
@@ -254,6 +267,7 @@ export function BillingCheckoutSection({
 
                     <p className="mt-3 text-sm font-medium text-slate-900">{plan.marketingHeadline}</p>
                     <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
+                    <p className="mt-2 text-sm text-slate-700">{plan.commercialCopy.checkoutSupport}</p>
 
                     <ul className="mt-4 space-y-2 text-sm">
                       {plan.features.map((feature) => (

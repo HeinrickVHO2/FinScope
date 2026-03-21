@@ -12,10 +12,11 @@ export function PricingSection() {
         <div className="space-y-3 text-center">
           <Badge className="border-primary/20 bg-primary/10 text-primary">Planos</Badge>
           <h2 className="text-3xl font-poppins font-bold md:text-4xl">
-            Compare Pro e Premium com preço e diferença clara
+            Escolha entre controle essencial ou uma rotina muito mais automatizada
           </h2>
           <p className="mx-auto max-w-3xl text-slate-600">
-            O Pro entrega controle essencial com IA básica. O Premium amplia a operação com WhatsApp, relatórios avançados e inteligência mais completa.
+            O Pro entrega organização prática para o dia a dia. O Premium reduz trabalho manual com Agent de WhatsApp,
+            relatórios mais completos e uma experiência mais inteligente.
           </p>
         </div>
 
@@ -29,7 +30,7 @@ export function PricingSection() {
             >
               {plan.recommended ? (
                 <div className="absolute right-4 top-4">
-                  <Badge className="bg-primary text-white">{plan.badge || "Mais recomendado"}</Badge>
+                  <Badge className="bg-primary text-white">{plan.badge || "Mais popular"}</Badge>
                 </div>
               ) : null}
 
@@ -42,6 +43,10 @@ export function PricingSection() {
                   <p className="text-sm uppercase tracking-[0.18em] text-slate-500">Preço mensal</p>
                   <p className="mt-2 text-4xl font-bold text-slate-900">{plan.price.replace("/mês", "")}</p>
                   <p className="text-sm text-slate-500">por mês</p>
+                  {plan.commercialCopy.dailyPriceLabel ? (
+                    <p className="mt-3 text-sm font-medium text-primary">{plan.commercialCopy.dailyPriceLabel}</p>
+                  ) : null}
+                  <p className="mt-2 text-sm text-slate-600">{plan.commercialCopy.priceSupport}</p>
                 </div>
               </CardHeader>
 
@@ -75,7 +80,7 @@ export function PricingSection() {
               <CardFooter>
                 <Link href="/signup" className="w-full">
                   <Button className="w-full" variant={plan.recommended ? "default" : "outline"}>
-                    Escolher {plan.shortName}
+                    {plan.id === "premium" ? "Quero mais automação" : `Escolher ${plan.shortName}`}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>

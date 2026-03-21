@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Lock, AlertTriangle } from "lucide-react";
+import { BILLING_PLANS } from "@shared/plans";
 
 interface LockedAiReportProps {
   onUpgrade: () => void;
@@ -9,7 +10,7 @@ interface LockedAiReportProps {
 
 export function LockedAiReport({ onUpgrade }: LockedAiReportProps) {
   return (
-    <Card className="border-dashed border-2 border-slate-200 bg-gradient-to-br from-slate-50 to-white shadow-none">
+    <Card className="border-2 border-dashed border-slate-200 bg-gradient-to-br from-slate-50 to-white shadow-none">
       <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <CardTitle className="flex items-center gap-2 text-2xl font-semibold">
@@ -19,6 +20,7 @@ export function LockedAiReport({ onUpgrade }: LockedAiReportProps) {
           <p className="text-sm text-muted-foreground">
             Veja análises mais completas, alertas e interpretações ao ativar o Premium.
           </p>
+          <p className="mt-2 text-sm font-medium text-primary">{BILLING_PLANS.premium.commercialCopy.dailyPriceLabel}</p>
         </div>
         <Badge className="bg-slate-900 text-white">FinScope Premium</Badge>
       </CardHeader>
@@ -53,6 +55,7 @@ export function LockedAiReport({ onUpgrade }: LockedAiReportProps) {
             <p className="text-sm text-muted-foreground">
               Atualize seu plano para liberar relatórios com IA, dicas mais úteis e alertas inteligentes.
             </p>
+            <p className="mt-1 text-sm text-primary">{BILLING_PLANS.premium.commercialCopy.upsellSupport}</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button onClick={onUpgrade} className="bg-indigo-600 hover:bg-indigo-700">

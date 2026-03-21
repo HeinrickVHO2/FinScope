@@ -370,6 +370,11 @@ export default function SettingsPage() {
                     ? "Conclua o pagamento para liberar todos os recursos."
                     : `${currentPlanConfig.priceLabel} • ${currentPlanConfig.marketingHeadline}`}
                 </p>
+                {displayPlan !== "pending" ? (
+                  <p className="mt-1 text-xs text-primary">
+                    {currentPlanConfig.commercialCopy.dailyPriceLabel ?? currentPlanConfig.commercialCopy.priceSupport}
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -395,7 +400,7 @@ export default function SettingsPage() {
                   setIsCheckoutModalOpen(true);
                 }}
               >
-                {currentPlan === "premium" ? "Alterar para Pro" : "Fazer upgrade"}
+                {currentPlan === "premium" ? "Alterar para Pro" : "Ver Premium"}
               </Button>
             )}
           </div>
@@ -442,6 +447,9 @@ export default function SettingsPage() {
                 <div className="text-2xl font-bold font-poppins" data-testid={`text-plan-price-${index}`}>
                   {plan.price}
                 </div>
+                <p className="text-sm text-primary">
+                  {plan.commercialCopy.dailyPriceLabel ?? plan.commercialCopy.priceSupport}
+                </p>
                 <p className="text-sm text-muted-foreground">{plan.comparisonSummary}</p>
               </CardHeader>
 
@@ -456,7 +464,7 @@ export default function SettingsPage() {
                 </ul>
 
                 <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground">
-                  {plan.modalHighlights.join(" • ")}
+                  {plan.commercialCopy.checkoutSupport}
                 </div>
               </CardContent>
 
@@ -473,7 +481,7 @@ export default function SettingsPage() {
                       setIsCheckoutModalOpen(true);
                     }}
                   >
-                    Selecionar plano
+                    {plan.id === "premium" ? "Quero o Premium" : "Selecionar plano"}
                   </Button>
                 ) : (
                   <Button className="w-full" variant="secondary" disabled data-testid={`button-current-${plan.id}`}>

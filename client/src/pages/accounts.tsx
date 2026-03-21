@@ -36,7 +36,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import UpgradeModal from "@/components/UpgradeModal";
-import { canUseBusinessArea } from "@shared/plans";
+import { BILLING_PLANS, canUseBusinessArea } from "@shared/plans";
 
 export default function AccountsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -273,8 +273,9 @@ export default function AccountsPage() {
             <div>
               <h3 className="font-semibold mb-1">Limite de contas atingido</h3>
               <p className="text-sm text-muted-foreground">
-                Você chegou ao limite de contas do seu plano
+                Você chegou ao limite de contas do seu plano. No Premium, você libera contas ilimitadas e uma rotina com menos restrições.
               </p>
+              <p className="mt-1 text-sm font-medium text-primary">{BILLING_PLANS.premium.commercialCopy.dailyPriceLabel}</p>
             </div>
             <Button variant="default" onClick={() => setIsUpgradeModalOpen(true)}>
               Ver planos

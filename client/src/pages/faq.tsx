@@ -44,7 +44,7 @@ export default function FAQPage() {
     },
     {
       q: "O plano Premium vale a pena se eu já uso o Pro?",
-      a: "Sim, principalmente se você precisa de mais automações, relatórios e visão completa da sua empresa. Para mudar de plano, basta abrir a área de configurações e seguir para o pagamento.",
+      a: "Sim, principalmente se você quer menos trabalho manual, Agent de WhatsApp, relatórios mais completos e a área Minha empresa no mesmo fluxo. Hoje o Premium custa R$ 39,90/mês, ou menos de R$ 1,33 por dia.",
     },
   ];
 
@@ -54,14 +54,14 @@ export default function FAQPage() {
     <div className="min-h-screen bg-white text-slate-900">
       <FinScopeHeader />
 
-      <main className="max-w-4xl mx-auto px-4 py-24 space-y-16">
+      <main className="mx-auto max-w-4xl space-y-16 px-4 py-24">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-4"
+          className="space-y-4 text-center"
         >
           <h1 className="text-4xl font-poppins font-bold">Perguntas Frequentes</h1>
-          <p className="text-slate-600 max-w-xl mx-auto">
+          <p className="mx-auto max-w-xl text-slate-600">
             Veja respostas para as dúvidas mais comuns sobre o FinScope.
           </p>
         </motion.div>
@@ -74,13 +74,13 @@ export default function FAQPage() {
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className="border rounded-xl p-5 bg-white shadow-sm"
+              className="rounded-xl border bg-white p-5 shadow-sm"
             >
               <button
                 onClick={() => setOpen(open === i ? null : i)}
-                className="w-full flex items-center justify-between text-left"
+                className="flex w-full items-center justify-between text-left"
               >
-                <p className="font-medium text-lg">{faq.q}</p>
+                <p className="text-lg font-medium">{faq.q}</p>
                 <ChevronDown
                   className={`h-5 w-5 transition-transform ${
                     open === i ? "rotate-180" : ""
@@ -93,7 +93,7 @@ export default function FAQPage() {
                   open === i ? "grid-rows-[1fr] pt-3" : "grid-rows-[0fr]"
                 }`}
               >
-                <p className="text-slate-600 text-sm overflow-hidden">{faq.a}</p>
+                <p className="overflow-hidden text-sm text-slate-600">{faq.a}</p>
               </div>
             </motion.div>
           ))}

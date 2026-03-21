@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import UpgradeModal from "@/components/UpgradeModal";
-import { canUseWhatsAppAgent } from "@shared/plans";
+import { BILLING_PLANS, canUseWhatsAppAgent } from "@shared/plans";
 
 type WhatsAppSession = {
   eligible: boolean;
@@ -381,17 +381,22 @@ export default function WhatsAppAgentPage() {
                 Agent de WhatsApp disponível no Premium
               </CardTitle>
               <CardDescription>
-                No Premium, o WhatsApp fica integrado ao FinScope para acelerar lançamentos, revisão de mensagens e automações.
+                No Premium, o WhatsApp entra na sua rotina para reduzir trabalho manual, acelerar lançamentos e manter tudo revisável dentro do FinScope.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="rounded-xl border border-primary/20 bg-background p-4">
+                <p className="text-sm font-semibold text-slate-900">{BILLING_PLANS.premium.priceLabel}</p>
+                <p className="mt-1 text-sm text-primary">{BILLING_PLANS.premium.commercialCopy.dailyPriceLabel}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{BILLING_PLANS.premium.commercialCopy.checkoutSupport}</p>
+              </div>
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl border bg-background p-4 text-sm">Conectar um número e revisar lançamentos em uma fila dedicada.</div>
-                <div className="rounded-xl border bg-background p-4 text-sm">Automação de mensagens com confirmação e histórico rastreável.</div>
-                <div className="rounded-xl border bg-background p-4 text-sm">Fluxo pensado para acelerar o operacional sem perder controle.</div>
+                <div className="rounded-xl border bg-background p-4 text-sm">Conecte um número e transforme mensagens em lançamentos revisáveis.</div>
+                <div className="rounded-xl border bg-background p-4 text-sm">Ganhe automação com confirmação, histórico rastreável e menos retrabalho.</div>
+                <div className="rounded-xl border bg-background p-4 text-sm">Ideal para quem quer praticidade sem perder controle financeiro.</div>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Button onClick={() => setIsUpgradeModalOpen(true)}>Ver Premium</Button>
+                <Button onClick={() => setIsUpgradeModalOpen(true)}>Desbloquear no Premium</Button>
                 <Button variant="outline" onClick={() => window.location.href = "/settings"}>
                   Comparar planos
                 </Button>

@@ -31,6 +31,12 @@ export type BillingPlanConfig = {
   features: string[];
   modalHighlights: string[];
   comparisonSummary: string;
+  commercialCopy: {
+    dailyPriceLabel?: string;
+    priceSupport: string;
+    checkoutSupport: string;
+    upsellSupport: string;
+  };
   featureFlags: BillingPlanFeatureFlags;
 };
 
@@ -45,7 +51,7 @@ export const BILLING_PLANS: Record<BillingPlanId, BillingPlanConfig> = {
     priceCents: 1990,
     priceLabel: formatPriceLabel(1990),
     monthlyLabel: "R$ 19,90/mês",
-    description: "Controle essencial com IA básica para organizar a rotina financeira.",
+    description: "Controle essencial com IA básica para registrar gastos, entradas e acompanhar sua rotina com clareza.",
     marketingHeadline: "Controle essencial com IA básica",
     accountsLimit: 3,
     checkout: {
@@ -55,8 +61,8 @@ export const BILLING_PLANS: Record<BillingPlanId, BillingPlanConfig> = {
     features: [
       "Até 3 contas",
       "Painel financeiro completo",
-      "Assistente com IA para registrar gastos e entradas",
-      "Resumos financeiros genéricos",
+      "IA básica para registrar gastos e entradas",
+      "Resumos financeiros genéricos para acompanhar o mês",
       "Relatório PDF básico",
     ],
     modalHighlights: [
@@ -65,6 +71,11 @@ export const BILLING_PLANS: Record<BillingPlanId, BillingPlanConfig> = {
       "Estrutura ideal para quem quer controle sem complexidade",
     ],
     comparisonSummary: "Ideal para organizar a operação do dia a dia com controle essencial.",
+    commercialCopy: {
+      priceSupport: "Controle essencial para organizar sua rotina financeira com praticidade.",
+      checkoutSupport: "Organize gastos, entradas e resumos do mês sem adicionar complexidade.",
+      upsellSupport: "Boa escolha para quem quer clareza e rotina financeira bem organizada.",
+    },
     featureFlags: {
       businessArea: false,
       whatsappAgent: false,
@@ -82,10 +93,10 @@ export const BILLING_PLANS: Record<BillingPlanId, BillingPlanConfig> = {
     priceCents: 3990,
     priceLabel: formatPriceLabel(3990),
     monthlyLabel: "R$ 39,90/mês",
-    description: "Automação, relatórios avançados e inteligência ampliada para a vida financeira e a sua empresa.",
+    description: "Automação, relatórios avançados e inteligência ampliada para quem quer menos trabalho manual e mais visibilidade financeira.",
     marketingHeadline: "Automação, relatórios avançados e inteligência ampliada",
     recommended: true,
-    badge: "Mais recomendado",
+    badge: "Mais popular",
     accountsLimit: Number.POSITIVE_INFINITY,
     checkout: {
       productEnvKeys: ["CAKTO_PRODUCT_PREMIUM_ID", "CAKTO_PLAN_PREMIUM_ID"],
@@ -94,9 +105,9 @@ export const BILLING_PLANS: Record<BillingPlanId, BillingPlanConfig> = {
     features: [
       "Contas ilimitadas",
       "Minha empresa com visão dedicada",
-      "Agent de WhatsApp",
-      "Assistente com IA avançada e insights premium",
-      "Relatórios PDF avançados",
+      "Agent de WhatsApp exclusivo para registrar pelo chat",
+      "IA avançada com análises, interpretações e insights premium",
+      "Relatórios PDF avançados, mais completos e profissionais",
     ],
     modalHighlights: [
       "Relatórios mais completos, prontos para compartilhar",
@@ -104,6 +115,12 @@ export const BILLING_PLANS: Record<BillingPlanId, BillingPlanConfig> = {
       "IA com análises mais úteis, dicas e interpretações avançadas",
     ],
     comparisonSummary: "Ideal para quem quer operação mais automatizada e leitura financeira mais profunda.",
+    commercialCopy: {
+      dailyPriceLabel: "Menos de R$ 1,33 por dia",
+      priceSupport: "Mais automação para sua rotina financeira por um custo baixo no dia a dia.",
+      checkoutSupport: "Por cerca de R$ 1,33 por dia, você libera WhatsApp, relatórios avançados e menos trabalho manual.",
+      upsellSupport: "Automatize registros, ganhe relatórios mais completos e tenha uma experiência mais inteligente no dia a dia.",
+    },
     featureFlags: {
       businessArea: true,
       whatsappAgent: true,

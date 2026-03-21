@@ -14,6 +14,7 @@ export const CHECKOUT_PLAN_OPTIONS = BILLING_PLAN_ORDER.map((planId) => {
     comparisonSummary: plan.comparisonSummary,
     features: plan.features,
     modalHighlights: plan.modalHighlights,
+    commercialCopy: plan.commercialCopy,
   };
 }) as const;
 

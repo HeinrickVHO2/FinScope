@@ -15,10 +15,10 @@ export default function BillingRequiredPage() {
 
   if (isLoading || !user) {
     return (
-      <div className="flex items-center justify-center h-full w-full py-20">
+      <div className="flex h-full w-full items-center justify-center py-20">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-muted-foreground text-sm">Verificando seu pagamento...</p>
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
+          <p className="text-sm text-muted-foreground">Verificando seu pagamento...</p>
         </div>
       </div>
     );
@@ -27,10 +27,11 @@ export default function BillingRequiredPage() {
   const checkoutIntent = user.billingStatus === "active" ? "upgrade" : "signup";
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="mx-auto max-w-3xl p-6">
       <BillingCheckoutSection
         intent={checkoutIntent}
         currentPlan={user.plan}
+        subtitle="Compare os planos com contexto claro. O Premium combina WhatsApp, relatórios avançados e mais automação por menos de R$ 1,33 por dia."
         onFinished={refetchUser}
       />
     </div>
