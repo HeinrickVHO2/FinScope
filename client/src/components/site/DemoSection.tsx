@@ -88,7 +88,7 @@ export function DemoSection() {
             Veja como o FinScope aparece na prática ao longo da rotina
           </h2>
           <p className="mx-auto max-w-3xl text-slate-600">
-            Da conversa com IA ao planejamento do mês, cada tela abaixo mostra uma parte real do produto no ponto certo da narrativa.
+            Veja as principais áreas do FinScope em uso real, com uma leitura clara de como a plataforma funciona no dia a dia.
           </p>
         </div>
 
