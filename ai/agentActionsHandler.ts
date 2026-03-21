@@ -276,7 +276,7 @@ async function ensureAccounts(userId: string, plan: string) {
   }
 
   if (plan === "premium" && !hasPJ) {
-    await storage.createAccount({ userId, name: "Conta empresarial", type: "pj", initialBalance: 0 });
+    await storage.createAccount({ userId, name: "Minha empresa", type: "pj", initialBalance: 0 });
   }
 
   return storage.getAccountsByUserId(userId);

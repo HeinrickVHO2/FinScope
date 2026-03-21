@@ -1,6 +1,6 @@
 /**
- * Novo Chat Agent - Versão Simplificada e Eficaz
- * Substitui a lógica complicada anterior por uma arquitetura real de agente financeiro
+ * Novo Chat Agent - Versao Simplificada e Eficaz
+ * Substitui a logica complicada anterior por uma arquitetura real de agente financeiro
  */
 
 import { buildFinancialContext } from "./buildFinancialContext";
@@ -61,15 +61,97 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
 
   const recentContext = getRecentContext(userId, 6);
   const assistantOrchestrator = new AssistantOrchestrator(storage);
-  const modelSelection = resolveModelForText(content);
+  let modelSelection = resolveModelForText(content);
 
   const userMessageRow = await saveChatHistoryMessage(userId, "user", content);
   addConversationContext(userId, "user", content);
   updateSessionMemory(userId, { lastUserMessage: content });
 
+  let effectiveContent = content;
+  const pendingBaseMessage = session.pendingTransactionMessage || session.lastUserMessage;
+  const explicitAccountType = detectAccountTypeFromText(content);
+  let resolvedAccountType = explicitAccountType ?? (shouldReuseLastAccountType(content) ? session.lastAccountType : null);
+
+  if (session.awaitingTransactionAmount) {
+    const inferred = explicitAccountType ?? session.lastAccountType ?? detectAccountTypeFromText(pendingBaseMessage) ?? "PF";
+    const baseMessage = pendingBaseMessage || content;
+
+    if (!hasMonetaryAmount(content)) {
+      const question = "Qual foi o valor dessa transação?";
+      const assistantQuestion = await saveChatHistoryMessage(userId, "assistant", question);
+      addConversationContext(userId, "assistant", question);
+      updateSessionMemory(userId, {
+        awaitingTransactionAmount: true,
+        pendingTransactionMessage: baseMessage,
+        lastAccountType: inferred,
+      });
+      return {
+        userMessage: mapHistoryToResponse(userMessageRow),
+        assistantMessage: mapHistoryToResponse(assistantQuestion),
+        actions: [],
+        payload: { model: modelSelection },
+      };
+    }
+
+    effectiveContent = mergeTransactionMessage(baseMessage, content, inferred);
+    resolvedAccountType = inferred;
+    updateSessionMemory(userId, {
+      awaitingTransactionAmount: false,
+      awaitingAccountType: false,
+      pendingTransactionMessage: null,
+      lastAccountType: inferred,
+    });
+  }
+
+  if (session.awaitingAccountType) {
+    const answerType = detectAccountTypeFromText(content) ?? detectAccountTypeFromAnswer(content);
+    if (!answerType) {
+      const question = "Isso é da sua conta pessoal ou da sua empresa?";
+      const assistantQuestion = await saveChatHistoryMessage(userId, "assistant", question);
+      addConversationContext(userId, "assistant", question);
+      updateSessionMemory(userId, {
+        awaitingAccountType: true,
+        pendingTransactionMessage: pendingBaseMessage || null,
+      });
+      return {
+        userMessage: mapHistoryToResponse(userMessageRow),
+        assistantMessage: mapHistoryToResponse(assistantQuestion),
+        actions: [],
+        payload: { model: modelSelection },
+      };
+    }
+
+    resolvedAccountType = answerType;
+    effectiveContent = mergeTransactionMessage(pendingBaseMessage || content, null, answerType);
+    updateSessionMemory(userId, {
+      awaitingAccountType: false,
+      lastAccountType: answerType,
+      pendingTransactionMessage: pendingBaseMessage || null,
+    });
+
+    if (looksLikeTransactionStatement(pendingBaseMessage || "") && !hasMonetaryAmount(pendingBaseMessage || "")) {
+      const question = "Qual foi o valor dessa transação?";
+      const assistantQuestion = await saveChatHistoryMessage(userId, "assistant", question);
+      addConversationContext(userId, "assistant", question);
+      updateSessionMemory(userId, {
+        awaitingTransactionAmount: true,
+        pendingTransactionMessage: pendingBaseMessage || null,
+        lastAccountType: answerType,
+      });
+      return {
+        userMessage: mapHistoryToResponse(userMessageRow),
+        assistantMessage: mapHistoryToResponse(assistantQuestion),
+        actions: [],
+        payload: { model: modelSelection },
+      };
+    }
+  }
+
+  modelSelection = resolveModelForText(effectiveContent);
+
   const orchestrated = await assistantOrchestrator.handleMessage({
     userId,
-    text: content,
+    text: effectiveContent,
     channel: "internal_chat",
   });
   if (orchestrated.handled && orchestrated.reply) {
@@ -88,14 +170,14 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     };
   }
 
-  if (looksLikeFinanceAssistantQuestion(content)) {
+  if (looksLikeFinanceAssistantQuestion(effectiveContent)) {
     updateSessionMemory(userId, {
       pendingTransactionMessage: null,
       awaitingAccountType: false,
       awaitingTransactionAmount: false,
     });
-    const assistantResponse = await buildFinancialAssistantResponse(storage, userId, content, "internal_chat");
-    const assistantReply = assistantResponse.message || await buildFinancialAssistantReply(storage, userId, content, "internal_chat");
+    const assistantResponse = await buildFinancialAssistantResponse(storage, userId, effectiveContent, "internal_chat");
+    const assistantReply = assistantResponse.message || await buildFinancialAssistantReply(storage, userId, effectiveContent, "internal_chat");
     const fallbackPayload = {
       ...(assistantResponse.payload || {}),
       model: modelSelection,
@@ -110,80 +192,11 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     };
   }
 
-  let effectiveContent = content;
-  const pendingBaseMessage = session.pendingTransactionMessage || session.lastUserMessage;
-  const explicitAccountType = detectAccountTypeFromText(content);
-  let resolvedAccountType = explicitAccountType ?? (shouldReuseLastAccountType(content) ? session.lastAccountType : null);
-
-  if (session.awaitingTransactionAmount) {
-    const inferred = explicitAccountType ?? session.lastAccountType ?? detectAccountTypeFromText(pendingBaseMessage) ?? "PF";
-    const baseMessage = pendingBaseMessage || content;
-    if (!hasMonetaryAmount(content)) {
-      const question = "Qual foi o valor dessa transação?";
-      const assistantQuestion = await saveChatHistoryMessage(userId, "assistant", question);
-      addConversationContext(userId, "assistant", question);
-      updateSessionMemory(userId, {
-        awaitingTransactionAmount: true,
-        pendingTransactionMessage: baseMessage,
-        lastAccountType: inferred,
-      });
-      return {
-        userMessage: mapHistoryToResponse(userMessageRow),
-        assistantMessage: mapHistoryToResponse(assistantQuestion),
-        actions: [],
-        payload: {
-          model: modelSelection,
-        },
-      };
-    }
-
-    effectiveContent = mergeTransactionMessage(baseMessage, content, inferred);
-    resolvedAccountType = inferred;
-    updateSessionMemory(userId, {
-      awaitingTransactionAmount: false,
-      pendingTransactionMessage: null,
-      lastAccountType: inferred,
-    });
-  }
-
-  if (session.awaitingAccountType) {
-    const answerType = detectAccountTypeFromText(content) ?? detectAccountTypeFromAnswer(content);
-    const inferred = answerType || session.lastAccountType || "PF";
-    resolvedAccountType = inferred;
-    effectiveContent = mergeTransactionMessage(pendingBaseMessage || content, null, inferred);
-    updateSessionMemory(userId, {
-      awaitingAccountType: false,
-      lastAccountType: inferred,
-      pendingTransactionMessage: pendingBaseMessage || null,
-    });
-
-    if (looksLikeTransactionStatement(pendingBaseMessage || "") && !hasMonetaryAmount(pendingBaseMessage || "")) {
-      const question = "Qual foi o valor dessa transação?";
-      const assistantQuestion = await saveChatHistoryMessage(userId, "assistant", question);
-      addConversationContext(userId, "assistant", question);
-      updateSessionMemory(userId, {
-        awaitingTransactionAmount: true,
-        pendingTransactionMessage: pendingBaseMessage || null,
-        lastAccountType: inferred,
-      });
-      return {
-        userMessage: mapHistoryToResponse(userMessageRow),
-        assistantMessage: mapHistoryToResponse(assistantQuestion),
-        actions: [],
-        payload: {
-          model: modelSelection,
-        },
-      };
-    }
-  }
-
-  if (!resolvedAccountType) {
-    updateSessionMemory(userId, { awaitingAccountType: true });
+  if (!resolvedAccountType && looksLikeTransactionStatement(effectiveContent)) {
     const question = "Isso é da sua conta pessoal ou da sua empresa?";
-    const pendingMessage = looksLikeTransactionStatement(content) ? content : session.pendingTransactionMessage;
     updateSessionMemory(userId, {
       awaitingAccountType: true,
-      pendingTransactionMessage: pendingMessage || null,
+      pendingTransactionMessage: effectiveContent,
     });
     const assistantQuestion = await saveChatHistoryMessage(userId, "assistant", question);
     addConversationContext(userId, "assistant", question);
@@ -191,17 +204,11 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
       userMessage: mapHistoryToResponse(userMessageRow),
       assistantMessage: mapHistoryToResponse(assistantQuestion),
       actions: [],
-      payload: {
-        model: modelSelection,
-      },
+      payload: { model: modelSelection },
     };
   }
 
-  if (
-    !session.awaitingTransactionAmount
-    && looksLikeTransactionStatement(effectiveContent)
-    && !hasMonetaryAmount(effectiveContent)
-  ) {
+  if (looksLikeTransactionStatement(effectiveContent) && !hasMonetaryAmount(effectiveContent)) {
     const question = "Qual foi o valor dessa transação?";
     const assistantQuestion = await saveChatHistoryMessage(userId, "assistant", question);
     addConversationContext(userId, "assistant", question);
@@ -214,23 +221,20 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
       userMessage: mapHistoryToResponse(userMessageRow),
       assistantMessage: mapHistoryToResponse(assistantQuestion),
       actions: [],
-      payload: {
-        model: modelSelection,
-      },
+      payload: { model: modelSelection },
     };
   }
 
   updateSessionMemory(userId, {
     lastAccountType: resolvedAccountType,
     pendingTransactionMessage: null,
+    awaitingAccountType: false,
     awaitingTransactionAmount: false,
   });
-  const financialContext = await buildFinancialContext(userId, resolvedAccountType);
+  const financialContext = await buildFinancialContext(userId, resolvedAccountType || "ALL");
 
-  // 4. CONSTRUIR PROMPT - Usar prompt conversacional existente
   const conversationalPrompt = buildConversationalPrompt("", financialContext?.asPrompt || "", insightFocus ?? null);
 
-  // 5. CHAMAR OPENAI COM CONTEXTO REAL
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -262,12 +266,10 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     throw new Error("Resposta vazia da IA");
   }
 
-  // 6. PARSEAR RESPOSTA (JSON format)
   let aiResponse: any = {};
   try {
     aiResponse = JSON.parse(aiResponseText);
   } catch {
-    // Se falhar, usar como mensagem simples
     aiResponse = {
       status: "success",
       conversationalMessage: aiResponseText,
@@ -294,11 +296,9 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     }
   }
 
-  // 8. SALVAR RESPOSTA DO ASSISTENTE
   const llmPayload = { model: modelSelection };
   const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", assistantReply, llmPayload);
 
-  // 9. ATUALIZAR MEMÓRIA DE SESSÃO
   addConversationContext(userId, "assistant", assistantReply);
 
   return {
@@ -329,8 +329,8 @@ function mapHistoryToResponse(row: ChatHistoryRow) {
 function detectAccountTypeFromText(text: string | undefined | null): "PF" | "PJ" | null {
   if (!text) return null;
   const normalized = text.toLowerCase();
-  const pjKeywords = ["empresa", "pj", "cnpj", "cliente", "nota fiscal", "emiti", "fornecedor", "contrato", "mei", "negócio", "negocio", "faturamento", "fatura"];
-  const pfKeywords = ["pessoal", "casa", "família", "familia", "cartão", "cartao", "mercado", "aluguel", "minha vida", "salário", "salario"];
+  const pjKeywords = ["empresa", "pj", "cnpj", "cliente", "nota fiscal", "emiti", "fornecedor", "contrato", "mei", "negocio", "faturamento", "fatura"];
+  const pfKeywords = ["pessoal", "casa", "familia", "cartao", "mercado", "aluguel", "minha vida", "salario"];
 
   if (pjKeywords.some((kw) => normalized.includes(kw))) {
     return "PJ";
@@ -344,7 +344,7 @@ function detectAccountTypeFromText(text: string | undefined | null): "PF" | "PJ"
 function detectAccountTypeFromAnswer(text: string): "PF" | "PJ" | null {
   const normalized = text.toLowerCase().trim();
   if (!normalized) return null;
-  if (normalized.includes("empresa") || normalized.includes("pj") || normalized.includes("negócio") || normalized.includes("negocio")) {
+  if (normalized.includes("empresa") || normalized.includes("pj") || normalized.includes("negocio")) {
     return "PJ";
   }
   if (normalized.includes("pessoal") || normalized.includes("pf") || normalized.includes("vida")) {

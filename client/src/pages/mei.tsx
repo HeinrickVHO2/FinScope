@@ -11,7 +11,7 @@ import { ArrowDownRight, ArrowUpRight, BarChart3, Building2, Lock, TrendingUp } 
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Bar, Tooltip, Legend } from "recharts";
 import UpgradeModal from "@/components/UpgradeModal";
 
-export default function MEIPage() {
+export default function MinhaEmpresaPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);

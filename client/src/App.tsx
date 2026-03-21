@@ -16,7 +16,7 @@ import DashboardPage from "@/pages/dashboard";
 import TransactionsPage from "@/pages/transactions";
 import InvestmentsPage from "@/pages/investments";
 import GoalsPage from "@/pages/goals";
-import MEIPage from "@/pages/mei";
+import MinhaEmpresaPage from "@/pages/mei";
 import SettingsPage from "@/pages/settings";
 import FutureExpensesPage from "@/pages/future-expenses";
 import AIClientPage from "@/pages/ai";
@@ -209,7 +209,7 @@ function Router() {
       </Route>
       <Route path="/mei">
         <DashboardLayout>
-          <MEIPage />
+          <MinhaEmpresaPage />
         </DashboardLayout>
       </Route>
       <Route path="/settings">

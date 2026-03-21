@@ -423,7 +423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const ensureScopeAccess = (scope: AccountScope, req: any, res: any) => {
     if (scope === "PJ" && req.currentUser?.plan !== "premium") {
-      res.status(403).json({ error: "Recurso empresarial disponível apenas para o plano Premium" });
+      res.status(403).json({ error: "A área Minha empresa está disponível apenas no plano Premium" });
       return false;
     }
     return true;
@@ -1578,7 +1578,7 @@ type AiInterpretationResult =
     if (plan === "premium" && !hasPJ) {
       await storage.createAccount({
         userId,
-        name: "Conta empresarial",
+        name: "Minha empresa",
         type: "pj",
         initialBalance: 0,
       });
@@ -2049,7 +2049,7 @@ type AiInterpretationResult =
         return res.status(404).json({ error: "Conta não encontrada" });
       }
       if (account.type === "pj" && req.currentUser?.plan !== "premium") {
-        return res.status(403).json({ error: "Contas PJ disponíveis apenas no plano Premium" });
+        return res.status(403).json({ error: "Contas da área Minha empresa disponíveis apenas no plano Premium" });
       }
       res.json(account);
     } catch (error) {
@@ -2071,8 +2071,8 @@ type AiInterpretationResult =
 
       if (validatedData.type === "pj" && req.currentUser?.plan !== "premium") {
         return res.status(403).json({ 
-          error: "Contas PJ disponíveis apenas no plano Premium",
-          message: "Para cadastrar contas empresariais (PJ), você precisa fazer upgrade para o plano Premium. Clique no botão 'Fazer Upgrade' para ativar todos os recursos empresariais."
+          error: "Contas da área Minha empresa disponíveis apenas no plano Premium",
+          message: "Para cadastrar contas na área Minha empresa, você precisa fazer upgrade para o plano Premium. Clique no botão 'Fazer Upgrade' para ativar esse recurso."
         });
       }
 
@@ -2094,7 +2094,7 @@ type AiInterpretationResult =
         return res.status(404).json({ error: "Conta não encontrada" });
       }
       if (account.type === "pj" && req.currentUser?.plan !== "premium") {
-        return res.status(403).json({ error: "Contas PJ disponíveis apenas no plano Premium" });
+        return res.status(403).json({ error: "Contas da área Minha empresa disponíveis apenas no plano Premium" });
       }
 
       // Strict validation - only allow name and type updates
@@ -2117,7 +2117,7 @@ type AiInterpretationResult =
         return res.status(404).json({ error: "Conta não encontrada" });
       }
       if (account.type === "pj" && req.currentUser?.plan !== "premium") {
-        return res.status(403).json({ error: "Contas PJ disponíveis apenas no plano Premium" });
+        return res.status(403).json({ error: "Contas da área Minha empresa disponíveis apenas no plano Premium" });
       }
 
       await storage.deleteAccount(req.params.id);
@@ -2151,7 +2151,7 @@ type AiInterpretationResult =
         return res.status(404).json({ error: "Conta não encontrada" });
       }
       if (account.type === "pj" && req.currentUser?.plan !== "premium") {
-        return res.status(403).json({ error: "Transações de contas PJ disponíveis apenas no plano Premium" });
+        return res.status(403).json({ error: "Transações da área Minha empresa disponíveis apenas no plano Premium" });
       }
 
       const transactions = await storage.getTransactionsByAccountId(req.params.accountId);
@@ -2174,7 +2174,7 @@ type AiInterpretationResult =
       }
       const requestedAccountType = normalizeAccountType(req.body?.accountType ?? (account.type === "pj" ? "PJ" : "PF"));
       if (requestedAccountType === "PJ" && req.currentUser?.plan !== "premium") {
-        return res.status(403).json({ error: "Transações em contas PJ disponíveis apenas no plano Premium" });
+        return res.status(403).json({ error: "Transações da área Minha empresa disponíveis apenas no plano Premium" });
       }
 
       const data = insertTransactionSchema.parse({
@@ -2205,7 +2205,7 @@ type AiInterpretationResult =
         return res.status(404).json({ error: "Conta não encontrada" });
       }
       if (transactionAccount?.type === "pj" && req.currentUser?.plan !== "premium") {
-        return res.status(403).json({ error: "Transações em contas PJ disponíveis apenas no plano Premium" });
+        return res.status(403).json({ error: "Transações da área Minha empresa disponíveis apenas no plano Premium" });
       }
 
       // Strict validation
@@ -2213,7 +2213,7 @@ type AiInterpretationResult =
       if (parsedUpdates.accountType) {
         parsedUpdates.accountType = normalizeAccountType(parsedUpdates.accountType);
         if (parsedUpdates.accountType === "PJ" && req.currentUser?.plan !== "premium") {
-          return res.status(403).json({ error: "Transações em contas PJ disponíveis apenas no plano Premium" });
+          return res.status(403).json({ error: "Transações da área Minha empresa disponíveis apenas no plano Premium" });
         }
       }
       const updated = await storage.updateTransaction(req.params.id, parsedUpdates);
@@ -2238,7 +2238,7 @@ type AiInterpretationResult =
         return res.status(404).json({ error: "Conta não encontrada" });
       }
       if (transactionAccount?.type === "pj" && req.currentUser?.plan !== "premium") {
-        return res.status(403).json({ error: "Transações em contas PJ disponíveis apenas no plano Premium" });
+        return res.status(403).json({ error: "Transações da área Minha empresa disponíveis apenas no plano Premium" });
       }
 
       await storage.deleteTransaction(req.params.id);
@@ -2460,7 +2460,7 @@ type AiInterpretationResult =
         expectedDate: req.body?.expectedDate,
       });
       if (parsed.accountType === "PJ" && req.currentUser?.plan !== "premium") {
-        return res.status(403).json({ error: "Valores previstos PJ disponíveis apenas no plano Premium" });
+        return res.status(403).json({ error: "Valores previstos da área Minha empresa disponíveis apenas no plano Premium" });
       }
       const futureTx = await storage.createFutureTransaction({
         ...parsed,

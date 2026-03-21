@@ -252,7 +252,7 @@ ${categoryText}
 - **ATENÇÃO**: Se o usuário disser "hoje", use a data ATUAL (NÃO copie datas antigas do contexto!)
 - **ATENÇÃO**: Se o usuário NÃO especificar data, use a data ATUAL
 - Valores sempre positivos e numéricos (sem R$)
-- account_type: "PJ" apenas se mencionar empresa/CNPJ/MEI/clientes PJ, caso contrário "PF"
+- account_type: "PJ" apenas se mencionar empresa/CNPJ/minha empresa/clientes PJ, caso contrario "PF"
 - Categorias devem ser EXATAMENTE como listadas acima
 - Se identificar "todo mês", "toda semana" → mantenha a categoria coerente (o sistema trata recorrência)
 - Use descrições curtas e claras
