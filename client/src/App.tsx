@@ -16,6 +16,7 @@ import DashboardPage from "@/pages/dashboard";
 import TransactionsPage from "@/pages/transactions";
 import InvestmentsPage from "@/pages/investments";
 import GoalsPage from "@/pages/goals";
+import AccountsPage from "@/pages/accounts";
 import MinhaEmpresaPage from "@/pages/mei";
 import SettingsPage from "@/pages/settings";
 import FutureExpensesPage from "@/pages/future-expenses";
@@ -205,6 +206,11 @@ function Router() {
       <Route path="/goals">
         <DashboardLayout>
           <GoalsPage />
+        </DashboardLayout>
+      </Route>
+      <Route path="/accounts">
+        <DashboardLayout>
+          <AccountsPage />
         </DashboardLayout>
       </Route>
       <Route path="/mei">
