@@ -74,10 +74,10 @@ const scopeLabels: Record<Scope, { title: string; description: string; accent: s
     badge: "PF",
   },
   PJ: {
-    title: "Finanças Empresariais",
-    description: "Entradas, saídas e compromissos do seu negócio.",
+    title: "Minha empresa",
+    description: "Entradas, saídas e compromissos do caixa da sua empresa.",
     accent: "from-purple-500/15 via-purple-500/5 to-transparent",
-    badge: "Premium",
+    badge: "Empresa",
   },
   ALL: {
     title: "Visão Consolidada",
@@ -235,7 +235,7 @@ export default function DashboardPage() {
             className={cn(selectedView === "PJ" && "border-purple-500 text-purple-600")}
             aria-disabled={!isPremium}
           >
-            Conta Empresarial
+            Minha empresa
             {!isPremium && <Lock className="ml-2 h-4 w-4" />}
           </Button>
           <Button
@@ -585,7 +585,7 @@ function DashboardBlock({ scope, data, premium, hideSummary }: DashboardBlockPro
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {hideSummary ? "Detalhes do contexto" : scope === "PF" ? "Conta pessoal" : scope === "PJ" ? "Conta empresarial" : "Consolidado"}
+              {hideSummary ? "Detalhes do contexto" : scope === "PF" ? "Conta pessoal" : scope === "PJ" ? "Minha empresa" : "Consolidado"}
             </p>
             <h3 className="text-2xl font-semibold text-slate-900 mt-1">{title}</h3>
             {!hideSummary && <p className="text-sm text-muted-foreground mt-1">{description}</p>}

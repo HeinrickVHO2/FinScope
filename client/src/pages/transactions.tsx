@@ -380,7 +380,7 @@ export default function TransactionsPage() {
               onClick={() => handleScopeChange("PJ")}
               aria-disabled={!isPremiumUser}
             >
-              Conta Empresarial
+              Minha empresa
               {!isPremiumUser && <Lock className="ml-2 h-4 w-4" />}
             </Button>
             <Button
@@ -449,13 +449,13 @@ export default function TransactionsPage() {
                           <SelectContent>
                             <SelectItem value="PF">Pessoal (PF)</SelectItem>
                             <SelectItem value="PJ" disabled={!isPremiumUser}>
-                              Empresarial (PJ)
+                              Minha empresa
                             </SelectItem>
                           </SelectContent>
                         </Select>
                         {!isPremiumUser && (
                           <p className="text-xs text-muted-foreground">
-                            A conta empresarial fica disponível no plano Premium.
+                            A opção Minha empresa fica disponível no plano Premium.
                           </p>
                         )}
                         <FormMessage />
@@ -505,7 +505,7 @@ export default function TransactionsPage() {
                           )}
                           {accountType === "PJ" && isPremiumUser && !businessAccount && !accountsLoading && (
                             <p className="text-xs text-destructive mt-1">
-                              Crie uma conta empresarial antes de registrar lançamentos PJ.
+                              Crie a conta da sua empresa antes de registrar lançamentos nessa visão.
                             </p>
                           )}
                           {accountType === "PF" && !personalAccount && !accountsLoading && (

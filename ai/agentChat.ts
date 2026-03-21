@@ -99,7 +99,8 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     };
   }
 
-  let resolvedAccountType = detectAccountTypeFromText(content) ?? session.lastAccountType;
+  const explicitAccountType = detectAccountTypeFromText(content);
+  let resolvedAccountType = explicitAccountType ?? (shouldReuseLastAccountType(content) ? session.lastAccountType : null);
 
   if (session.awaitingAccountType) {
     const answerType = detectAccountTypeFromText(content) ?? detectAccountTypeFromAnswer(content);
@@ -113,7 +114,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
 
   if (!resolvedAccountType) {
     updateSessionMemory(userId, { awaitingAccountType: true });
-    const question = "Isso é da sua conta pessoal ou da sua conta da empresa (PJ)?";
+    const question = "Isso é da sua conta pessoal ou da sua empresa?";
     const assistantQuestion = await saveChatHistoryMessage(userId, "assistant", question);
     addConversationContext(userId, "assistant", question);
     return {
@@ -231,7 +232,7 @@ function mapHistoryToResponse(row: ChatHistoryRow) {
 function detectAccountTypeFromText(text: string | undefined | null): "PF" | "PJ" | null {
   if (!text) return null;
   const normalized = text.toLowerCase();
-  const pjKeywords = ["empresa", "pj", "cnpj", "cliente", "nota", "emiti", "fornecedor", "contrato", "mei", "negócio", "negocio", "serviço", "servico", "projeto", "fatura"];
+  const pjKeywords = ["empresa", "pj", "cnpj", "cliente", "nota fiscal", "emiti", "fornecedor", "contrato", "mei", "negócio", "negocio", "faturamento", "fatura"];
   const pfKeywords = ["pessoal", "casa", "família", "familia", "cartão", "cartao", "mercado", "aluguel", "minha vida", "salário", "salario"];
 
   if (pjKeywords.some((kw) => normalized.includes(kw))) {
@@ -246,13 +247,21 @@ function detectAccountTypeFromText(text: string | undefined | null): "PF" | "PJ"
 function detectAccountTypeFromAnswer(text: string): "PF" | "PJ" | null {
   const normalized = text.toLowerCase().trim();
   if (!normalized) return null;
-  if (normalized.includes("pessoal") || normalized.includes("pf") || normalized.includes("minha") || normalized.includes("vida")) {
-    return "PF";
-  }
   if (normalized.includes("empresa") || normalized.includes("pj") || normalized.includes("negócio") || normalized.includes("negocio")) {
     return "PJ";
   }
+  if (normalized.includes("pessoal") || normalized.includes("pf") || normalized.includes("vida")) {
+    return "PF";
+  }
   return null;
+}
+
+function shouldReuseLastAccountType(text: string | undefined | null) {
+  if (!text) return false;
+  const normalized = text.toLowerCase().trim();
+  if (!normalized) return false;
+
+  return !/\b(recebi|ganhei|gastei|paguei|comprei|vendi|faturei|pix|entrou|saiu|transferi|depositei|saquei)\b/.test(normalized);
 }
 
 function extractAccountTypeFromResult(result: AgentActionResult): "PF" | "PJ" | null {

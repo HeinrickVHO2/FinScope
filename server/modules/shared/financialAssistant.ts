@@ -672,7 +672,7 @@ export async function buildStructuredFinancialSummary(
 
 function scopeLabel(scope: AccountScope) {
   if (scope === "PF") return " na sua conta pessoal";
-  if (scope === "PJ") return " na sua conta empresarial";
+  if (scope === "PJ") return " na sua empresa";
   return "";
 }
 

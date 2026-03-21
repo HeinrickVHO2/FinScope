@@ -267,7 +267,7 @@ export default function FutureExpensesPage() {
             onClick={() => handleScopeChange("PJ")}
             disabled={!isPremium}
           >
-            Conta Empresarial
+            Minha empresa
           </Button>
         </div>
       </div>

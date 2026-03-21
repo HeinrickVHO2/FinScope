@@ -103,6 +103,29 @@ function detectAccountScopeHint(text?: string): "PF" | "PJ" | null {
   return null;
 }
 
+function hasMixedAccountTypes(accounts: Account[]) {
+  return new Set(
+    accounts
+      .map((account) => String(account.type || "").toUpperCase())
+      .filter(Boolean),
+  ).size > 1;
+}
+
+function looksLikeStandaloneTransactionMessage(text?: string) {
+  const normalized = normalizeText(text);
+  if (!normalized) return false;
+  if (looksLikeGreeting(text) || looksLikeFinanceAssistantQuestion(text || "")) return false;
+
+  const hasTransactionVerb = /\b(paguei|gastei|comprei|recebi|ganhei|pix|boleto|faturamento|entrada|saida|entrou|saiu|transferi|depositei|saquei)\b/.test(normalized);
+  const hasAmountHint = /\br\$\s*\d|\b\d[\d.,]*\s*(reais?|rs)\b/.test(normalized);
+
+  return hasTransactionVerb && hasAmountHint;
+}
+
+function isScopeOnlyReply(text?: string) {
+  return Boolean(detectAccountScopeHint(text)) && !looksLikeStandaloneTransactionMessage(text);
+}
+
 function accountLabel(account: Account) {
   const name = String(account.name || "").trim();
   const type = account.type.toUpperCase();
@@ -1248,6 +1271,56 @@ export class WhatsAppAgentService {
     }
 
     if (candidate.status === WHATSAPP_CANDIDATE_STATUS.AWAITING_USER_CONFIRMATION) {
+      const scopeHint = detectAccountScopeHint(text);
+      if (scopeHint && isScopeOnlyReply(text)) {
+        const accounts = await this.storage.getAccountsByUserId(user.id);
+        const scopedAccounts = accounts.filter((account) => account.type.toUpperCase() === scopeHint);
+
+        if (scopedAccounts.length === 1) {
+          const selectedAccount = scopedAccounts[0];
+          await this.repository.updateCandidate({
+            candidateId: candidate.id,
+            userId: user.id,
+            status: WHATSAPP_CANDIDATE_STATUS.AWAITING_USER_CONFIRMATION,
+            evidence: this.mergeCandidateEvidence(candidate, {
+              selectedAccountId: selectedAccount.id,
+              selectedAccountLabel: accountLabel(selectedAccount),
+              accountSelectionReason: "user_scope_correction",
+            }),
+          });
+
+          await this.sendReplyToInbound(
+            inbound,
+            `🏦 Ajustei a conta do lançamento\n\n${this.formatCandidateDetails(candidate)}\n\n• Conta: ${accountLabel(selectedAccount)}\n\nPosso confirmar agora?`,
+          );
+          return { status: "awaiting_user_confirmation" };
+        }
+
+        if (scopedAccounts.length > 1) {
+          await this.repository.updateCandidate({
+            candidateId: candidate.id,
+            userId: user.id,
+            status: WHATSAPP_CANDIDATE_STATUS.AWAITING_ACCOUNT_SELECTION,
+            evidence: this.mergeCandidateEvidence(candidate, {
+              selectedAccountId: null,
+              selectedAccountLabel: null,
+              accountSelectionReason: "user_scope_correction_needs_account_selection",
+              accountOptions: scopedAccounts.map((account) => ({
+                id: account.id,
+                name: account.name,
+                type: account.type.toUpperCase(),
+              })),
+            }),
+          });
+
+          await this.sendReplyToInbound(
+            inbound,
+            `🏦 Entendi. Vou lançar nessa visão.\n\n${this.formatCandidateDetails(candidate)}\n\nAgora escolha a conta:\n${this.formatAccountOptions(scopedAccounts)}`,
+          );
+          return { status: "awaiting_account_selection" };
+        }
+      }
+
       const confirmation = detectConfirmationIntent(text);
       if (confirmation === "cancel") {
         await this.repository.updateCandidate({
@@ -1528,6 +1601,14 @@ export class WhatsAppAgentService {
       };
     }
 
+    if (!scopeHint && hasMixedAccountTypes(scoped)) {
+      return {
+        selectedAccount: null,
+        accountOptions: scoped,
+        selectionReason: "ambiguous_scope_between_pf_pj",
+      };
+    }
+
     const transactions = await this.storage.getTransactionsByUserId(userId, "ALL");
     const recentTransactions = transactions
       .filter((transaction) => scoped.some((account) => account.id === transaction.accountId))
@@ -1593,9 +1674,11 @@ export class WhatsAppAgentService {
 
   private shouldHandleAsReplyToOpenCandidate(candidate: CandidateRecord, text: string) {
     if (!text.trim()) return true;
-    if (detectResetIntent(text) || detectConfirmationIntent(text) || detectAccountScopeHint(text)) return true;
+    if (detectResetIntent(text) || detectConfirmationIntent(text)) return true;
 
     const normalized = normalizeText(text);
+    if (looksLikeStandaloneTransactionMessage(text)) return false;
+    if (isScopeOnlyReply(text)) return true;
     if (/^\d+$/.test(normalized)) return true;
 
     if (candidate.status === WHATSAPP_CANDIDATE_STATUS.AWAITING_ACCOUNT_SELECTION) {
@@ -1836,7 +1919,7 @@ export class WhatsAppAgentService {
     const clamped = Math.max(0, Math.min(100, percent));
     const total = 8;
     const filled = Math.round((clamped / 100) * total);
-    return `${"█".repeat(filled)}${"░".repeat(Math.max(0, total - filled))}`;
+    return `${"#".repeat(filled)}${"-".repeat(Math.max(0, total - filled))}`;
   }
 
   private async confirmPhoneBinding(pending: PendingPhoneBinding, event: WhatsAppInboundEvent): Promise<{ status: string }> {

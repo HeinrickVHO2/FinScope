@@ -1545,7 +1545,130 @@ test("WhatsAppAgentService does not trap a new standalone transaction behind an 
   assert.equal(repository.candidates.get("candidate-1")?.status, "auto_created_pending_review");
 });
 
-test("WhatsAppAgentService auto creates transaction with multiple accounts when recent history indicates the likely account", async () => {
+test("WhatsAppAgentService does not trap a scoped standalone transaction behind an older pending candidate", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const parser = buildParser([{
+    kind: "income",
+    amount: 50,
+    description: "Recebimento",
+    merchant: "Cliente",
+    categorySuggestion: "Outros",
+    transactionDate: new Date("2026-03-15T00:00:00.000Z"),
+    confidence: 0.95,
+    missingFields: [],
+  }]);
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    parser: parser as any,
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  repository.candidates.set("candidate-old", {
+    id: "candidate-old",
+    user_id: "user-1",
+    inbound_message_id: "in-old",
+    proposed_type: "expense",
+    amount: 10,
+    currency: "BRL",
+    description: "Coxinha",
+    merchant_name: "Padaria",
+    category_suggestion: "Alimentacao",
+    transaction_date: "2026-03-15T00:00:00.000Z",
+    confidence_score: 0.78,
+    status: "awaiting_user_confirmation",
+    evidence: { rawMessage: "paguei 10 no lanche" },
+    persisted_transaction_id: null,
+    created_at: new Date("2026-03-15T10:00:00.000Z").toISOString(),
+    updated_at: new Date("2026-03-15T10:00:00.000Z").toISOString(),
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-new-scoped-transaction",
+    text: "recebi 50 reais na minha conta pessoal",
+  }));
+
+  assert.equal(result.status, "auto_created_pending_review");
+  assert.equal(repository.candidates.get("candidate-old")?.status, "ignored");
+  assert.equal(storage.createTransactionCalls, 1);
+  assert.equal(repository.candidates.get("candidate-1")?.status, "auto_created_pending_review");
+});
+
+test("WhatsAppAgentService updates the pending candidate account when the user corrects the scope", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  storage.accounts = [
+    {
+      id: "acc-1",
+      userId: "user-1",
+      name: "Carteira PF",
+      type: "pf",
+      businessCategory: null,
+      initialBalance: "0",
+      createdAt: new Date(),
+    },
+    {
+      id: "acc-2",
+      userId: "user-1",
+      name: "Minha empresa",
+      type: "pj",
+      businessCategory: null,
+      initialBalance: "0",
+      createdAt: new Date(),
+    },
+  ];
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  repository.candidates.set("candidate-old", {
+    id: "candidate-old",
+    user_id: "user-1",
+    inbound_message_id: "in-old",
+    proposed_type: "expense",
+    amount: 120,
+    currency: "BRL",
+    description: "Fone de ouvido",
+    merchant_name: "Loja",
+    category_suggestion: "Moradia",
+    transaction_date: "2026-03-15T00:00:00.000Z",
+    confidence_score: 0.95,
+    status: "awaiting_user_confirmation",
+    evidence: {
+      rawMessage: "gastei 120 reais em um fone de ouvido",
+      selectedAccountId: "acc-2",
+      selectedAccountLabel: "Minha empresa PJ",
+    },
+    persisted_transaction_id: null,
+    created_at: new Date("2026-03-15T10:00:00.000Z").toISOString(),
+    updated_at: new Date("2026-03-15T10:00:00.000Z").toISOString(),
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-scope-correction",
+    text: "na minha conta pessoal",
+  }));
+
+  assert.equal(result.status, "awaiting_user_confirmation");
+  assert.equal(repository.candidates.get("candidate-old")?.evidence?.selectedAccountId, "acc-1");
+  assert.equal(repository.candidates.get("candidate-old")?.evidence?.accountSelectionReason, "user_scope_correction");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /Carteira PF/i);
+});
+
+test("WhatsAppAgentService auto creates transaction with multiple accounts of the same scope when recent history indicates the likely account", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();
   const messenger = new FakeMessenger();
@@ -1581,8 +1704,8 @@ test("WhatsAppAgentService auto creates transaction with multiple accounts when 
     {
       id: "acc-3",
       userId: "user-1",
-      name: "Caixa PJ",
-      type: "pj",
+      name: "Caixa Reserva PF",
+      type: "pf",
       businessCategory: null,
       initialBalance: "0",
       createdAt: new Date(),
@@ -1621,6 +1744,75 @@ test("WhatsAppAgentService auto creates transaction with multiple accounts when 
   assert.equal(storage.createTransactionCalls, 2);
   assert.equal(storage.transactions.get("tx-2")?.accountId, "acc-2");
   assert.equal(repository.candidates.get("candidate-1")?.evidence?.accountSelectionReason, "recent_history_default");
+});
+
+test("WhatsAppAgentService asks for account selection when PF and PJ exist and the message does not define scope", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const parser = buildParser([{
+    kind: "expense",
+    amount: 27,
+    description: "Uber",
+    merchant: "Uber",
+    categorySuggestion: "Transporte",
+    transactionDate: new Date("2026-03-15T00:00:00.000Z"),
+    confidence: 0.95,
+    missingFields: [],
+  }]);
+  storage.accounts = [
+    {
+      id: "acc-1",
+      userId: "user-1",
+      name: "Carteira PF",
+      type: "pf",
+      businessCategory: null,
+      initialBalance: "0",
+      createdAt: new Date(),
+    },
+    {
+      id: "acc-2",
+      userId: "user-1",
+      name: "Minha empresa",
+      type: "pj",
+      businessCategory: null,
+      initialBalance: "0",
+      createdAt: new Date(),
+    },
+  ];
+
+  await storage.createTransaction({
+    userId: "user-1",
+    accountId: "acc-2",
+    description: "Despesa recente PJ",
+    type: "saida",
+    amount: 80,
+    category: "Transporte",
+    date: new Date(),
+    accountType: "PJ",
+    source: "manual",
+  });
+
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    parser: parser as any,
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-ambiguous-scope",
+    text: "paguei 27 de uber",
+  }));
+
+  assert.equal(result.status, "awaiting_account_selection");
+  assert.equal(storage.createTransactionCalls, 1);
+  assert.equal(repository.candidates.get("candidate-1")?.evidence?.accountSelectionReason, "ambiguous_scope_between_pf_pj");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /em qual conta devo lançar/i);
 });
 
 test("WhatsAppAgentService falls back to pending confirmation when auto transaction persistence fails", async () => {
