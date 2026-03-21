@@ -23,25 +23,8 @@ export default function AIClientPage() {
   const [isSending, setIsSending] = useState(false);
   const [pendingBotId, setPendingBotId] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  const [insightFocus, setInsightFocus] = useState<"economy" | "debt" | "investments" | null>(() => {
-    const saved = localStorage.getItem("ai_insight_focus");
-    return (saved as any) || null;
-  });
   const { toast } = useToast();
   const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
-
-  // Persistir foco de insight
-  useEffect(() => {
-    if (insightFocus) {
-      localStorage.setItem("ai_insight_focus", insightFocus);
-      apiFetch("/api/ai/insight-focus", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ focus: insightFocus }),
-        credentials: "include",
-      }).catch((e) => console.error("Erro ao salvar foco:", e));
-    }
-  }, [insightFocus]);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -122,9 +105,8 @@ export default function AIClientPage() {
       const response = await apiFetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           content: tempUserMessage.content,
-          insightFocus: insightFocus,
         }),
         credentials: "include",
       });
@@ -207,32 +189,6 @@ export default function AIClientPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={insightFocus === "economy" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setInsightFocus(insightFocus === "economy" ? null : "economy")}
-            data-testid="button-focus-economy"
-          >
-            Economizar
-          </Button>
-          <Button
-            variant={insightFocus === "debt" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setInsightFocus(insightFocus === "debt" ? null : "debt")}
-            data-testid="button-focus-debt"
-          >
-            Quitar dívidas
-          </Button>
-          <Button
-            variant={insightFocus === "investments" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setInsightFocus(insightFocus === "investments" ? null : "investments")}
-            data-testid="button-focus-investments"
-          >
-            Investir melhor
-          </Button>
-        </div>
       </div>
 
       <Card className="flex flex-col h-[70vh] overflow-hidden border-primary/10 shadow-sm">

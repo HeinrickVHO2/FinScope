@@ -7,16 +7,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import type { Account, Transaction } from "@shared/schema";
 import { useLocation } from "wouter";
-import { ArrowDownRight, ArrowUpRight, BarChart3, Building2, Lock, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BarChart3, Building2, Lock, TrendingUp } from "lucide-react";
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Bar, Tooltip, Legend } from "recharts";
 import UpgradeModal from "@/components/UpgradeModal";
-
-type ViewMode = "pj" | "mei";
 
 export default function MEIPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
-  const [viewMode, setViewMode] = useState<ViewMode>("pj");
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
@@ -32,15 +29,10 @@ export default function MEIPage() {
 
   const businessAccounts = useMemo(
     () => accounts.filter((acc) => acc.type === "pj"),
-    [accounts]
-  );
-  const meiAccounts = useMemo(
-    () => businessAccounts.filter((acc) => acc.businessCategory === "mei"),
-    [businessAccounts]
+    [accounts],
   );
 
-  const selectedAccounts = viewMode === "pj" ? businessAccounts : meiAccounts;
-  const selectedAccountIds = new Set(selectedAccounts.map((acc) => acc.id));
+  const selectedAccountIds = new Set(businessAccounts.map((acc) => acc.id));
   const businessTransactions = transactions.filter((tx) => selectedAccountIds.has(tx.accountId));
 
   const metrics = useMemo(() => {
@@ -110,9 +102,9 @@ export default function MEIPage() {
       <>
         <div className="p-6 space-y-6">
           <div>
-            <h1 className="text-3xl font-poppins font-bold">Gestão Empresarial</h1>
+            <h1 className="text-3xl font-poppins font-bold">Minha empresa</h1>
             <p className="text-muted-foreground">
-              Reúna suas contas PJ e MEI em um só lugar e acompanhe o caixa da empresa com mais clareza.
+              Reúna as contas da sua empresa em um só lugar e acompanhe o caixa com mais clareza.
             </p>
           </div>
           <Card className="border-primary/40 bg-primary/5">
@@ -122,7 +114,7 @@ export default function MEIPage() {
               </div>
               <h3 className="text-2xl font-semibold font-poppins">Recurso exclusivo do Premium</h3>
               <p className="max-w-xl text-muted-foreground">
-                Ative o Premium para acompanhar as finanças da empresa com mais detalhes e relatórios dedicados.
+                Ative o Premium para acompanhar a área Minha empresa com relatórios e visão dedicada.
               </p>
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => setLocation("/settings")} data-testid="button-learn-more">
@@ -138,7 +130,7 @@ export default function MEIPage() {
         <UpgradeModal
           open={isUpgradeModalOpen}
           onOpenChange={setIsUpgradeModalOpen}
-          featureName="Gestão Empresarial"
+          featureName="Minha empresa"
         />
       </>
     );
@@ -146,171 +138,160 @@ export default function MEIPage() {
 
   return (
     <>
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-poppins font-bold">Gestão PJ & MEI</h1>
-          <p className="text-muted-foreground">
-            Acompanhe o caixa da empresa e destaque as contas marcadas como MEI.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant={viewMode === "pj" ? "default" : "outline"} onClick={() => setViewMode("pj")}>
-            Todas as contas PJ
-          </Button>
-          <Button
-            variant={viewMode === "mei" ? "default" : "outline"}
-            onClick={() => setViewMode("mei")}
-            disabled={meiAccounts.length === 0}
-          >
-            Somente MEI
-          </Button>
-        </div>
-      </div>
-
-      {selectedAccounts.length === 0 ? (
-        <Card className="p-10 text-center space-y-3">
-          <Building2 className="h-10 w-10 text-muted-foreground mx-auto" />
-          <h3 className="font-semibold">Nenhuma conta {viewMode === "mei" ? "MEI" : "PJ"} encontrada</h3>
-          <p className="text-sm text-muted-foreground">
-            Adicione contas PJ e marque-as como MEI dentro do cadastro para vê-las aqui.
-          </p>
-          <Button onClick={() => setIsUpgradeModalOpen(true)}>Desbloquear contas PJ</Button>
-        </Card>
-      ) : (
-        <>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-sm font-medium">Receitas</CardTitle>
-                  <CardDescription>Entradas por contas {viewMode.toUpperCase()}</CardDescription>
-                </div>
-                <ArrowUpRight className="h-5 w-5 text-emerald-500" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">
-                  R$ {metrics.revenue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-sm font-medium">Despesas</CardTitle>
-                  <CardDescription>Saídas registradas</CardDescription>
-                </div>
-                <ArrowDownRight className="h-5 w-5 text-destructive" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">
-                  R$ {metrics.expenses.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-sm font-medium">Lucro Líquido</CardTitle>
-                  <CardDescription>Receitas - Despesas</CardDescription>
-                </div>
-                <TrendingUp className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <p className={`text-3xl font-bold ${metrics.net >= 0 ? "text-primary" : "text-destructive"}`}>
-                  R$ {metrics.net.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                </p>
-              </CardContent>
-            </Card>
+      <div className="p-6 space-y-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-poppins font-bold">Minha empresa</h1>
+            <p className="text-muted-foreground">
+              Acompanhe o caixa da sua empresa em uma visão dedicada.
+            </p>
           </div>
+          <Button variant="outline" onClick={() => setLocation("/accounts")}>
+            Gerenciar contas
+          </Button>
+        </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+        {businessAccounts.length === 0 ? (
+          <Card className="p-10 text-center space-y-3">
+            <Building2 className="h-10 w-10 text-muted-foreground mx-auto" />
+            <h3 className="font-semibold">Nenhuma conta da empresa encontrada</h3>
+            <p className="text-sm text-muted-foreground">
+              Adicione uma conta na área Minha empresa para começar a acompanhar essa visão.
+            </p>
+            <Button onClick={() => setLocation("/accounts")}>Ir para contas</Button>
+          </Card>
+        ) : (
+          <>
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-medium">Receitas</CardTitle>
+                    <CardDescription>Entradas nas contas da empresa</CardDescription>
+                  </div>
+                  <ArrowUpRight className="h-5 w-5 text-emerald-500" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">
+                    R$ {metrics.revenue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-medium">Despesas</CardTitle>
+                    <CardDescription>Saídas registradas</CardDescription>
+                  </div>
+                  <ArrowDownRight className="h-5 w-5 text-destructive" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">
+                    R$ {metrics.expenses.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-medium">Saldo líquido</CardTitle>
+                    <CardDescription>Receitas menos despesas</CardDescription>
+                  </div>
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                </CardHeader>
+                <CardContent>
+                  <p className={`text-3xl font-bold ${metrics.net >= 0 ? "text-primary" : "text-destructive"}`}>
+                    R$ {metrics.net.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Fluxo de caixa (6 meses)</CardTitle>
+                  <CardDescription>Tendência de receitas e despesas da sua empresa</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {monthlyBreakdown.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-10">
+                      Cadastre movimentações para visualizar o histórico.
+                    </p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={260}>
+                      <BarChart data={monthlyBreakdown}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="label" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="receitas" fill="#10b981" name="Receitas" />
+                        <Bar dataKey="despesas" fill="#ef4444" name="Despesas" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Contas da empresa</CardTitle>
+                  <CardDescription>Resumo das contas cadastradas nessa área</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {businessAccounts.map((account) => (
+                    <div key={account.id} className="flex items-center justify-between border rounded-xl p-3">
+                      <div>
+                        <p className="font-semibold">{account.name}</p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Badge variant="secondary">Minha empresa</Badge>
+                          <span>Saldo inicial: R$ {Number(account.initialBalance).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      </div>
+                      <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+
             <Card>
               <CardHeader>
-                <CardTitle>Fluxo de Caixa (6 meses)</CardTitle>
-                <CardDescription>Tendência de receitas e despesas das contas selecionadas</CardDescription>
+                <CardTitle>Últimas movimentações</CardTitle>
+                <CardDescription>Operações relacionadas às contas da sua empresa</CardDescription>
               </CardHeader>
-              <CardContent>
-                {monthlyBreakdown.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-10">
-                    Cadastre movimentações para visualizar o histórico.
+              <CardContent className="space-y-4">
+                {recentTransactions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    Nenhuma movimentação recente nas contas da sua empresa.
                   </p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={monthlyBreakdown}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="label" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="receitas" fill="#10b981" name="Receitas" />
-                      <Bar dataKey="despesas" fill="#ef4444" name="Despesas" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  recentTransactions.map((tx) => (
+                    <div key={tx.id} className="flex items-center justify-between border rounded-xl p-3">
+                      <div>
+                        <p className="font-medium">{tx.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(tx.date).toLocaleDateString("pt-BR")} · {tx.category}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-semibold ${tx.type === "entrada" ? "text-emerald-600" : "text-rose-600"}`}>
+                          {tx.type === "entrada" ? "+" : "-"}R$ {Number(tx.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+                  ))
                 )}
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Contas empresariais</CardTitle>
-                <CardDescription>Resumo das contas PJ cadastradas</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {selectedAccounts.map((account) => (
-                  <div key={account.id} className="flex items-center justify-between border rounded-xl p-3">
-                    <div>
-                      <p className="font-semibold">{account.name}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Badge variant="secondary">
-                          {account.businessCategory === "mei" ? "PJ · MEI" : "PJ"}
-                        </Badge>
-                        <span>Saldo inicial: R$ {Number(account.initialBalance).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    </div>
-                    <BarChart3 className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Últimas movimentações</CardTitle>
-              <CardDescription>Operações relacionadas às contas selecionadas</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {recentTransactions.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  Nenhuma movimentação recente nas contas selecionadas.
-                </p>
-              ) : (
-                recentTransactions.map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between border rounded-xl p-3">
-                    <div>
-                      <p className="font-medium">{tx.description}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(tx.date).toLocaleDateString("pt-BR")} · {tx.category}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-semibold ${tx.type === "entrada" ? "text-emerald-600" : "text-rose-600"}`}>
-                        {tx.type === "entrada" ? "+" : "-"}R$ {Number(tx.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
-    </div>
-    <UpgradeModal
-      open={isUpgradeModalOpen}
-      onOpenChange={setIsUpgradeModalOpen}
-      featureName="Gestão Empresarial"
-    />
+          </>
+        )}
+      </div>
+      <UpgradeModal
+        open={isUpgradeModalOpen}
+        onOpenChange={setIsUpgradeModalOpen}
+        featureName="Minha empresa"
+      />
     </>
   );
 }

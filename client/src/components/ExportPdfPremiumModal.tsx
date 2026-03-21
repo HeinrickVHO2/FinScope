@@ -25,8 +25,8 @@ const REPORT_TYPES = [
   },
   {
     value: "empresarial",
-    label: "Painel Empresarial",
-    description: "Versão com foco em contas PJ, entradas, saídas e tributos.",
+    label: "Painel da empresa",
+    description: "Versão com foco na sua empresa, com entradas, saídas e tributos.",
   },
 ] as const;
 

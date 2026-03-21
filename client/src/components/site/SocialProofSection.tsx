@@ -15,7 +15,7 @@ const testimonials = [
     image: JulianaImage,
   },
   {
-    name: "Rafael, MEI",
+    name: "Rafael, pequeno negócio",
     quote:
       "Consegui enxergar meus gastos do mês com clareza e separar melhor o que é pessoal e o que é do negócio.",
     focus: "Organização entre PF e negócio",

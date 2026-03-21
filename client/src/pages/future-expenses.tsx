@@ -235,7 +235,7 @@ export default function FutureExpensesPage() {
     if (scope === "PJ" && !isPremium) {
       toast({
         title: "Disponível no Premium",
-        description: "As contas empresariais ficam disponíveis no plano Premium.",
+        description: "A área Minha empresa fica disponível no plano Premium.",
       });
       return;
     }
@@ -477,7 +477,7 @@ export default function FutureExpensesPage() {
                             if (value === "PJ" && !isPremium) {
                               toast({
                                 title: "Exclusivo do Premium",
-                                description: "As contas empresariais ficam disponíveis no plano Premium.",
+                                description: "A área Minha empresa fica disponível no plano Premium.",
                               });
                               return;
                             }
@@ -492,7 +492,7 @@ export default function FutureExpensesPage() {
                           <SelectContent>
                             <SelectItem value="PF">Conta pessoal</SelectItem>
                             <SelectItem value="PJ" disabled={!isPremium}>
-                              Conta empresarial
+                              Minha empresa
                             </SelectItem>
                           </SelectContent>
                         </Select>

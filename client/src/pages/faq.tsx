@@ -11,8 +11,8 @@ export default function FAQPage() {
       a: "Sim. Você paga, usa sem limitações e tem 10 dias para pedir reembolso total se achar que o FinScope não faz sentido para você.",
     },
     {
-      q: "Posso usar tanto para vida pessoal quanto para minha PJ?",
-      a: "Sim, o FinScope possui separação completa entre contas PF e PJ, com categorias empresariais (incluindo MEI) dentro do mesmo painel.",
+      q: "Posso usar tanto para vida pessoal quanto para minha empresa?",
+      a: "Sim, o FinScope separa sua conta pessoal da área Minha empresa dentro do mesmo painel.",
     },
     {
       q: "Como funciona o planejamento de contas futuras?",
@@ -36,7 +36,7 @@ export default function FAQPage() {
     },
     {
       q: "Consigo testar os recursos antes de contratar?",
-      a: "Todo novo cliente tem 10 dias de garantia. Nesse período, você pode explorar o painel, cadastrar contas e testar o controle empresarial sem risco.",
+      a: "Todo novo cliente tem 10 dias de garantia. Nesse período, você pode explorar o painel, cadastrar contas e testar a área Minha empresa sem risco.",
     },
     {
       q: "Como o suporte funciona na prática?",
@@ -44,7 +44,7 @@ export default function FAQPage() {
     },
     {
       q: "O plano Premium vale a pena se eu já uso o Pro?",
-      a: "Sim, principalmente se você precisa de mais automações, relatórios e controle empresarial completo. Para mudar de plano, basta abrir a área de configurações e seguir para o pagamento.",
+      a: "Sim, principalmente se você precisa de mais automações, relatórios e visão completa da sua empresa. Para mudar de plano, basta abrir a área de configurações e seguir para o pagamento.",
     },
   ];
 

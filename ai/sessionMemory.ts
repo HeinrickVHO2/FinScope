@@ -9,6 +9,7 @@
 export interface SessionMemory {
   userId: string;
   lastUserMessage: string;
+  pendingTransactionMessage: string | null;
   lastIntention: "transaction" | "future_bill" | "goal" | "question" | null;
   lastEntityType: "transaction" | "investment" | "goal" | "future_bill" | null;
   lastEntityId: string | null;
@@ -16,6 +17,7 @@ export interface SessionMemory {
   lastAccountType: "PF" | "PJ" | null;
   lastTransactionType: "income" | "expense" | null;
   awaitingAccountType: boolean;
+  awaitingTransactionAmount: boolean;
   hydrated: boolean;
   conversationContext: Array<{ role: "user" | "assistant"; content: string }>;
   createdAt: number;
@@ -32,6 +34,7 @@ export function getSessionMemory(userId: string): SessionMemory {
     session = {
       userId,
       lastUserMessage: "",
+      pendingTransactionMessage: null,
       lastIntention: null,
       lastEntityType: null,
       lastEntityId: null,
@@ -39,6 +42,7 @@ export function getSessionMemory(userId: string): SessionMemory {
       lastAccountType: null,
       lastTransactionType: null,
       awaitingAccountType: false,
+      awaitingTransactionAmount: false,
       hydrated: false,
       conversationContext: [],
       createdAt: Date.now(),

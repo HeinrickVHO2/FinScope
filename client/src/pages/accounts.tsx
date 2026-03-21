@@ -35,7 +35,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import UpgradeModal from "@/components/UpgradeModal";
 
 export default function AccountsPage() {
@@ -146,15 +145,6 @@ export default function AccountsPage() {
     return Number(account.initialBalance);
   }
 
-  const watchedType = form.watch("type");
-  const isBusinessAccount = watchedType === "pj";
-
-  useEffect(() => {
-    if (!isBusinessAccount && form.getValues("businessCategory")) {
-      form.setValue("businessCategory", undefined);
-    }
-  }, [form, isBusinessAccount]);
-
   return (
     <>
     <div className="p-6 space-y-6">
@@ -225,46 +215,21 @@ export default function AccountsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="pf">Pessoa Física (PF)</SelectItem>
+                          <SelectItem value="pf">Conta pessoal</SelectItem>
                           <SelectItem value="pj" disabled={currentPlan !== "premium"}>
-                            Pessoa Jurídica (PJ)
+                            Minha empresa
                           </SelectItem>
                         </SelectContent>
                       </Select>
                       {currentPlan !== "premium" && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          Contas empresariais ficam disponíveis no plano Premium.
+                          A área Minha empresa fica disponível no plano Premium.
                         </p>
                       )}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                {isBusinessAccount && (
-                  <FormField
-                    control={form.control}
-                    name="businessCategory"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Categoria dentro da PJ</FormLabel>
-                        <div className="flex items-center justify-between rounded-xl border border-muted p-4">
-                          <div>
-                            <p className="text-sm font-medium">Marcar esta conta como MEI</p>
-                            <p className="text-xs text-muted-foreground">
-                              Use esta opção se a conta faz parte do seu MEI.
-                            </p>
-                          </div>
-                          <Switch
-                            checked={field.value === "mei"}
-                            onCheckedChange={(checked) => field.onChange(checked ? "mei" : undefined)}
-                            data-testid="switch-mei-category"
-                          />
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
                 <FormField
                   control={form.control}
                   name="initialBalance"
@@ -353,11 +318,7 @@ export default function AccountsPage() {
                       {account.name}
                     </CardTitle>
                     <Badge variant="secondary" className="mt-1">
-                      {account.type === "pj"
-                        ? account.businessCategory === "mei"
-                          ? "PJ · MEI"
-                          : "PJ"
-                        : "PF"}
+                      {account.type === "pj" ? "Minha empresa" : "Conta pessoal"}
                     </Badge>
                   </div>
                 </div>
@@ -402,7 +363,7 @@ export default function AccountsPage() {
         </div>
       )}
     </div>
-    <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Contas PJ" />
+    <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Minha empresa" />
     </>
   );
 }

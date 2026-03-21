@@ -713,9 +713,9 @@ function LockedCard({ onUpgrade }: { onUpgrade: () => void }) {
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-50">
         <Lock className="h-8 w-8 text-purple-500" />
       </div>
-      <h3 className="text-2xl font-semibold">Finanças empresariais bloqueadas</h3>
+      <h3 className="text-2xl font-semibold">Minha empresa está bloqueada</h3>
       <p className="text-muted-foreground max-w-2xl mx-auto">
-        Atualize para o plano Premium e acompanhe faturamento, despesas PJ e relatórios exclusivos para MEI e empresas.
+        Atualize para o plano Premium e acompanhe o caixa da sua empresa com relatórios e visão dedicada.
       </p>
       <Button onClick={onUpgrade} className="mt-2">Desbloquear com Premium</Button>
     </section>

@@ -13,7 +13,7 @@ interface UpgradeModalProps {
 }
 
 const PREMIUM_BENEFITS = [
-  "Gestão completa para contas PJ e MEI",
+  "Gestão completa da sua empresa",
   "Relatórios em PDF com visão detalhada",
   "Organização automática das categorias",
   "Atendimento prioritário e ajuda na configuração",

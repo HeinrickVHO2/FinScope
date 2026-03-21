@@ -37,7 +37,7 @@ export function AppSidebar() {
   const isPremium = user?.plan === "premium";
   const menuItems: MenuItem[] = [
     baseMenuItems[0],
-    { title: "Gestão PJ e MEI", url: "/mei", icon: Building2, requiresPremium: true },
+    { title: "Minha empresa", url: "/mei", icon: Building2, requiresPremium: true },
     { title: "Contas a Pagar", url: "/future-expenses", icon: CalendarClock, requiresPremium: false },
     { title: "WhatsApp", url: "/whatsapp-agent", icon: MessageCircle, requiresPremium: false },
     { title: "Assistente com IA", url: "/ai", icon: Sparkles },
@@ -101,7 +101,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>
-    <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Gestão PJ e MEI" />
+    <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Minha empresa" />
     </>
   );
 }

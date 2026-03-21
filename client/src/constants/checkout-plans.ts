@@ -16,13 +16,13 @@ export const CHECKOUT_PLAN_OPTIONS = [
     id: "premium",
     name: "Plano Premium",
     price: "R$ 29,90/mês",
-    description: "Tudo do Pro + recursos para contas PJ e MEI.",
+    description: "Tudo do Pro + recursos completos para a sua empresa.",
     badge: "Mais popular",
     features: [
       "Contas ilimitadas",
       "Organização automática das categorias",
       "Relatórios avançados",
-      "Gestão empresarial completa",
+      "Minha empresa com visão completa",
     ],
   },
 ] as const;
