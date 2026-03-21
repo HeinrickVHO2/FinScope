@@ -112,18 +112,18 @@ function parseGoalTargetValue(rawText: string) {
 
 function parseGoalInitialContribution(rawText: string) {
   const patterns = [
-    /ja tenho\s+([^.!?\n]+?)\s+(?:guardado|guardada|guardados|guardadas|juntado|juntada|separado|separada)/i,
-    /tenho\s+([^.!?\n]+?)\s+(?:guardado|guardada|guardados|guardadas|juntado|juntada|separado|separada)/i,
-    /ja guardei\s+([^.!?\n]+)/i,
-    /guardei\s+([^.!?\n]+)/i,
-    /ja juntei\s+([^.!?\n]+)/i,
-    /juntei\s+([^.!?\n]+)/i,
+    /ja tenho\s+(.+?)\s+(?:guardado|guardada|guardados|guardadas|juntado|juntada|separado|separada)\b/i,
+    /tenho\s+(.+?)\s+(?:guardado|guardada|guardados|guardadas|juntado|juntada|separado|separada)\b/i,
+    /ja guardei\s+(.+)/i,
+    /guardei\s+(.+)/i,
+    /ja juntei\s+(.+)/i,
+    /juntei\s+(.+)/i,
   ];
 
   for (const pattern of patterns) {
     const match = rawText.match(pattern);
     if (!match?.[1]) continue;
-    const amount = parseMonetaryAmountFromNaturalLanguage(match[1]);
+    const amount = parseFirstCurrencyLikeAmount(match[1]) ?? parseMonetaryAmountFromNaturalLanguage(match[1]);
     if (amount) return amount;
   }
 

@@ -15,6 +15,7 @@ test("parseMonetaryAmountFromNaturalLanguage handles common Brazilian monetary p
 test("parseMonetaryAmountFromNaturalLanguage accepts thousand separators typed with comma", () => {
   assert.equal(parseMonetaryAmountFromNaturalLanguage("meta de 3,700 reais"), 3700);
   assert.equal(parseMonetaryAmountFromNaturalLanguage("quero guardar 13,500 para viajar"), 13500);
+  assert.equal(parseMonetaryAmountFromNaturalLanguage("ja juntei 15.450"), 15450);
   assert.equal(parseMonetaryAmountFromNaturalLanguage("ja juntei 850"), 850);
   assert.equal(parseMonetaryAmountFromNaturalLanguage("o cafe custou 3,70"), 3.7);
 });

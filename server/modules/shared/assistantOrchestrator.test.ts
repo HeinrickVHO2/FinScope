@@ -233,6 +233,17 @@ test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload
     assert.match(purchaseGoal.reply || "", /83\.000,00|83000/);
     assert.match(purchaseGoal.reply || "", /23\.000,00|23000/);
 
+    const purchaseGoalWithDotThousands = await orchestrator.handleMessage({
+      userId: "user-1",
+      text: "Quero juntar dinheiro para comprar um carro de 80 mil reais. Ja juntei 15.450",
+      channel: "internal_chat",
+      plan: "pro",
+    });
+    assert.equal(purchaseGoalWithDotThousands.handled, true);
+    assert.equal((purchaseGoalWithDotThousands.payload as any)?.data?.goal?.targetValue, "80000");
+    assert.equal((purchaseGoalWithDotThousands.payload as any)?.data?.goal?.currentValue, "15450");
+    assert.match(purchaseGoalWithDotThousands.reply || "", /15\.450,00|15450/);
+
     const contributed = await orchestrator.handleMessage({
       userId: "user-1",
       text: "Ja guardei 500 hoje",
