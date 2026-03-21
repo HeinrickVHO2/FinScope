@@ -55,6 +55,7 @@ function parseGoalTitle(rawText: string) {
     /meta\s+para\s+(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
     /guardar\s+(?:dinheiro\s+)?para\s+(?:comprar\s+)?(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
     /juntar\s+(?:dinheiro\s+)?para\s+(?:comprar\s+)?(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
+    /quero\s+comprar\s+(.+?)(?:,| no valor| valendo| preciso| quero| tenho| ja tenho| já tenho| por\s+\d| de\s+\d|$)/i,
     /objetivo\s+para\s+(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
     /(?:pagar|quitar)\s+(?:uma\s+|a\s+)?(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
   ];
@@ -94,6 +95,7 @@ function parseGoalTargetValue(rawText: string) {
     /preciso de\s+([^!?\n]+)/i,
     /objetivo de\s+([^!?\n]+)/i,
     /meta de\s+([^!?\n]+)/i,
+    /quero comprar .*?\bde\s+([^!?\n]+)/i,
     /para comprar .*?\bde\s+([^!?\n]+)/i,
     /para .*?\bde\s+([^!?\n]+)/i,
   ];
@@ -278,7 +280,13 @@ function detectSummaryFocus(normalized: string): SummaryIntentFocus {
 
 export function looksLikeGoalIntent(text: string) {
   const normalized = normalizeAssistantText(text);
-  return /crie uma meta|criar meta|quero uma meta|meta para|guardar dinheiro para|juntar dinheiro para|guardar para|juntar para|objetivo para|quero pagar uma divida|quero quitar uma divida|pagar uma divida|quitar uma divida|pagar a divida|quitar a divida/.test(normalized);
+  const explicitGoalIntent = /crie uma meta|criar meta|quero uma meta|meta para|guardar dinheiro para|juntar dinheiro para|guardar para|juntar para|objetivo para|quero pagar uma divida|quero quitar uma divida|pagar uma divida|quitar uma divida|pagar a divida|quitar a divida/.test(normalized);
+  const purchaseWithSavedAmountIntent =
+    /quero comprar/.test(normalized)
+    && /(?:no valor de|de)\s+\d/.test(normalized)
+    && /ja tenho|guardado|guardada|ja juntei|juntei|ja guardei|guardei/.test(normalized);
+
+  return explicitGoalIntent || purchaseWithSavedAmountIntent;
 }
 
 export function looksLikeReminderIntent(text: string) {

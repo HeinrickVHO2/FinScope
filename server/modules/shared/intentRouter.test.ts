@@ -31,6 +31,14 @@ test("parseAssistantRouteIntent identifica meta, aporte e lembrete", () => {
     initialContribution: 3000,
   });
 
+  const purchaseGoalWithSavedAmount = parseAssistantRouteIntent("Quero comprar um carro de 83 mil, ja tenho 23 mil guardado");
+  assert.deepEqual(purchaseGoalWithSavedAmount, {
+    type: "create_goal",
+    title: "carro",
+    targetValue: 83000,
+    initialContribution: 23000,
+  });
+
   const goalWithCommaThousands = parseAssistantRouteIntent("Quero juntar dinheiro para comprar um playstation 5 no valor de 3,700 reais. Ja juntei 850.");
   assert.deepEqual(goalWithCommaThousands, {
     type: "create_goal",

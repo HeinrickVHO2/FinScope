@@ -135,93 +135,72 @@ test("AssistantOrchestrator responde resumo e status de limites", async () => {
 });
 
 test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload de navegacao", async () => {
+  const goals = new Map<string, any>();
+  let goalSequence = 0;
+
   const restoreCreateGoal = patchMethod(
     GoalService.prototype,
     "createGoal",
-    (async (_userId: string, payload: any) => ({
-      id: "goal-1",
-      userId: "user-1",
-      title: payload.title,
-      targetValue: String(payload.targetValue),
-      currentValue: "0",
-      targetDate: null,
-      status: "active",
-      archivedAt: null,
-      completedAt: null,
-      metadata: payload.metadata ?? null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })) as GoalService["createGoal"],
+    (async (_userId: string, payload: any) => {
+      goalSequence += 1;
+      const goal = {
+        id: `goal-${goalSequence}`,
+        userId: "user-1",
+        title: payload.title,
+        targetValue: String(payload.targetValue),
+        currentValue: String(payload.currentValue ?? 0),
+        targetDate: payload.targetDate ?? null,
+        status: payload.status ?? "active",
+        archivedAt: null,
+        completedAt: null,
+        metadata: payload.metadata ?? null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      goals.set(goal.id, goal);
+      return goal;
+    }) as GoalService["createGoal"],
   );
 
   const restoreGetLatestActiveGoal = patchMethod(
     GoalService.prototype,
     "getLatestActiveGoal",
-    (async () => ({
-      id: "goal-1",
-      userId: "user-1",
-      title: "iPhone 16",
-      targetValue: "5399",
-      currentValue: "0",
-      targetDate: null,
-      status: "active",
-      archivedAt: null,
-      completedAt: null,
-      metadata: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })) as GoalService["getLatestActiveGoal"],
+    (async () => Array.from(goals.values()).at(-1) ?? null) as GoalService["getLatestActiveGoal"],
   );
 
   const restoreAddContribution = patchMethod(
     GoalService.prototype,
     "addContribution",
-    (async ({ amount }: any) => ({
-      goal: {
-        id: "goal-1",
-        userId: "user-1",
-        title: "iPhone 16",
-        targetValue: "5399",
-        currentValue: String(amount),
-        targetDate: null,
-        status: "active",
-        archivedAt: null,
-        completedAt: null,
-        metadata: null,
-        createdAt: new Date(),
+    (async ({ goalId, amount, note }: any) => {
+      const currentGoal = goals.get(goalId);
+      if (!currentGoal) throw new Error("Meta nao encontrada no mock");
+
+      const updatedGoal = {
+        ...currentGoal,
+        currentValue: String(Number(currentGoal.currentValue || 0) + Number(amount || 0)),
         updatedAt: new Date(),
-      },
-      contribution: {
-        id: "contrib-1",
-        goalId: "goal-1",
-        userId: "user-1",
-        amount: String(amount),
-        contributedAt: new Date(),
-        note: "Aporte via assistente",
-        createdAt: new Date(),
-      },
-    })) as GoalService["addContribution"],
+      };
+      goals.set(goalId, updatedGoal);
+
+      return {
+        goal: updatedGoal,
+        contribution: {
+          id: `contrib-${goalId}`,
+          goalId,
+          userId: "user-1",
+          amount: String(amount),
+          contributedAt: new Date(),
+          note: note ?? "Aporte via assistente",
+          createdAt: new Date(),
+        },
+      };
+    }) as GoalService["addContribution"],
   );
 
   const restoreListGoals = patchMethod(
     GoalService.prototype,
     "listGoals",
-    (async () => [
-      {
-        id: "goal-1",
-        userId: "user-1",
-        title: "iPhone 16",
-        targetValue: "5399",
-        currentValue: "500",
-        targetDate: null,
-        status: "active",
-        archivedAt: null,
-        completedAt: null,
-        metadata: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]) as GoalService["listGoals"],
+    (async () => Array.from(goals.values())) as GoalService["listGoals"],
   );
 
   try {
@@ -231,6 +210,7 @@ test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload
       userId: "user-1",
       text: "Quero juntar dinheiro para comprar uma moto de 13.500 reais. Ja tenho 3 mil guardado",
       channel: "internal_chat",
+      plan: "pro",
     });
     assert.equal(created.handled, true);
     assert.equal((created.payload as any)?.data?.route, "/goals");
@@ -240,10 +220,24 @@ test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload
     assert.equal((created.payload as any)?.data?.goal?.currentValue, "3000");
     assert.match(created.reply || "", /3\.000,00|3000/);
 
+    const purchaseGoal = await orchestrator.handleMessage({
+      userId: "user-1",
+      text: "Quero comprar um carro de 83 mil, ja tenho 23 mil guardado",
+      channel: "internal_chat",
+      plan: "pro",
+    });
+    assert.equal(purchaseGoal.handled, true);
+    assert.equal((purchaseGoal.payload as any)?.data?.route, "/goals");
+    assert.equal((purchaseGoal.payload as any)?.data?.goal?.targetValue, "83000");
+    assert.equal((purchaseGoal.payload as any)?.data?.goal?.currentValue, "23000");
+    assert.match(purchaseGoal.reply || "", /83\.000,00|83000/);
+    assert.match(purchaseGoal.reply || "", /23\.000,00|23000/);
+
     const contributed = await orchestrator.handleMessage({
       userId: "user-1",
       text: "Ja guardei 500 hoje",
       channel: "whatsapp",
+      plan: "pro",
     });
     assert.equal(contributed.handled, true);
     assert.match(contributed.reply || "", /500/);
@@ -253,6 +247,7 @@ test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload
       userId: "user-1",
       text: "minhas metas",
       channel: "internal_chat",
+      plan: "pro",
     });
     assert.equal(listed.handled, true);
     assert.match(listed.reply || "", /Suas metas/i);
@@ -264,6 +259,21 @@ test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload
     restoreAddContribution();
     restoreListGoals();
   }
+});
+
+test("AssistantOrchestrator mantém bloqueio de orientação avançada no plano Pro", async () => {
+  const orchestrator = new AssistantOrchestrator(buildFakeStorage() as any);
+
+  const response = await orchestrator.handleMessage({
+    userId: "user-1",
+    text: "me de dicas para economizar",
+    channel: "internal_chat",
+    plan: "pro",
+  });
+
+  assert.equal(response.handled, true);
+  assert.equal(response.intent, "assistant.plan_limit");
+  assert.equal((response.payload as any)?.data?.route, "/settings");
 });
 
 test("AssistantOrchestrator cria lembrete, marca como pago, resume investimentos e alterna visao", async () => {

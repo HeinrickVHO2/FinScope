@@ -241,16 +241,11 @@ function isAdvancedOrchestratorIntent(intent: ReturnType<typeof parseAssistantRo
     "limits_status",
     "upsert_limit",
     "investments_summary",
-    "create_goal",
-    "add_goal_contribution",
-    "list_goals",
-    "goal_progress",
-    "switch_financial_view",
   ].includes(intent.type);
 }
 
 function buildPlanLimitedResponse(model: ModelSelection): AssistantOrchestratorResult {
-  const message = "No plano Pro eu consigo registrar movimentações e mostrar resumos objetivos. Para análises, metas, limites e orientações mais completas, o Premium libera a experiência avançada.";
+  const message = "No plano Pro eu consigo registrar movimentações e mostrar resumos objetivos. Para orientações mais completas, limites por categoria e leitura financeira mais avançada, o Premium libera a experiência ampliada.";
   return buildResponse({
     intent: "assistant.plan_limit",
     action: "show_plan_limit",
@@ -264,7 +259,7 @@ function buildPlanLimitedResponse(model: ModelSelection): AssistantOrchestratorR
     uiPayload: {
       type: "plan_limit",
       title: "Disponível no Premium",
-      subtitle: "Análises, metas e orientações avançadas",
+      subtitle: "Limites, orientações e leitura financeira ampliada",
       route: "/settings",
       view: "plans",
       cards: [

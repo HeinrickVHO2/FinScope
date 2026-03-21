@@ -154,7 +154,7 @@ export default function AccountsPage() {
         <div>
           <h1 className="text-3xl font-poppins font-bold" data-testid="text-accounts-title">Contas</h1>
           <p className="text-muted-foreground" data-testid="text-accounts-subtitle">
-            Organize suas contas pessoais e empresariais em um so lugar
+            Organize suas contas pessoais e empresariais em um só lugar
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -268,7 +268,7 @@ export default function AccountsPage() {
             <div>
               <h3 className="font-semibold mb-1">Mais recursos no Premium</h3>
               <p className="text-sm text-muted-foreground">
-                No Premium, voce libera Minha empresa, WhatsApp e relatorios mais completos para uma rotina com menos trabalho manual.
+                No Premium, você libera Minha empresa, WhatsApp e relatórios mais completos para uma rotina com menos trabalho manual.
               </p>
               <p className="mt-1 text-sm font-medium text-primary">{BILLING_PLANS.premium.commercialCopy.dailyPriceLabel}</p>
             </div>

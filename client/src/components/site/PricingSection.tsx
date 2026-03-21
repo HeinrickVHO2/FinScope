@@ -2,9 +2,42 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, ArrowRight } from "lucide-react";
+import { Check, ArrowRight, X } from "lucide-react";
 import { CHECKOUT_PLAN_OPTIONS } from "@/constants/checkout-plans";
 import { useAuth } from "@/lib/auth";
+
+const planMatrix = [
+  {
+    id: "personal",
+    label: "Conta pessoal com controle essencial",
+    plans: { pro: true, premium: true },
+  },
+  {
+    id: "dashboard",
+    label: "Painel financeiro completo",
+    plans: { pro: true, premium: true },
+  },
+  {
+    id: "business",
+    label: "Minha empresa com visão dedicada",
+    plans: { pro: false, premium: true },
+  },
+  {
+    id: "whatsapp",
+    label: "Agent de WhatsApp para registrar pelo chat",
+    plans: { pro: false, premium: true },
+  },
+  {
+    id: "advanced-ai",
+    label: "IA avançada com análises e interpretações premium",
+    plans: { pro: false, premium: true },
+  },
+  {
+    id: "advanced-pdf",
+    label: "Relatórios PDF avançados e mais completos",
+    plans: { pro: false, premium: true },
+  },
+] as const;
 
 export function PricingSection() {
   const { user } = useAuth();
@@ -65,13 +98,26 @@ export function PricingSection() {
                   <p className="mt-1 text-sm text-slate-600">{plan.comparisonSummary}</p>
                 </div>
 
-                <div className="space-y-2">
-                  {plan.features.map((feature) => (
-                    <div key={feature} className="flex items-start gap-2 text-sm text-slate-700">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <span>{feature}</span>
-                    </div>
-                  ))}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                  <p className="text-sm font-semibold text-slate-900">Comparação rápida</p>
+                  <div className="mt-4 space-y-2.5">
+                    {planMatrix.map((item) => {
+                      const enabled = item.plans[plan.id];
+
+                      return (
+                        <div key={item.id} className="grid grid-cols-[auto_1fr] items-start gap-3 text-sm">
+                          <span
+                            className={`mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full ${
+                              enabled ? "bg-primary/10 text-primary" : "bg-slate-200 text-slate-400"
+                            }`}
+                          >
+                            {enabled ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                          </span>
+                          <span className={enabled ? "text-slate-700" : "text-slate-400"}>{item.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="mt-auto flex flex-wrap gap-2 text-xs text-slate-600">
