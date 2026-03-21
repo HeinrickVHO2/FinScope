@@ -62,13 +62,15 @@ export default function SettingsPage() {
   );
 
   useEffect(() => {
-    const shouldShow = displayPlan === "pending";
-    setIsCheckoutModalOpen(shouldShow);
-    setCheckoutIntent(shouldShow ? "signup" : "upgrade");
-    if (!shouldShow) {
-      setSelectedPlanId(null);
+    if (displayPlan !== "pending") {
+      setCheckoutIntent("upgrade");
+      return;
     }
-  }, [displayPlan]);
+
+    setCheckoutIntent("signup");
+    setSelectedPlanId((current) => current ?? currentPlan);
+    setIsCheckoutModalOpen(true);
+  }, [displayPlan, currentPlan]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

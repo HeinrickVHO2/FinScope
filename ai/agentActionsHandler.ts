@@ -70,6 +70,7 @@ async function handleTransactionAction(user: User, payload: any, context: Financ
   const description = (payload.description || payload.title || "Transação FinScope").trim();
   const normalizedDesc = normalizeText(description);
   const txType = String(payload.type || "").toLowerCase() === "income" ? "entrada" : "saida";
+  const shouldUpdateExisting = payload.updateExisting === true || payload.update_existing === true;
   const existing = context.lastTransactions.find((tx) => {
     const sameType = String(tx.type).toLowerCase() === txType;
     const sameAccount = (tx.account_type || "PF").toUpperCase() === accountType;
@@ -80,7 +81,7 @@ async function handleTransactionAction(user: User, payload: any, context: Financ
   const date = parseDate(payload.date);
   const category = payload.category || guessCategory(description, txType);
 
-  if (existing) {
+  if (existing && shouldUpdateExisting) {
     const newAmount = Number(txAmount(existing)) + amount;
     const updated = await storage.updateTransaction(existing.id, {
       amount: Number(newAmount.toFixed(2)),
@@ -351,6 +352,20 @@ function normalizeAccountType(value: any, plan: string): AccountKind {
 function parseDate(value?: string): Date {
   if (!value) {
     return new Date();
+  }
+  const calendarMatch = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (calendarMatch) {
+    return new Date(
+      Date.UTC(
+        Number(calendarMatch[1]),
+        Number(calendarMatch[2]) - 1,
+        Number(calendarMatch[3]),
+        12,
+        0,
+        0,
+        0,
+      ),
+    );
   }
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {

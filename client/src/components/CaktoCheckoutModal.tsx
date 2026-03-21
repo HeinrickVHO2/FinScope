@@ -105,7 +105,6 @@ export default function CaktoCheckoutModal({
       }
 
       setCheckoutUrl(data.checkoutUrl);
-      await refetchUser();
     } catch (error) {
       const message = (error as Error).message || "Não conseguimos abrir o pagamento agora.";
       setErrorMessage(message);
