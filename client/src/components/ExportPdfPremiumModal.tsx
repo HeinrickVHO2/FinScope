@@ -11,6 +11,7 @@ import UpgradeModal from "@/components/UpgradeModal";
 import { FileDown, Loader2, Lock } from "lucide-react";
 import { useDashboardView } from "@/context/dashboard-view";
 import { apiFetch } from "@/lib/api";
+import { canUseAdvancedPdf } from "@shared/plans";
 
 const REPORT_TYPES = [
   {
@@ -54,16 +55,16 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
   const [isExporting, setIsExporting] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
-  const isPremiumUser = useMemo(() => user?.plan === "premium", [user?.plan]);
+  const hasAdvancedPdf = useMemo(() => canUseAdvancedPdf(user?.plan), [user?.plan]);
 
   const selectedTypeLabel = useMemo(
     () => REPORT_TYPES.find((option) => option.value === reportType)?.label ?? "Financeiro completo",
-    [reportType]
+    [reportType],
   );
 
   const selectedPeriodLabel = useMemo(
     () => PERIOD_OPTIONS.find((option) => option.value === period)?.label ?? "Últimos 30 dias",
-    [period]
+    [period],
   );
 
   const dashboardScope = useMemo<"PF" | "PJ" | "ALL">(() => {
@@ -79,19 +80,21 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
 
   useEffect(() => {
     if (!open) return;
-    if (selectedView === "PJ" && isPremiumUser) {
+    if (selectedView === "PJ" && hasAdvancedPdf) {
       setReportType("empresarial");
     } else {
       setReportType("financeiro");
     }
-  }, [selectedView, open, isPremiumUser]);
+  }, [selectedView, open, hasAdvancedPdf]);
 
   async function handleExport() {
-    if (reportScope === "PJ" && !isPremiumUser) {
+    if (reportScope === "PJ" && !hasAdvancedPdf) {
       setIsUpgradeModalOpen(true);
       return;
     }
+
     setIsExporting(true);
+
     try {
       const response = await apiFetch("/api/pdf/export", {
         method: "POST",
@@ -102,7 +105,7 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
           period: selectedPeriodLabel,
           includeCharts,
           includeInsights,
-          reportType: reportType,
+          reportType,
           accountScope: reportScope,
         }),
       });
@@ -115,7 +118,7 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `FinScope-premium-${reportType}-${Date.now()}.pdf`;
+      link.download = `FinScope-avancado-${reportType}-${Date.now()}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -123,7 +126,7 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
 
       toast({
         title: "PDF gerado com sucesso",
-        description: "O download começou automaticamente. Confira sua pasta de downloads.",
+        description: "O download começou automaticamente.",
       });
       onOpenChange(false);
     } catch (error) {
@@ -137,22 +140,17 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
     }
   }
 
-  const handleUpgrade = () => {
-    setIsUpgradeModalOpen(true);
-  };
-
-  const modalBody = isPremiumUser ? (
+  const modalBody = hasAdvancedPdf ? (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-2">
+      <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
         <div>
-          <p className="text-sm font-medium text-slate-900">Formato Premium A4</p>
+          <p className="text-sm font-medium text-slate-900">Relatório avançado em PDF</p>
           <p className="text-xs text-slate-500">
-            Relatório em PDF com resumo do período, gráficos e observações automáticas.
+            Formato profissional com resumo do período, gráficos e observações automáticas.
           </p>
         </div>
-        <div className="rounded-lg bg-white/80 p-3 border border-amber-200 text-amber-900 text-xs">
+        <div className="rounded-lg border border-amber-200 bg-white/80 p-3 text-xs text-amber-900">
           <strong>Atenção:</strong> esse relatório pode levar alguns minutos para ficar pronto.
-          O download começa automaticamente assim que ele for gerado.
         </div>
       </div>
 
@@ -194,7 +192,7 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 p-4 space-y-4">
+        <div className="space-y-4 rounded-2xl border border-slate-200 p-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-900">Incluir gráficos</p>
@@ -214,8 +212,8 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
 
       <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
         <div>
-          <p className="text-sm font-semibold text-emerald-900">Formato executivo</p>
-          <p className="text-xs text-emerald-700">Ideal para compartilhar com sócios, contabilidade ou para seu próprio acompanhamento.</p>
+          <p className="text-sm font-semibold text-emerald-900">Formato profissional</p>
+          <p className="text-xs text-emerald-700">Ideal para compartilhar com sócios, contabilidade ou para acompanhamento executivo.</p>
         </div>
         <Badge variant="secondary" className="bg-white text-emerald-600">
           Premium
@@ -235,7 +233,7 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
           ) : (
             <>
               <FileDown className="mr-2 h-4 w-4" />
-              Exportar PDF
+              Exportar relatório
             </>
           )}
         </Button>
@@ -247,19 +245,19 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
         <Lock className="h-8 w-8" />
       </div>
       <div className="space-y-2">
-        <p className="text-lg font-semibold text-slate-900">Exportação Premium bloqueada</p>
+        <p className="text-lg font-semibold text-slate-900">Relatório avançado bloqueado</p>
         <p className="text-sm text-slate-500">
-          Essa funcionalidade é exclusiva para clientes Premium. Ative o plano para gerar relatórios em PDF com gráficos e observações automáticas.
+          Essa funcionalidade é exclusiva do Premium. Ative o plano para gerar relatórios mais completos, com gráficos e observações automáticas.
         </p>
       </div>
       <div className="rounded-2xl border border-primary/40 bg-primary/5 p-4 text-sm text-primary">
-        Upgrade instantâneo com 10 dias de garantia total. Cancelou? Devolvemos 100%.
+        Upgrade instantâneo com 10 dias de garantia total.
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
         <Button variant="ghost" onClick={() => onOpenChange(false)}>
           Agora não
         </Button>
-        <Button onClick={handleUpgrade}>Fazer upgrade agora</Button>
+        <Button onClick={() => setIsUpgradeModalOpen(true)}>Ver Premium</Button>
       </div>
     </div>
   );
@@ -269,17 +267,15 @@ export function ExportPdfPremiumModal({ open, onOpenChange }: ExportPdfPremiumMo
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="w-full max-w-2xl rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-semibold tracking-tight">
-              Exportar PDF Premium
-            </DialogTitle>
+            <DialogTitle className="text-2xl font-semibold tracking-tight">Exportar relatório avançado</DialogTitle>
             <DialogDescription>
-              Personalize seu relatório em PDF com o período, o tipo de visão e os detalhes que deseja incluir.
+              Personalize seu relatório profissional com período, tipo de visão e detalhes que deseja incluir.
             </DialogDescription>
           </DialogHeader>
           {modalBody}
         </DialogContent>
       </Dialog>
-      <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Relatórios Premium" />
+      <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Relatórios avançados em PDF" />
     </>
   );
 }

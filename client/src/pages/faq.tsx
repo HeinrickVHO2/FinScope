@@ -36,7 +36,7 @@ export default function FAQPage() {
     },
     {
       q: "Consigo testar os recursos antes de contratar?",
-      a: "Todo novo cliente tem 10 dias de garantia. Nesse período, você pode explorar o painel, cadastrar contas e testar a área Minha empresa sem risco.",
+      a: "Todo novo cliente tem 10 dias de garantia. Nesse período, você pode explorar o plano contratado sem risco. No Premium, isso inclui a área Minha empresa, o Agent de WhatsApp e os relatórios avançados.",
     },
     {
       q: "Como o suporte funciona na prática?",

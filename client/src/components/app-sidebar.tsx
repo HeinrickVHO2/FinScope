@@ -3,6 +3,7 @@ import { Home, ArrowLeftRight, Settings, PiggyBank, Building2, Lock, CalendarClo
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import UpgradeModal from "@/components/UpgradeModal";
+import { canUseBusinessArea, canUseWhatsAppAgent } from "@shared/plans";
 import {
   Sidebar,
   SidebarContent,
@@ -34,12 +35,14 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const isPremium = user?.plan === "premium";
+  const [lockedFeatureName, setLockedFeatureName] = useState("Premium");
+  const canAccessBusinessArea = canUseBusinessArea(user?.plan);
+  const canAccessWhatsApp = canUseWhatsAppAgent(user?.plan);
   const menuItems: MenuItem[] = [
     baseMenuItems[0],
     { title: "Minha empresa", url: "/mei", icon: Building2, requiresPremium: true },
     { title: "Contas a Pagar", url: "/future-expenses", icon: CalendarClock, requiresPremium: false },
-    { title: "WhatsApp", url: "/whatsapp-agent", icon: MessageCircle, requiresPremium: false },
+    { title: "WhatsApp", url: "/whatsapp-agent", icon: MessageCircle, requiresPremium: true },
     { title: "Assistente com IA", url: "/ai", icon: Sparkles },
     ...baseMenuItems.slice(1),
   ];
@@ -67,7 +70,11 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => {
-                const isLocked = item.requiresPremium && !isPremium;
+                const isLocked = item.url === "/mei"
+                  ? !canAccessBusinessArea
+                  : item.url === "/whatsapp-agent"
+                    ? !canAccessWhatsApp
+                    : Boolean(item.requiresPremium && !canAccessBusinessArea);
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
@@ -80,7 +87,10 @@ export function AppSidebar() {
                         <button
                           type="button"
                           className="flex w-full items-center gap-2"
-                          onClick={() => setIsUpgradeModalOpen(true)}
+                          onClick={() => {
+                            setLockedFeatureName(item.title === "WhatsApp" ? "Agent de WhatsApp" : item.title);
+                            setIsUpgradeModalOpen(true);
+                          }}
                         >
                           <item.icon className="h-4 w-4" />
                           <span>{item.title}</span>
@@ -101,7 +111,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>
-    <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Minha empresa" />
+    <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName={lockedFeatureName} />
     </>
   );
 }

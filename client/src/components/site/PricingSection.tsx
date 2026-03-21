@@ -1,103 +1,81 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, ArrowRight } from "lucide-react";
-
-const plans = [
-  {
-    name: "Pro",
-    highlight: false,
-    description: "Para quem quer organizar a rotina financeira com simplicidade.",
-    value: "Base completa para o dia a dia",
-    features: [
-      "Controle de contas e gastos",
-      "Planejamento mensal",
-      "Lembretes importantes",
-      "Relatórios básicos",
-    ],
-  },
-  {
-    name: "Premium",
-    highlight: true,
-    description: "Para quem precisa de mais recursos de organização e acompanhamento.",
-    value: "Tudo do Pro + visão avançada",
-    features: [
-      "Mais opções de acompanhamento",
-      "Mais recursos para rotina PF e negócio",
-      "Relatórios mais completos",
-      "Exportação de dados",
-      "Atendimento prioritário",
-    ],
-  },
-];
+import { CHECKOUT_PLAN_OPTIONS } from "@/constants/checkout-plans";
 
 export function PricingSection() {
   return (
-    <section id="planos" className="py-16 bg-white text-slate-900 border-t border-slate-200">
-      <div className="max-w-6xl mx-auto px-4 space-y-8">
+    <section id="planos" className="border-t border-slate-200 bg-white py-16 text-slate-900">
+      <div className="mx-auto max-w-6xl space-y-8 px-4">
         <div className="space-y-3 text-center">
-          <Badge className="bg-primary/10 text-primary border-primary/20">Planos</Badge>
-          <h2 className="text-3xl md:text-4xl font-poppins font-bold">
-            Escolha o plano ideal para sua rotina
+          <Badge className="border-primary/20 bg-primary/10 text-primary">Planos</Badge>
+          <h2 className="text-3xl font-poppins font-bold md:text-4xl">
+            Compare Pro e Premium com preço e diferença clara
           </h2>
-          <p className="text-slate-600 max-w-3xl mx-auto">
-            Você pode se cadastrar primeiro e escolher o plano no app, com calma.
+          <p className="mx-auto max-w-3xl text-slate-600">
+            O Pro entrega controle essencial com IA básica. O Premium amplia a operação com WhatsApp, relatórios avançados e inteligência mais completa.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {plans.map((plan) => (
+        <div className="grid gap-6 md:grid-cols-2">
+          {CHECKOUT_PLAN_OPTIONS.map((plan) => (
             <Card
-              key={plan.name}
-              className={`relative rounded-2xl border ${
-                plan.highlight ? "border-primary/40 shadow-lg" : "border-slate-200 shadow-sm"
-              } text-slate-900 overflow-hidden bg-white`}
+              key={plan.id}
+              className={`relative overflow-hidden rounded-2xl border bg-white text-slate-900 ${
+                plan.recommended ? "border-primary/40 shadow-lg ring-1 ring-primary/10" : "border-slate-200 shadow-sm"
+              }`}
             >
-              {plan.highlight && (
-                <div className="absolute top-4 right-4">
-                  <Badge className="bg-primary text-white">Mais escolhido</Badge>
+              {plan.recommended ? (
+                <div className="absolute right-4 top-4">
+                  <Badge className="bg-primary text-white">{plan.badge || "Mais recomendado"}</Badge>
                 </div>
-              )}
-              <CardHeader>
-                <CardTitle className="font-poppins text-2xl">{plan.name}</CardTitle>
-                <CardDescription className="text-slate-600">{plan.description}</CardDescription>
+              ) : null}
+
+              <CardHeader className="space-y-3">
+                <div>
+                  <CardTitle className="font-poppins text-2xl">{plan.name}</CardTitle>
+                  <CardDescription className="mt-2 text-slate-600">{plan.description}</CardDescription>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-sm uppercase tracking-[0.18em] text-slate-500">Preço mensal</p>
+                  <p className="mt-2 text-4xl font-bold text-slate-900">{plan.price.replace("/mês", "")}</p>
+                  <p className="text-sm text-slate-500">por mês</p>
+                </div>
               </CardHeader>
+
               <CardContent className="space-y-6">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xl font-semibold text-slate-900">{plan.value}</span>
+                <div className="rounded-xl border border-primary/10 bg-primary/[0.03] p-4">
+                  <p className="text-sm font-semibold text-slate-900">{plan.marketingHeadline}</p>
+                  <p className="mt-1 text-sm text-slate-600">{plan.comparisonSummary}</p>
                 </div>
+
                 <div className="space-y-2">
                   {plan.features.map((feature) => (
-                    <div key={feature} className="flex items-center gap-2 text-sm text-slate-700">
-                      <Check className="h-4 w-4 text-primary" />
+                    <div key={feature} className="flex items-start gap-2 text-sm text-slate-700">
+                      <Check className="mt-0.5 h-4 w-4 text-primary" />
                       <span>{feature}</span>
                     </div>
                   ))}
                 </div>
+
                 <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/5 border border-primary/10">
-                    Cadastro rápido
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/5 border border-primary/10">
-                    Segurança e privacidade
-                  </span>
+                  {plan.modalHighlights.map((highlight) => (
+                    <span
+                      key={highlight}
+                      className="inline-flex items-center rounded-full border border-primary/10 bg-primary/5 px-3 py-1"
+                    >
+                      {highlight}
+                    </span>
+                  ))}
                 </div>
               </CardContent>
+
               <CardFooter>
                 <Link href="/signup" className="w-full">
-                  <Button
-                    className="w-full"
-                    variant={plan.highlight ? "default" : "outline"}
-                  >
-                    Cadastre-se
+                  <Button className="w-full" variant={plan.recommended ? "default" : "outline"}>
+                    Escolher {plan.shortName}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>

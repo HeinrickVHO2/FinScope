@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,13 +9,14 @@ import { Check, Crown, Pencil, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BillingCheckoutSection } from "@/components/BillingCheckoutSection";
+import CaktoCheckoutModal from "@/components/CaktoCheckoutModal";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { CheckoutPlanId } from "@/constants/checkout-plans";
+import { CHECKOUT_PLAN_OPTIONS, type CheckoutPlanId } from "@/constants/checkout-plans";
 import { apiFetch } from "@/lib/api";
 import { PasswordInput } from "@/components/auth/password-input";
 import { PasswordStrengthChecklist } from "@/components/auth/password-strength-checklist";
 import { validatePasswordStrength } from "@shared/password-policy";
+import { getBillingPlan } from "@shared/plans";
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -25,7 +26,7 @@ export default function SettingsPage() {
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingEmail, setIsEditingEmail] = useState(false);
-  const [showCheckoutSection, setShowCheckoutSection] = useState(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [checkoutIntent, setCheckoutIntent] = useState<"signup" | "upgrade">("signup");
   const [selectedPlanId, setSelectedPlanId] = useState<CheckoutPlanId | null>(null);
   const [confirmField, setConfirmField] = useState<"name" | "email" | null>(null);
@@ -43,26 +44,26 @@ export default function SettingsPage() {
     }
   }, [user]);
 
-  if (isLoading || !user) {
-    return (
-      <div className="p-6 space-y-6">
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-60 w-full" />
-      </div>
-    );
-  }
-
-  const currentPlan = user.plan;
-  const displayPlan = user.billingStatus === "active" ? user.plan : "pending";
+  const currentPlan = (user?.plan as CheckoutPlanId | undefined) ?? "pro";
+  const displayPlan = user?.billingStatus === "active" ? currentPlan : "pending";
+  const currentPlanConfig = getBillingPlan(currentPlan);
   const passwordValidation = validatePasswordStrength(newPassword, {
     email,
     fullName,
   });
 
+  const plans = useMemo(
+    () =>
+      CHECKOUT_PLAN_OPTIONS.map((plan) => ({
+        ...plan,
+        current: currentPlan === plan.id,
+      })),
+    [currentPlan],
+  );
+
   useEffect(() => {
     const shouldShow = displayPlan === "pending";
-    setShowCheckoutSection(shouldShow);
+    setIsCheckoutModalOpen(shouldShow);
     setCheckoutIntent(shouldShow ? "signup" : "upgrade");
     if (!shouldShow) {
       setSelectedPlanId(null);
@@ -81,7 +82,7 @@ export default function SettingsPage() {
 
     if (checkoutMode === "signup" || checkoutMode === "upgrade" || requestedPlan) {
       setCheckoutIntent(checkoutMode === "signup" ? "signup" : "upgrade");
-      setShowCheckoutSection(true);
+      setIsCheckoutModalOpen(true);
     }
 
     if (params.toString()) {
@@ -89,21 +90,15 @@ export default function SettingsPage() {
     }
   }, []);
 
-  const plans = [
-    {
-      name: "Pro",
-      price: "R$ 19,90/mês",
-      current: currentPlan === "pro",
-      features: ["Até 3 contas", "Painel completo", "Alertas de pagamento", "Exportação em PDF"],
-    },
-    {
-      name: "Premium",
-      price: "R$ 29,90/mês",
-      current: currentPlan === "premium",
-      recommended: true,
-      features: ["Contas ilimitadas", "Painel avançado", "Organização automática das categorias", "Minha empresa com visão completa", "Relatórios em PDF"],
-    },
-  ];
+  if (isLoading || !user) {
+    return (
+      <div className="space-y-6 p-6">
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-60 w-full" />
+      </div>
+    );
+  }
 
   const handleFieldSaveRequest = (field: "name" | "email") => {
     if (field === "name") {
@@ -128,23 +123,23 @@ export default function SettingsPage() {
     if (field === "name") {
       setFullName(user.fullName);
       setIsEditingName(false);
-    } else {
-      setEmail(user.email);
-      setIsEditingEmail(false);
+      return;
     }
+
+    setEmail(user.email);
+    setIsEditingEmail(false);
   };
 
   const confirmProfileUpdate = async () => {
     if (!confirmField) return;
-    const payload =
-      confirmField === "name"
-        ? { fullName: fullName.trim() }
-        : { email: email.trim() };
+
+    const payload = confirmField === "name" ? { fullName: fullName.trim() } : { email: email.trim() };
 
     try {
       const field = confirmField;
       setConfirmField(null);
       setIsUpdatingProfile(true);
+
       const response = await apiFetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -160,11 +155,9 @@ export default function SettingsPage() {
       await refetchUser();
       toast({
         title: "Perfil atualizado",
-        description:
-          field === "name"
-            ? "Seu nome foi atualizado com sucesso."
-            : "Seu email foi atualizado com sucesso.",
+        description: field === "name" ? "Seu nome foi atualizado com sucesso." : "Seu email foi atualizado com sucesso.",
       });
+
       if (field === "name") {
         setIsEditingName(false);
       } else {
@@ -234,7 +227,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <div>
         <h1 className="text-3xl font-poppins font-bold" data-testid="text-settings-title">
           Configurações
@@ -244,54 +237,39 @@ export default function SettingsPage() {
         </p>
       </div>
 
-
       <Card data-testid="card-profile">
         <CardHeader>
-          <CardTitle className="font-poppins">Informações Pessoais</CardTitle>
+          <CardTitle className="font-poppins">Informações pessoais</CardTitle>
           <CardDescription>Mantenha seus dados sempre em dia</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="fullName">Nome Completo</Label>
+            <Label htmlFor="fullName">Nome completo</Label>
             <div className="flex items-center gap-2">
               <Input
                 id="fullName"
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                onChange={(event) => setFullName(event.target.value)}
                 disabled={!isEditingName || isUpdatingProfile}
                 data-testid="input-fullname"
               />
               {!isEditingName ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsEditingName(true)}
-                  aria-label="Editar nome"
-                >
+                <Button variant="ghost" size="icon" onClick={() => setIsEditingName(true)} aria-label="Editar nome">
                   <Pencil className="h-4 w-4" />
                 </Button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => cancelEditField("name")}
-                    aria-label="Cancelar edição de nome"
-                  >
+                  <Button variant="outline" size="icon" onClick={() => cancelEditField("name")} aria-label="Cancelar edição de nome">
                     <X className="h-4 w-4" />
                   </Button>
-                  <Button
-                    size="icon"
-                    onClick={() => handleFieldSaveRequest("name")}
-                    aria-label="Salvar nome"
-                    disabled={isUpdatingProfile}
-                  >
+                  <Button size="icon" onClick={() => handleFieldSaveRequest("name")} aria-label="Salvar nome" disabled={isUpdatingProfile}>
                     <Check className="h-4 w-4" />
                   </Button>
                 </div>
               )}
             </div>
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <div className="flex items-center gap-2">
@@ -299,35 +277,20 @@ export default function SettingsPage() {
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(event) => setEmail(event.target.value)}
                 disabled={!isEditingEmail || isUpdatingProfile}
                 data-testid="input-email"
               />
               {!isEditingEmail ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsEditingEmail(true)}
-                  aria-label="Editar email"
-                >
+                <Button variant="ghost" size="icon" onClick={() => setIsEditingEmail(true)} aria-label="Editar email">
                   <Pencil className="h-4 w-4" />
                 </Button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => cancelEditField("email")}
-                    aria-label="Cancelar edição de email"
-                  >
+                  <Button variant="outline" size="icon" onClick={() => cancelEditField("email")} aria-label="Cancelar edição de email">
                     <X className="h-4 w-4" />
                   </Button>
-                  <Button
-                    size="icon"
-                    onClick={() => handleFieldSaveRequest("email")}
-                    aria-label="Salvar email"
-                    disabled={isUpdatingProfile}
-                  >
+                  <Button size="icon" onClick={() => handleFieldSaveRequest("email")} aria-label="Salvar email" disabled={isUpdatingProfile}>
                     <Check className="h-4 w-4" />
                   </Button>
                 </div>
@@ -340,7 +303,7 @@ export default function SettingsPage() {
       <Card data-testid="card-security">
         <CardHeader>
           <CardTitle className="font-poppins">Segurança</CardTitle>
-          <CardDescription>Atualize sua senha com uma combinação mais forte e difícil de adivinhar</CardDescription>
+          <CardDescription>Atualize sua senha com uma combinação mais forte e difícil de adivinhar.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -365,10 +328,7 @@ export default function SettingsPage() {
             />
           </div>
 
-          <PasswordStrengthChecklist
-            password={newPassword}
-            userContext={{ email, fullName }}
-          />
+          <PasswordStrengthChecklist password={newPassword} userContext={{ email, fullName }} />
 
           <div className="space-y-2">
             <Label htmlFor="confirmNewPassword">Confirmar nova senha</Label>
@@ -381,19 +341,10 @@ export default function SettingsPage() {
             />
           </div>
 
-          {passwordError && (
-            <p className="text-sm font-medium text-destructive">{passwordError}</p>
-          )}
+          {passwordError ? <p className="text-sm font-medium text-destructive">{passwordError}</p> : null}
+          {passwordSuccess ? <p className="text-sm font-medium text-emerald-600">{passwordSuccess}</p> : null}
 
-          {passwordSuccess && (
-            <p className="text-sm font-medium text-emerald-600">{passwordSuccess}</p>
-          )}
-
-          <Button
-            onClick={handlePasswordUpdate}
-            disabled={isUpdatingPassword}
-            className="w-full sm:w-auto"
-          >
+          <Button onClick={handlePasswordUpdate} disabled={isUpdatingPassword} className="w-full sm:w-auto">
             {isUpdatingPassword ? "Atualizando senha..." : "Atualizar senha"}
           </Button>
         </CardContent>
@@ -401,56 +352,62 @@ export default function SettingsPage() {
 
       <Card data-testid="card-current-plan">
         <CardHeader>
-          <CardTitle className="font-poppins">Plano Atual</CardTitle>
+          <CardTitle className="font-poppins">Plano atual</CardTitle>
           <CardDescription>Gerencie sua assinatura</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                 <Crown className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <p className="font-semibold font-poppins text-lg" data-testid="text-current-plan-name">
-                  {displayPlan === "pending" ? "Pagamento pendente" : `Plano ${currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}`}
+                <p className="text-lg font-semibold font-poppins" data-testid="text-current-plan-name">
+                  {displayPlan === "pending" ? "Pagamento pendente" : currentPlanConfig.name}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {displayPlan === "pending"
-                    ? "Conclua o pagamento para liberar todos os recursos"
-                    : "Assinatura confirmada"}
+                    ? "Conclua o pagamento para liberar todos os recursos."
+                    : `${currentPlanConfig.priceLabel} • ${currentPlanConfig.marketingHeadline}`}
                 </p>
               </div>
             </div>
+
             {displayPlan === "pending" ? (
               <Button
                 variant="outline"
                 data-testid="button-finish-payment"
                 onClick={() => {
                   setCheckoutIntent("signup");
-                  setSelectedPlanId((currentPlan as CheckoutPlanId) || null);
-                  setShowCheckoutSection(true);
+                  setSelectedPlanId(currentPlan);
+                  setIsCheckoutModalOpen(true);
                 }}
               >
                 Concluir pagamento
               </Button>
-            ) : currentPlan !== "premium" ? (
+            ) : (
               <Button
                 variant="outline"
-                data-testid="button-upgrade-plan"
+                data-testid={currentPlan === "premium" ? "button-downgrade-plan" : "button-upgrade-plan"}
                 onClick={() => {
                   setCheckoutIntent("upgrade");
-                  setSelectedPlanId("premium");
-                  setShowCheckoutSection(true);
+                  setSelectedPlanId(currentPlan === "premium" ? "pro" : "premium");
+                  setIsCheckoutModalOpen(true);
                 }}
               >
-                Fazer Upgrade
+                {currentPlan === "premium" ? "Alterar para Pro" : "Fazer upgrade"}
               </Button>
-            ) : null}
+            )}
           </div>
+
           <Separator className="my-4" />
+
           <div className="text-sm text-muted-foreground">
-            {displayPlan === "pending" && <p>Se você já pagou, clique em &quot;Verificar pagamento&quot; abaixo.</p>}
-            {displayPlan !== "pending" && <p>Os detalhes da próxima cobrança aparecem aqui assim que sua assinatura estiver sincronizada.</p>}
+            {displayPlan === "pending" ? (
+              <p>Se você já pagou, clique em "Verificar pagamento" na modal para atualizar o acesso.</p>
+            ) : (
+              <p>{currentPlanConfig.comparisonSummary}</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -459,60 +416,68 @@ export default function SettingsPage() {
         <h2 className="text-2xl font-poppins font-bold" data-testid="text-plans-title">
           Planos disponíveis
         </h2>
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           {plans.map((plan, index) => (
             <Card
-              key={plan.name}
+              key={plan.id}
               className={`relative ${plan.current ? "border-primary" : ""} ${plan.recommended ? "border-primary border-2" : ""}`}
-              data-testid={`card-plan-${plan.name.toLowerCase()}`}
+              data-testid={`card-plan-${plan.id}`}
             >
-              {plan.recommended && (
+              {plan.recommended ? (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge variant="default">Recomendado</Badge>
+                  <Badge variant="default">{plan.badge || "Recomendado"}</Badge>
                 </div>
-              )}
-              {plan.current && (
+              ) : null}
+              {plan.current ? (
                 <div className="absolute -top-3 right-4">
                   <Badge variant="secondary">Atual</Badge>
                 </div>
-              )}
+              ) : null}
+
               <CardHeader>
                 <CardTitle className="font-poppins" data-testid={`text-plan-name-${index}`}>
                   {plan.name}
                 </CardTitle>
+                <CardDescription>{plan.marketingHeadline}</CardDescription>
                 <div className="text-2xl font-bold font-poppins" data-testid={`text-plan-price-${index}`}>
                   {plan.price}
                 </div>
+                <p className="text-sm text-muted-foreground">{plan.comparisonSummary}</p>
               </CardHeader>
-              <CardContent>
+
+              <CardContent className="space-y-4">
                 <ul className="space-y-2">
                   {plan.features.map((feature, featureIndex) => (
                     <li key={featureIndex} className="flex items-start gap-2" data-testid={`text-feature-${index}-${featureIndex}`}>
-                      <Check className="h-4 w-4 text-secondary shrink-0 mt-0.5" />
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
                       <span className="text-sm">{feature}</span>
                     </li>
                   ))}
                 </ul>
+
+                <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground">
+                  {plan.modalHighlights.join(" • ")}
+                </div>
               </CardContent>
+
               <CardFooter>
                 {!plan.current ? (
                   <Button
                     className="w-full"
                     variant={plan.recommended ? "default" : "outline"}
-                    data-testid={`button-select-${plan.name.toLowerCase()}`}
+                    data-testid={`button-select-${plan.id}`}
                     onClick={() => {
-                      const targetPlan = plan.name.toLowerCase() as CheckoutPlanId;
                       const isUpgradeFlow = displayPlan !== "pending";
                       setCheckoutIntent(isUpgradeFlow ? "upgrade" : "signup");
-                      setSelectedPlanId(targetPlan);
-                      setShowCheckoutSection(true);
+                      setSelectedPlanId(plan.id);
+                      setIsCheckoutModalOpen(true);
                     }}
                   >
                     Selecionar plano
                   </Button>
                 ) : (
-                  <Button className="w-full" variant="secondary" disabled data-testid={`button-current-${plan.name.toLowerCase()}`}>
-                    Plano Atual
+                  <Button className="w-full" variant="secondary" disabled data-testid={`button-current-${plan.id}`}>
+                    Plano atual
                   </Button>
                 )}
               </CardFooter>
@@ -521,19 +486,22 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {showCheckoutSection && (
-        <BillingCheckoutSection
-          intent={checkoutIntent}
-          currentPlan={currentPlan}
-          autoVerify={false}
-          initialPlanId={selectedPlanId}
-          onFinished={async () => {
-            await refetchUser();
-            setShowCheckoutSection(false);
+      <CaktoCheckoutModal
+        open={isCheckoutModalOpen}
+        onOpenChange={(open) => {
+          setIsCheckoutModalOpen(open);
+          if (!open) {
             setSelectedPlanId(null);
-          }}
-        />
-      )}
+          }
+        }}
+        intent={checkoutIntent}
+        initialPlanId={selectedPlanId}
+        onFinished={async () => {
+          await refetchUser();
+          setIsCheckoutModalOpen(false);
+          setSelectedPlanId(null);
+        }}
+      />
 
       <Dialog
         open={!!confirmField}
@@ -547,15 +515,11 @@ export default function SettingsPage() {
             <DialogDescription>
               {confirmField === "name"
                 ? "Tem certeza que deseja alterar seu nome completo?"
-                : "Tem certeza que deseja alterar seu e-mail?"}
+                : "Tem certeza que deseja alterar seu email?"}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex flex-col sm:flex-row sm:justify-end sm:space-x-2 space-y-2 sm:space-y-0">
-            <Button
-              variant="outline"
-              onClick={() => setConfirmField(null)}
-              disabled={isUpdatingProfile}
-            >
+          <DialogFooter className="flex flex-col space-y-2 sm:flex-row sm:justify-end sm:space-x-2 sm:space-y-0">
+            <Button variant="outline" onClick={() => setConfirmField(null)} disabled={isUpdatingProfile}>
               Cancelar
             </Button>
             <Button onClick={confirmProfileUpdate} disabled={isUpdatingProfile}>
@@ -564,7 +528,6 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

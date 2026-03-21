@@ -114,6 +114,9 @@ export function registerWhatsAppAgentRoutes(params: {
   const service = new WhatsAppAgentService(repository, storage);
   const runtimeInfo = getWhatsAppAgentRuntimeInfo();
 
+  const resolveAccessErrorStatus = (message: string) =>
+    /assinantes ativos|plano premium/i.test(message) ? 403 : 400;
+
   console.info("[WHATSAPP] runtime registered", runtimeInfo);
 
   app.get("/api/whatsapp/session", requireAuth, async (req: any, res) => {
@@ -138,7 +141,7 @@ export function registerWhatsAppAgentRoutes(params: {
         : error instanceof Error
           ? error.message
           : "Não foi possível gerar o código agora.";
-      const status = message === "Disponível para assinantes ativos." ? 403 : 400;
+      const status = resolveAccessErrorStatus(message);
       return res.status(status).json({ error: message });
     }
   });
@@ -160,7 +163,7 @@ export function registerWhatsAppAgentRoutes(params: {
       return res.json(candidates.map(mapCandidate));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Não foi possível carregar as sugestões.";
-      const status = message === "Disponível para assinantes ativos." ? 403 : 400;
+      const status = resolveAccessErrorStatus(message);
       return res.status(status).json({ error: message });
     }
   });
@@ -185,7 +188,7 @@ export function registerWhatsAppAgentRoutes(params: {
       return res.json(items);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Nao foi possivel carregar os lancamentos do WhatsApp.";
-      const status = message === "Disponivel para assinantes ativos." ? 403 : 400;
+      const status = resolveAccessErrorStatus(message);
       return res.status(status).json({ error: message });
     }
   });

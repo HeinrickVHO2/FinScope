@@ -25,6 +25,7 @@ import {
 import { storage } from "../server/storage";
 import { AssistantOrchestrator } from "../server/modules/shared/assistantOrchestrator";
 import { resolveModelForText } from "../server/modules/shared/modelRouter";
+import { getInternalAiMode } from "../shared/plans";
 
 export interface ChatRequest {
   content: string;
@@ -61,6 +62,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
 
   const recentContext = getRecentContext(userId, 6);
   const assistantOrchestrator = new AssistantOrchestrator(storage);
+  const internalAiMode = getInternalAiMode(user.plan);
   let modelSelection = resolveModelForText(content);
 
   const userMessageRow = await saveChatHistoryMessage(userId, "user", content);
@@ -153,6 +155,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     userId,
     text: effectiveContent,
     channel: "internal_chat",
+    plan: user.plan,
   });
   if (orchestrated.handled && orchestrated.reply) {
     updateSessionMemory(userId, {
@@ -176,8 +179,8 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
       awaitingAccountType: false,
       awaitingTransactionAmount: false,
     });
-    const assistantResponse = await buildFinancialAssistantResponse(storage, userId, effectiveContent, "internal_chat");
-    const assistantReply = assistantResponse.message || await buildFinancialAssistantReply(storage, userId, effectiveContent, "internal_chat");
+    const assistantResponse = await buildFinancialAssistantResponse(storage, userId, effectiveContent, "internal_chat", user.plan);
+    const assistantReply = assistantResponse.message || await buildFinancialAssistantReply(storage, userId, effectiveContent, "internal_chat", user.plan);
     const fallbackPayload = {
       ...(assistantResponse.payload || {}),
       model: modelSelection,
@@ -233,7 +236,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
   });
   const financialContext = await buildFinancialContext(userId, resolvedAccountType || "ALL");
 
-  const conversationalPrompt = buildConversationalPrompt("", financialContext?.asPrompt || "", insightFocus ?? null);
+  const conversationalPrompt = buildConversationalPrompt("", financialContext?.asPrompt || "", insightFocus ?? null, internalAiMode);
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

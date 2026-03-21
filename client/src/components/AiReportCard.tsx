@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import UpgradeModal from "@/components/UpgradeModal";
 import { LockedAiReport } from "@/components/LockedAiReport";
 import { Skeleton } from "@/components/ui/skeleton";
+import { canUseAiReports } from "@shared/plans";
 
 type AiReportResponse = {
   insights: string[];
@@ -28,7 +29,7 @@ const monthFormatter = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "
 export function AiReportCard() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const isPremium = user?.plan === "premium";
+  const isPremium = canUseAiReports(user?.plan);
 
   const [data, setData] = useState<AiReportResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);

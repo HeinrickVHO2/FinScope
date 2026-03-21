@@ -22,6 +22,7 @@ import { createDefaultOcrProvider, type OcrProvider } from "./ocr";
 import { AssistantOrchestrator } from "../shared/assistantOrchestrator";
 import { inferExpenseCategory } from "../shared/expenseClassifier";
 import { buildWhatsAppConversationUrl, normalizePhone } from "./phone";
+import { canUseWhatsAppAgent } from "../../../shared/plans";
 import type { InboundMessageRecord, WhatsAppRepository } from "./repository";
 import type {
   PendingPhoneBinding,
@@ -245,10 +246,10 @@ export class WhatsAppAgentService {
     const businessPhone = this.getBusinessPhone();
 
     return {
-      eligible: user.billingStatus === "active",
+      eligible: user.billingStatus === "active" && canUseWhatsAppAgent(user.plan),
       billingStatus: user.billingStatus,
       plan: user.plan,
-      instructions: user.billingStatus === "active"
+      instructions: user.billingStatus === "active" && canUseWhatsAppAgent(user.plan)
         ? [
             "Informe seu número.",
             "Copie o código gerado.",
@@ -256,8 +257,8 @@ export class WhatsAppAgentService {
             "Depois disso, o assistente passa a responder e registrar lançamentos.",
           ]
         : [
-            "Este recurso fica disponível para assinantes ativos.",
-            "Ative sua assinatura para conectar o WhatsApp e usar o assistente.",
+            "Este recurso fica disponível apenas no plano Premium com assinatura ativa.",
+            "Ative o Premium para conectar o WhatsApp e usar o assistente.",
           ],
       businessPhone,
       conversationUrl: binding?.phone_e164 ? buildConversationUrl(businessPhone) : null,
@@ -764,6 +765,7 @@ export class WhatsAppAgentService {
         userId: user.id,
         text: sanitizedEvent.text || "",
         channel: "whatsapp",
+        plan: user.plan,
       });
       if (orchestrated.handled && orchestrated.reply) {
         return this.handleAssistantReply(inbound, user, orchestrated.reply, "assistant_orchestrated", orchestrated.payload ?? null);
@@ -2006,6 +2008,7 @@ export class WhatsAppAgentService {
     const user = await this.storage.getUser(userId);
     if (!user) throw new Error("Usuario nao encontrado.");
     if (user.billingStatus !== "active") throw new Error("Disponivel para assinantes ativos.");
+    if (!canUseWhatsAppAgent(user.plan)) throw new Error("Disponivel apenas no plano Premium.");
     return user;
   }
 

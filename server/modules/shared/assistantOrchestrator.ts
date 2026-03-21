@@ -5,6 +5,7 @@ import { buildFinancialSummaryPayload, formatFinancialSummaryText, type Financia
 import { GoalService } from "./goalService";
 import { looksLikeAssistantOrchestratorMessage, parseAssistantRouteIntent, type SummaryIntentFocus } from "./intentRouter";
 import { resolveModelForIntent, type ModelSelection } from "./modelRouter";
+import { canUseAdvancedInternalAi } from "../../../shared/plans";
 
 export type AgentUiPayload = {
   type: string;
@@ -233,6 +234,47 @@ function buildResponse(params: {
   };
 }
 
+function isAdvancedOrchestratorIntent(intent: ReturnType<typeof parseAssistantRouteIntent>) {
+  if (!intent) return false;
+  return [
+    "financial_guidance",
+    "limits_status",
+    "upsert_limit",
+    "investments_summary",
+    "create_goal",
+    "add_goal_contribution",
+    "list_goals",
+    "goal_progress",
+    "switch_financial_view",
+  ].includes(intent.type);
+}
+
+function buildPlanLimitedResponse(model: ModelSelection): AssistantOrchestratorResult {
+  const message = "No plano Pro eu consigo registrar movimentações e mostrar resumos objetivos. Para análises, metas, limites e orientações mais completas, o Premium libera a experiência avançada.";
+  return buildResponse({
+    intent: "assistant.plan_limit",
+    action: "show_plan_limit",
+    message,
+    model,
+    confidence: 0.98,
+    data: {
+      requiredPlan: "premium",
+      route: "/settings",
+    },
+    uiPayload: {
+      type: "plan_limit",
+      title: "Disponível no Premium",
+      subtitle: "Análises, metas e orientações avançadas",
+      route: "/settings",
+      view: "plans",
+      cards: [
+        { label: "Plano atual", value: "Pro" },
+        { label: "Desbloqueia", value: "Premium" },
+      ],
+    },
+  });
+}
+
 export class AssistantOrchestrator {
   private readonly goalService = new GoalService();
   private readonly limitService = new CategoryLimitService();
@@ -247,11 +289,15 @@ export class AssistantOrchestrator {
     userId: string;
     text: string;
     channel: "whatsapp" | "internal_chat";
+    plan?: string | null;
   }): Promise<AssistantOrchestratorResult> {
     const intent = parseAssistantRouteIntent(params.text);
     if (!intent) return { handled: false };
 
     const modelSelection = resolveModelForIntent(intent);
+    if (!canUseAdvancedInternalAi(params.plan) && isAdvancedOrchestratorIntent(intent)) {
+      return buildPlanLimitedResponse(modelSelection);
+    }
 
     if (intent.type === "summary") {
       const limits = await this.limitService.listByUser(params.userId).catch(() => []);

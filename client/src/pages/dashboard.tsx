@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { type Transaction, type FutureTransaction } from "@shared/schema";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, FileDown, Lock } from "lucide-react";
@@ -13,6 +14,8 @@ import UpgradeModal from "@/components/UpgradeModal";
 import { useDashboardView, type DashboardScope } from "@/context/dashboard-view";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend, LineChart, Line } from "recharts";
 import { AiReportCard } from "@/components/AiReportCard";
+import { canUseAdvancedPdf, canUseBasicPdf, canUseBusinessArea } from "@shared/plans";
+import { exportBasicPdf, resolveTransactionPeriodLabel } from "@/lib/pdf-export";
 
 interface DashboardMetrics {
   totalBalance: number;
@@ -119,34 +122,64 @@ function useDashboardScope(scope: Scope, enabled: boolean) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const isPremium = user?.plan === "premium";
+  const { toast } = useToast();
+  const hasBusinessArea = canUseBusinessArea(user?.plan);
+  const canAccessBasicPdf = canUseBasicPdf(user?.plan);
+  const canAccessAdvancedPdf = canUseAdvancedPdf(user?.plan);
   const { selectedView, setSelectedView } = useDashboardView();
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [upgradeFeatureName, setUpgradeFeatureName] = useState("Minha empresa");
 
   const pfData = useDashboardScope("PF", true);
   const totalData = useDashboardScope("ALL", true);
-  const pjData = useDashboardScope("PJ", isPremium);
+  const pjData = useDashboardScope("PJ", hasBusinessArea);
 
   useEffect(() => {
-    if (!isPremium && selectedView === "PJ") {
+    if (!hasBusinessArea && selectedView === "PJ") {
       setSelectedView("PF");
     }
-  }, [isPremium, selectedView, setSelectedView]);
+  }, [hasBusinessArea, selectedView, setSelectedView]);
 
   const summaryData = useMemo(() => {
-    if (selectedView === "PJ" && !isPremium) {
+    if (selectedView === "PJ" && !hasBusinessArea) {
       return pfData;
     }
     return selectedView === "PF" ? pfData : selectedView === "PJ" ? pjData : totalData;
-  }, [selectedView, pfData, pjData, totalData, isPremium]);
+  }, [selectedView, pfData, pjData, totalData, hasBusinessArea]);
 
   const handleScopeClick = (scope: Scope) => {
-    if (scope === "PJ" && !isPremium) {
+    if (scope === "PJ" && !hasBusinessArea) {
+      setUpgradeFeatureName("Minha empresa");
       setIsUpgradeModalOpen(true);
       return;
     }
     setSelectedView(scope);
+  };
+
+  const handleBasicPdfExport = async () => {
+    if (!canAccessBasicPdf) {
+      setUpgradeFeatureName("Relatório básico em PDF");
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+
+    try {
+      await exportBasicPdf({
+        scope: selectedView,
+        periodLabel: resolveTransactionPeriodLabel(summaryData.transactions || []),
+      });
+      toast({
+        title: "Relatório pronto",
+        description: "O download do relatório básico começou automaticamente.",
+      });
+    } catch (error) {
+      toast({
+        title: "Não foi possível gerar o PDF",
+        description: (error as Error).message || "Tente novamente em instantes.",
+        variant: "destructive",
+      });
+    }
   };
 
   const summaryStats = summaryData.metrics
@@ -158,7 +191,7 @@ export default function DashboardPage() {
       ]
     : [];
 
-  const forecastEnabled = !(selectedView === "PJ" && !isPremium);
+  const forecastEnabled = !(selectedView === "PJ" && !hasBusinessArea);
   const forecastQuery = useQuery<CashflowForecast>({
     queryKey: [`/api/cashflow/forecast?type=${selectedView}`],
     enabled: forecastEnabled,
@@ -229,14 +262,14 @@ export default function DashboardPage() {
           >
             Conta Pessoal
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => handleScopeClick("PJ")}
-            className={cn(selectedView === "PJ" && "border-purple-500 text-purple-600")}
-            aria-disabled={!isPremium}
-          >
+            <Button
+              variant="outline"
+              onClick={() => handleScopeClick("PJ")}
+              className={cn(selectedView === "PJ" && "border-purple-500 text-purple-600")}
+              aria-disabled={!hasBusinessArea}
+            >
             Minha empresa
-            {!isPremium && <Lock className="ml-2 h-4 w-4" />}
+            {!hasBusinessArea && <Lock className="ml-2 h-4 w-4" />}
           </Button>
           <Button
             variant="outline"
@@ -245,20 +278,27 @@ export default function DashboardPage() {
           >
             Visão Total
           </Button>
+          {canAccessBasicPdf ? (
+            <Button variant="secondary" onClick={handleBasicPdfExport}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Relatório básico
+            </Button>
+          ) : null}
           <Button
-            variant="secondary"
+            variant={canAccessAdvancedPdf ? "outline" : "secondary"}
             onClick={() => {
-              if (!isPremium) {
+              if (!canAccessAdvancedPdf) {
+                setUpgradeFeatureName("Relatórios avançados em PDF");
                 setIsUpgradeModalOpen(true);
                 return;
               }
               setIsExportModalOpen(true);
             }}
-            className={cn(!isPremium && "opacity-60")}
+            className={cn(!canAccessAdvancedPdf && "opacity-90")}
           >
             <FileDown className="mr-2 h-4 w-4" />
-            Exportar PDF Premium
-            {!isPremium && <Lock className="ml-2 h-4 w-4" />}
+            Relatório avançado
+            {!canAccessAdvancedPdf && <Lock className="ml-2 h-4 w-4" />}
           </Button>
         </div>
       </div>
@@ -525,11 +565,14 @@ export default function DashboardPage() {
 
 {selectedView === "PF" && <DashboardBlock scope="PF" data={pfData} hideSummary />}
 {selectedView === "PJ" &&
-        (isPremium ? <DashboardBlock scope="PJ" data={pjData} hideSummary premium /> : <LockedCard onUpgrade={() => setIsUpgradeModalOpen(true)} />)}
+        (hasBusinessArea ? <DashboardBlock scope="PJ" data={pjData} hideSummary premium /> : <LockedCard onUpgrade={() => {
+          setUpgradeFeatureName("Minha empresa");
+          setIsUpgradeModalOpen(true);
+        }} />)}
 {selectedView === "ALL" && <DashboardBlock scope="ALL" data={totalData} hideSummary />}
 
       <ExportPdfPremiumModal open={isExportModalOpen} onOpenChange={setIsExportModalOpen} />
-      <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Relatórios Premium" />
+      <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName={upgradeFeatureName} />
     </div>
   );
 }

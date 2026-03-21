@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, timestamp, decimal, boolean, integer, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { BILLING_PLANS } from "./plans";
 import { uuid, numeric } from "drizzle-orm/pg-core";
 import { validatePasswordStrength } from "./password-policy";
 
@@ -545,8 +546,8 @@ export type UpdateUserProfile = z.infer<typeof updateUserProfileSchema>;
 
 // Plan limits
 export const PLAN_LIMITS = {
-  pro: { accounts: 3, features: ["basic_dashboard", "cash_flow", "csv_export", "alerts"] },
-  premium: { accounts: Infinity, features: ["advanced_dashboard", "auto_rules", "pdf_reports"] },
+  pro: { accounts: BILLING_PLANS.pro.accountsLimit, features: ["basic_dashboard", "cash_flow", "csv_export", "alerts", "basic_pdf", "basic_ai"] },
+  premium: { accounts: BILLING_PLANS.premium.accountsLimit, features: ["advanced_dashboard", "auto_rules", "advanced_pdf", "advanced_ai", "whatsapp_agent", "business_area"] },
 } as const;
 
 // Categories (predefined)

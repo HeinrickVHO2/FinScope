@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, ArrowLeft, Loader2, CreditCard, Clock3 } from "lucide-react";
+import { Check, ArrowLeft, ArrowRightLeft, Loader2, CreditCard, Clock3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { CHECKOUT_PLAN_OPTIONS, type CheckoutPlanId } from "@/constants/checkout-plans";
@@ -14,38 +14,17 @@ interface CaktoCheckoutModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   intent: CheckoutIntent;
+  initialPlanId?: CheckoutPlanId | null;
   onFinished?: () => void;
 }
 
-const PLAN_OPTIONS = [
-    {
-      id: "pro",
-      name: "Plano Pro",
-      price: "R$ 19,90/mês",
-    description: "Para quem precisa organizar as finanças com mais controle.",
-    features: [
-      "Até 3 contas",
-      "Painel completo",
-      "Alertas de pagamento",
-      "Exportação em PDF",
-    ],
-  },
-  {
-    id: "premium",
-    name: "Plano Premium",
-    price: "R$ 29,90/mês",
-    description: "Tudo do Pro + recursos completos para a sua empresa.",
-    badge: "Mais popular",
-    features: [
-      "Contas ilimitadas",
-      "Categorização automática",
-      "Relatórios avançados",
-      "Minha empresa com visão completa",
-    ],
-  },
-] as const;
-
-export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinished }: CaktoCheckoutModalProps) {
+export default function CaktoCheckoutModal({
+  open,
+  onOpenChange,
+  intent,
+  initialPlanId = null,
+  onFinished,
+}: CaktoCheckoutModalProps) {
   const { toast } = useToast();
   const { refetchUser, user } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<CheckoutPlanId | null>(null);
@@ -65,24 +44,35 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
     }
   }, [open]);
 
-  const dialogTitle = intent === "signup" ? "Escolha um plano para começar" : "Atualize seu plano";
-
-  const subtitle = useMemo(() => {
-    if (intent === "signup") {
-      return "Escolha seu plano e conclua o pagamento sem sair do FinScope. Assim que ele for aprovado, seu acesso é liberado.";
-    }
-    return "Mude de plano em poucos passos. A garantia de 10 dias também vale após a nova cobrança.";
-  }, [intent]);
-
   useEffect(() => {
     if (!open) return;
     if (intent === "upgrade") {
-      const defaultPlan = CHECKOUT_PLAN_OPTIONS.find((plan) => plan.id !== currentPlan)?.id ?? null;
+      const defaultPlan =
+        (initialPlanId && initialPlanId !== currentPlan
+          ? initialPlanId
+          : CHECKOUT_PLAN_OPTIONS.find((plan) => plan.id !== currentPlan)?.id) ?? null;
       setSelectedPlan(defaultPlan);
     } else {
-      setSelectedPlan(null);
+      setSelectedPlan(initialPlanId);
     }
-  }, [open, intent, currentPlan]);
+  }, [open, intent, currentPlan, initialPlanId]);
+
+  const currentPlanOption = useMemo(
+    () => CHECKOUT_PLAN_OPTIONS.find((plan) => plan.id === currentPlan) ?? null,
+    [currentPlan],
+  );
+  const selectedPlanOption = useMemo(
+    () => CHECKOUT_PLAN_OPTIONS.find((plan) => plan.id === selectedPlan) ?? null,
+    [selectedPlan],
+  );
+
+  const dialogTitle = intent === "signup" ? "Escolha um plano para começar" : "Alterar plano";
+  const subtitle = useMemo(() => {
+    if (intent === "signup") {
+      return "Veja o preço atual, compare as diferenças e conclua o pagamento sem sair do FinScope.";
+    }
+    return "Revise seu plano atual, compare o plano alvo e siga para o checkout com contexto claro.";
+  }, [intent]);
 
   async function createCheckout() {
     if (!selectedPlan) {
@@ -137,16 +127,16 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-full">
+      <DialogContent className="max-w-5xl w-full">
         <DialogHeader>
           <DialogTitle className="font-poppins text-2xl">{dialogTitle}</DialogTitle>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         </DialogHeader>
 
         {!checkoutUrl ? (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">
-              <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
                 <Clock3 className="h-5 w-5 text-primary" />
               </div>
               <div>
@@ -156,61 +146,88 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
                 </p>
               </div>
             </div>
-            <div className="grid md:grid-cols-2 gap-4">
+
+            {intent === "upgrade" && selectedPlanOption && (
+              <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr]">
+                <div className="rounded-xl border bg-muted/30 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Plano atual</p>
+                  <p className="mt-2 font-poppins text-lg font-semibold">{currentPlanOption?.name ?? "Plano atual"}</p>
+                  <p className="text-sm text-muted-foreground">{currentPlanOption?.price ?? ""}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{currentPlanOption?.comparisonSummary ?? ""}</p>
+                </div>
+                <div className="flex items-center justify-center text-muted-foreground">
+                  <ArrowRightLeft className="h-5 w-5" />
+                </div>
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+                  <p className="text-xs uppercase tracking-wide text-primary">Plano alvo</p>
+                  <p className="mt-2 font-poppins text-lg font-semibold">{selectedPlanOption.name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedPlanOption.price}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{selectedPlanOption.comparisonSummary}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
               {CHECKOUT_PLAN_OPTIONS.map((plan) => {
                 const isCurrentPlan = intent === "upgrade" && currentPlan === plan.id;
+                const isSelected = selectedPlan === plan.id;
                 return (
-                <button
-                  key={plan.id}
-                  type="button"
-                  onClick={() => {
-                    if (isCurrentPlan) return;
-                    setSelectedPlan(plan.id);
-                  }}
-                  disabled={isCurrentPlan}
-                  className={`rounded-xl border p-4 text-left transition-all ${
-                    selectedPlan === plan.id ? "border-primary shadow-md" : "border-border hover:border-primary/60"
-                  } ${isCurrentPlan ? "opacity-60 cursor-not-allowed" : ""}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-poppins text-lg font-semibold">{plan.name}</p>
-                      <p className="text-sm text-muted-foreground">{plan.price}</p>
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => {
+                      if (isCurrentPlan) return;
+                      setSelectedPlan(plan.id);
+                    }}
+                    disabled={isCurrentPlan}
+                    className={`rounded-xl border p-5 text-left transition-all ${
+                      isSelected ? "border-primary shadow-md ring-2 ring-primary/10" : "border-border hover:border-primary/60"
+                    } ${isCurrentPlan ? "cursor-not-allowed opacity-60" : ""}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-poppins text-lg font-semibold">{plan.name}</p>
+                        <p className="text-sm text-muted-foreground">{plan.price}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        {plan.badge && (
+                          <Badge variant="secondary" className="text-xs">
+                            {plan.badge}
+                          </Badge>
+                        )}
+                        {isCurrentPlan && (
+                          <Badge variant="outline" className="text-xs">
+                            Plano atual
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex gap-1">
-                      {plan.badge && (
-                        <Badge variant="secondary" className="text-xs">
-                          {plan.badge}
-                        </Badge>
-                      )}
-                      {isCurrentPlan && (
-                        <Badge variant="outline" className="text-xs">
-                          Plano atual
-                        </Badge>
-                      )}
+
+                    <p className="mt-3 text-sm font-medium text-slate-900">{plan.marketingHeadline}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
+
+                    <ul className="mt-4 space-y-2 text-sm">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-secondary" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="mt-4 rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+                      {plan.modalHighlights.join(" • ")}
                     </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">{plan.description}</p>
-                  <ul className="mt-4 space-y-2 text-sm">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-secondary" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </button>
+                  </button>
                 );
               })}
             </div>
+
             {intent === "upgrade" && !hasSelectablePlan && (
-              <p className="text-sm text-muted-foreground">
-                Você já está no plano mais completo disponível.
-              </p>
+              <p className="text-sm text-muted-foreground">Você já está no plano mais completo disponível.</p>
             )}
-            {errorMessage && (
-              <p className="text-sm text-destructive">{errorMessage}</p>
-            )}
+            {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
+
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
@@ -218,13 +235,11 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
               <Button onClick={createCheckout} disabled={!selectedPlan || isCreatingCheckout || !hasSelectablePlan}>
                 {isCreatingCheckout ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Preparando pagamento
                   </>
                 ) : (
-                  <>
-                    Continuar para pagamento
-                  </>
+                  <>Continuar para o checkout</>
                 )}
               </Button>
             </div>
@@ -233,43 +248,44 @@ export default function CaktoCheckoutModal({ open, onOpenChange, intent, onFinis
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Button variant="ghost" size="sm" onClick={() => setCheckoutUrl(null)}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="mr-2 h-4 w-4" />
                 Trocar plano
               </Button>
               <p className="text-xs text-muted-foreground">
                 Se preferir,{" "}
                 <a href={checkoutUrl} target="_blank" rel="noreferrer" className="text-primary underline">
                   abra o pagamento em outra aba
-                </a>.
+                </a>
+                .
               </p>
             </div>
-            <div className="rounded-xl border bg-muted/30 h-[520px] overflow-hidden">
+
+            <div className="h-[520px] overflow-hidden rounded-xl border bg-muted/30">
               <iframe
                 key={checkoutUrl}
                 src={checkoutUrl}
                 title="Checkout Cakto"
-                className="w-full h-full border-0"
+                className="h-full w-full border-0"
                 allow="payment *"
               />
             </div>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border rounded-lg p-4 bg-background">
+
+            <div className="flex flex-col justify-between gap-3 rounded-lg border bg-background p-4 md:flex-row md:items-center">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
                   <CreditCard className="h-5 w-5 text-primary" />
                 </div>
-              <div>
-                <p className="font-medium">Conclua o pagamento</p>
-                <p className="text-sm text-muted-foreground">
-                  Após confirmar o pagamento, clique em &quot;Verificar pagamento&quot; ou feche esta janela para atualizar o status.
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Sua assinatura continua com 10 dias de garantia para solicitar reembolso integral.
-                </p>
+                <div>
+                  <p className="font-medium">Conclua o pagamento</p>
+                  <p className="text-sm text-muted-foreground">
+                    Após confirmar o pagamento, clique em <strong>Verificar pagamento</strong> para atualizar o status.
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Sua assinatura continua com 10 dias de garantia para solicitar reembolso integral.
+                  </p>
+                </div>
               </div>
-            </div>
-              <Button onClick={handleFinish}>
-                Verificar pagamento
-              </Button>
+              <Button onClick={handleFinish}>Verificar pagamento</Button>
             </div>
           </div>
         )}

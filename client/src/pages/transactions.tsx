@@ -33,10 +33,11 @@ import ExportPdfPremiumModal from "@/components/ExportPdfPremiumModal";
 import UpgradeModal from "@/components/UpgradeModal";
 import { useDashboardView } from "@/context/dashboard-view";
 import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api";
 import { Link } from "wouter";
 import { subscribeToUserTransactions, supabaseClient } from "@/lib/realtime";
 import StatementImportsPage from "@/pages/statement-imports";
+import { exportBasicPdf, resolveTransactionPeriodLabel } from "@/lib/pdf-export";
+import { canUseAdvancedPdf, canUseBasicPdf, canUseBusinessArea } from "@shared/plans";
 
 type Scope = "PF" | "PJ" | "ALL";
 
@@ -80,21 +81,22 @@ export default function TransactionsPage() {
   const { selectedView, setSelectedView } = useDashboardView();
   const [scopeFilter, setScopeFilter] = useState<Scope>(selectedView);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [upgradeFeatureName, setUpgradeFeatureName] = useState("Minha empresa");
   const [isPremiumPdfModalOpen, setIsPremiumPdfModalOpen] = useState(false);
   const [isStatementImportOpen, setIsStatementImportOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const { toast } = useToast();
   const { user } = useAuth();
-  const isPremiumUser = user?.plan === "premium";
-  const isProUser = user?.plan === "pro";
-  const canAccessProPdf = Boolean(isPremiumUser || isProUser);
+  const hasBusinessArea = canUseBusinessArea(user?.plan);
+  const canAccessBasicPdf = canUseBasicPdf(user?.plan);
+  const canAccessAdvancedPdf = canUseAdvancedPdf(user?.plan);
 
   // Fetch transactions and accounts
   const transactionsEndpoint = `/api/transactions?type=${scopeFilter}`;
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: [transactionsEndpoint],
-    enabled: !(scopeFilter === "PJ" && !isPremiumUser),
+    enabled: !(scopeFilter === "PJ" && !hasBusinessArea),
   });
 
   const {
@@ -234,7 +236,7 @@ export default function TransactionsPage() {
     };
   }, [user?.id]);
 
-  const canSubmit = accountType === "PJ" ? isPremiumUser && !!businessAccount?.id : !!personalAccount?.id;
+  const canSubmit = accountType === "PJ" ? hasBusinessArea && !!businessAccount?.id : !!personalAccount?.id;
 
   async function onSubmit(data: InsertTransaction) {
     const targetAccount = data.accountType === "PJ" ? businessAccount : personalAccount;
@@ -261,7 +263,8 @@ export default function TransactionsPage() {
   }
 
   const handleScopeChange = (scope: Scope) => {
-    if (scope === "PJ" && !isPremiumUser) {
+    if (scope === "PJ" && !hasBusinessArea) {
+      setUpgradeFeatureName("Minha empresa");
       setIsUpgradeModalOpen(true);
       return;
     }
@@ -270,40 +273,22 @@ export default function TransactionsPage() {
   };
 
   async function handleExportProPdf() {
-    const isTryingBusinessView = scopeFilter === "PJ" && !isPremiumUser;
-    if (!canAccessProPdf || isTryingBusinessView) {
+    const isTryingBusinessView = scopeFilter === "PJ" && !hasBusinessArea;
+    if (!canAccessBasicPdf || isTryingBusinessView) {
+      setUpgradeFeatureName(isTryingBusinessView ? "Minha empresa" : "Relatório básico em PDF");
       setIsUpgradeModalOpen(true);
       return;
     }
 
     try {
-      const response = await apiFetch("/api/export/pro", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          type: scopeFilter,
-          period: resolvePeriodLabel(),
-        }),
+      await exportBasicPdf({
+        scope: scopeFilter,
+        periodLabel: resolveTransactionPeriodLabel(transactions),
       });
-
-      if (!response.ok) {
-        throw new Error("Não foi possível gerar o PDF.");
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `FinScope-pro-transacoes-${Date.now()}.pdf`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(anchor);
 
       toast({
         title: "Relatório pronto",
-        description: "O download do PDF começou automaticamente.",
+        description: "O download do relatório básico começou automaticamente.",
       });
     } catch (error) {
       toast({
@@ -315,7 +300,8 @@ export default function TransactionsPage() {
   }
 
   const handlePremiumPdfOpen = () => {
-    if (!isPremiumUser) {
+    if (!canAccessAdvancedPdf) {
+      setUpgradeFeatureName("Relatórios avançados em PDF");
       setIsUpgradeModalOpen(true);
       return;
     }
@@ -323,40 +309,18 @@ export default function TransactionsPage() {
   };
 
   useEffect(() => {
-    if (!isPremiumUser && selectedView === "PJ") {
+    if (!hasBusinessArea && selectedView === "PJ") {
       setSelectedView("PF");
       return;
     }
     setScopeFilter(selectedView);
-  }, [selectedView, isPremiumUser, setSelectedView]);
+  }, [selectedView, hasBusinessArea, setSelectedView]);
 
   const filteredTransactions = (transactions || []).filter(t => {
     const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === "all" || t.type === filterType;
     return matchesSearch && matchesType;
   });
-
-  const resolvePeriodLabel = () => {
-    const dataset = transactions || [];
-    const timestamps = dataset
-      .map((tx) => {
-        const parsed = new Date(tx.date);
-        return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
-      })
-      .filter((value): value is number => value !== null);
-
-    if (timestamps.length === 0) {
-      return "Sem movimentacoes registradas";
-    }
-
-    const startDate = new Date(Math.min(...timestamps));
-    const endDate = new Date(Math.max(...timestamps));
-    const formatLabel = (date: Date) =>
-      `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
-    const startLabel = formatLabel(startDate);
-    const endLabel = formatLabel(endDate);
-    return startLabel === endLabel ? endLabel : `${startLabel} a ${endLabel}`;
-  };
 
   return (
     <div className="p-6 space-y-6">
@@ -378,10 +342,10 @@ export default function TransactionsPage() {
             <Button
               variant={scopeFilter === "PJ" ? "default" : "outline"}
               onClick={() => handleScopeChange("PJ")}
-              aria-disabled={!isPremiumUser}
+              aria-disabled={!hasBusinessArea}
             >
               Minha empresa
-              {!isPremiumUser && <Lock className="ml-2 h-4 w-4" />}
+              {!hasBusinessArea && <Lock className="ml-2 h-4 w-4" />}
             </Button>
             <Button
               variant={scopeFilter === "ALL" ? "default" : "outline"}
@@ -391,23 +355,25 @@ export default function TransactionsPage() {
             </Button>
           </div>
           <div className="flex flex-wrap gap-2 sm:justify-end">
+            {canAccessBasicPdf ? (
+              <Button
+                variant="secondary"
+                onClick={handleExportProPdf}
+                className={cn("bg-slate-900 hover:bg-slate-800", scopeFilter === "PJ" && !hasBusinessArea && "opacity-60")}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Relatório básico
+                {scopeFilter === "PJ" && !hasBusinessArea ? <Lock className="ml-2 h-4 w-4" /> : null}
+              </Button>
+            ) : null}
             <Button
-              variant="secondary"
-              onClick={handleExportProPdf}
-              className={cn("bg-slate-900 hover:bg-slate-800", !canAccessProPdf && "opacity-60")}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Exportar PDF (PRO)
-              {(!canAccessProPdf || (scopeFilter === "PJ" && !isPremiumUser)) && <Lock className="ml-2 h-4 w-4" />}
-            </Button>
-            <Button
-              variant="outline"
+              variant={canAccessAdvancedPdf ? "outline" : "secondary"}
               onClick={handlePremiumPdfOpen}
-              className={cn(!isPremiumUser && "opacity-60")}
+              className={cn(!canAccessAdvancedPdf && "opacity-90")}
             >
               <Download className="mr-2 h-4 w-4" />
-              PDF Premium
-              {!isPremiumUser && <Lock className="ml-2 h-4 w-4" />}
+              Relatório avançado
+              {!canAccessAdvancedPdf ? <Lock className="ml-2 h-4 w-4" /> : null}
             </Button>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
@@ -433,7 +399,8 @@ export default function TransactionsPage() {
                         <FormLabel>Conta</FormLabel>
                         <Select
                           onValueChange={(value) => {
-                            if (value === "PJ" && !isPremiumUser) {
+                            if (value === "PJ" && !hasBusinessArea) {
+                              setUpgradeFeatureName("Minha empresa");
                               setIsUpgradeModalOpen(true);
                               return;
                             }
@@ -448,12 +415,12 @@ export default function TransactionsPage() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="PF">Pessoal (PF)</SelectItem>
-                            <SelectItem value="PJ" disabled={!isPremiumUser}>
+                            <SelectItem value="PJ" disabled={!hasBusinessArea}>
                               Minha empresa
                             </SelectItem>
                           </SelectContent>
                         </Select>
-                        {!isPremiumUser && (
+                        {!hasBusinessArea && (
                           <p className="text-xs text-muted-foreground">
                             A opção Minha empresa fica disponível no plano Premium.
                           </p>
@@ -498,12 +465,12 @@ export default function TransactionsPage() {
                             </SelectContent>
                           </Select>
                           <FormMessage />
-                          {accountType === "PJ" && !isPremiumUser && (
+                          {accountType === "PJ" && !hasBusinessArea && (
                             <p className="text-xs text-muted-foreground mt-1">
                               Disponível apenas no plano Premium.
                             </p>
                           )}
-                          {accountType === "PJ" && isPremiumUser && !businessAccount && !accountsLoading && (
+                          {accountType === "PJ" && hasBusinessArea && !businessAccount && !accountsLoading && (
                             <p className="text-xs text-destructive mt-1">
                               Crie a conta da sua empresa antes de registrar lançamentos nessa visão.
                             </p>
@@ -778,7 +745,7 @@ export default function TransactionsPage() {
         </div>
       )}
       <ExportPdfPremiumModal open={isPremiumPdfModalOpen} onOpenChange={setIsPremiumPdfModalOpen} />
-      <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName="Exportações avançadas" />
+      <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} featureName={upgradeFeatureName} />
     </div>
   );
 }

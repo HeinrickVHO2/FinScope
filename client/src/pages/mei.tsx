@@ -10,6 +10,7 @@ import { useLocation } from "wouter";
 import { ArrowDownRight, ArrowUpRight, BarChart3, Building2, Lock, TrendingUp } from "lucide-react";
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Bar, Tooltip, Legend } from "recharts";
 import UpgradeModal from "@/components/UpgradeModal";
+import { canUseBusinessArea } from "@shared/plans";
 
 export default function MinhaEmpresaPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -25,7 +26,7 @@ export default function MinhaEmpresaPage() {
   });
 
   const loading = authLoading || accountsLoading || transactionsLoading;
-  const isPremium = user?.plan === "premium";
+  const isPremium = canUseBusinessArea(user?.plan);
 
   const businessAccounts = useMemo(
     () => accounts.filter((acc) => acc.type === "pj"),

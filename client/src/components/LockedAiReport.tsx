@@ -12,36 +12,36 @@ export function LockedAiReport({ onUpgrade }: LockedAiReportProps) {
     <Card className="border-dashed border-2 border-slate-200 bg-gradient-to-br from-slate-50 to-white shadow-none">
       <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <CardTitle className="text-2xl font-semibold flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-2xl font-semibold">
             <Sparkles className="h-5 w-5 text-indigo-500" />
             Resumo inteligente do mês
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Veja análises geradas com IA ao ativar o plano Premium.
+            Veja análises mais completas, alertas e interpretações ao ativar o Premium.
           </p>
         </div>
         <Badge className="bg-slate-900 text-white">FinScope Premium</Badge>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="relative rounded-2xl border border-slate-200 bg-white p-6 overflow-hidden">
-          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center text-center px-6">
-            <Lock className="h-8 w-8 text-slate-500 mb-3" />
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 px-6 text-center backdrop-blur-sm">
+            <Lock className="mb-3 h-8 w-8 text-slate-500" />
             <p className="text-base font-semibold text-slate-800">Prévia bloqueada</p>
             <p className="text-sm text-muted-foreground">
-              Receba previsões e alertas com ajuda da IA exclusiva do Premium.
+              Receba previsões, alertas e insights premium com ajuda da IA avançada.
             </p>
           </div>
-          <div className="space-y-4 opacity-50 pointer-events-none select-none">
+          <div className="pointer-events-none select-none space-y-4 opacity-50">
             <div className="h-4 w-2/3 rounded-full bg-slate-200" />
             <div className="grid gap-3 md:grid-cols-3">
               {Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="rounded-xl border border-slate-100 p-4 space-y-2">
+                <div key={index} className="space-y-2 rounded-xl border border-slate-100 p-4">
                   <div className="flex items-center gap-2 text-sm text-slate-500">
                     <AlertTriangle className="h-4 w-4" />
                     Insight {index + 1}
                   </div>
                   <div className="h-3 rounded-full bg-slate-100" />
-                  <div className="h-3 rounded-full bg-slate-100 w-4/5" />
+                  <div className="h-3 w-4/5 rounded-full bg-slate-100" />
                 </div>
               ))}
             </div>
@@ -51,7 +51,7 @@ export function LockedAiReport({ onUpgrade }: LockedAiReportProps) {
           <div>
             <p className="text-sm font-semibold text-slate-900">Desbloqueie agora</p>
             <p className="text-sm text-muted-foreground">
-              Atualize seu plano para receber dicas personalizadas e alertas inteligentes.
+              Atualize seu plano para liberar relatórios com IA, dicas mais úteis e alertas inteligentes.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

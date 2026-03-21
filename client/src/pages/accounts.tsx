@@ -36,6 +36,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import UpgradeModal from "@/components/UpgradeModal";
+import { canUseBusinessArea } from "@shared/plans";
 
 export default function AccountsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -44,6 +45,7 @@ export default function AccountsPage() {
   const { user } = useAuth();
   
   const currentPlan = (user?.plan as keyof typeof PLAN_LIMITS) || "pro";
+  const hasBusinessArea = canUseBusinessArea(currentPlan);
   const planLimit = PLAN_LIMITS[currentPlan]?.accounts ?? PLAN_LIMITS.pro.accounts;
 
   // Fetch accounts
@@ -201,7 +203,7 @@ export default function AccountsPage() {
                       <FormLabel>Tipo de Conta</FormLabel>
                       <Select
                         onValueChange={(value) => {
-                          if (value === "pj" && currentPlan !== "premium") {
+                          if (value === "pj" && !hasBusinessArea) {
                             setIsUpgradeModalOpen(true);
                             return;
                           }
@@ -216,12 +218,12 @@ export default function AccountsPage() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="pf">Conta pessoal</SelectItem>
-                          <SelectItem value="pj" disabled={currentPlan !== "premium"}>
+                          <SelectItem value="pj" disabled={!hasBusinessArea}>
                             Minha empresa
                           </SelectItem>
                         </SelectContent>
                       </Select>
-                      {currentPlan !== "premium" && (
+                      {!hasBusinessArea && (
                         <p className="text-xs text-muted-foreground mt-1">
                           A área Minha empresa fica disponível no plano Premium.
                         </p>

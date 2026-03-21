@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import UpgradeModal from "@/components/UpgradeModal";
+import { canUseWhatsAppAgent } from "@shared/plans";
 
 type WhatsAppSession = {
   eligible: boolean;
@@ -87,6 +89,7 @@ function formatDate(value: string) {
 export default function WhatsAppAgentPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [phone, setPhone] = useState("");
   const [accountByCandidate, setAccountByCandidate] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState("all");
@@ -98,8 +101,11 @@ export default function WhatsAppAgentPage() {
     date: string;
   }>>({});
 
+  const hasWhatsAppAccess = canUseWhatsAppAgent(user?.plan);
+
   const sessionQuery = useQuery<WhatsAppSession>({
     queryKey: ["/api/whatsapp/session"],
+    enabled: hasWhatsAppAccess,
   });
 
   const { data: accounts = [] } = useQuery<Account[]>({
@@ -318,6 +324,7 @@ export default function WhatsAppAgentPage() {
   });
 
   const reviewItems = reviewItemsQuery.data || [];
+
   const filteredReviewItems = useMemo(
     () => reviewItems.filter((item) => {
       const confidence = item.confidenceScore ?? 0;
@@ -362,6 +369,44 @@ export default function WhatsAppAgentPage() {
       "client_pending_binding_conversation_link",
     );
   }, [session?.businessPhone, session?.pendingBinding?.code]);
+
+  if (!hasWhatsAppAccess) {
+    return (
+      <>
+        <div className="space-y-6 p-6">
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 font-poppins">
+                <MessageCircle className="h-5 w-5 text-primary" />
+                Agent de WhatsApp disponível no Premium
+              </CardTitle>
+              <CardDescription>
+                No Premium, o WhatsApp fica integrado ao FinScope para acelerar lançamentos, revisão de mensagens e automações.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border bg-background p-4 text-sm">Conectar um número e revisar lançamentos em uma fila dedicada.</div>
+                <div className="rounded-xl border bg-background p-4 text-sm">Automação de mensagens com confirmação e histórico rastreável.</div>
+                <div className="rounded-xl border bg-background p-4 text-sm">Fluxo pensado para acelerar o operacional sem perder controle.</div>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button onClick={() => setIsUpgradeModalOpen(true)}>Ver Premium</Button>
+                <Button variant="outline" onClick={() => window.location.href = "/settings"}>
+                  Comparar planos
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <UpgradeModal
+          open={isUpgradeModalOpen}
+          onOpenChange={setIsUpgradeModalOpen}
+          featureName="Agent de WhatsApp"
+        />
+      </>
+    );
+  }
 
   const getDraftForItem = (item: ReviewItem) => (
     draftByCandidate[item.candidateId] || {

@@ -63,6 +63,13 @@ import {
   buildPasswordUserContext,
   getPrimaryPasswordSubmissionError,
 } from "./auth/password-validation";
+import {
+  BILLING_PLANS,
+  canUseAdvancedPdf,
+  canUseAiReports,
+  canUseBasicPdf,
+  canUseBusinessArea,
+} from "@shared/plans";
 
 
 // Extend Express session type
@@ -422,7 +429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   const ensureScopeAccess = (scope: AccountScope, req: any, res: any) => {
-    if (scope === "PJ" && req.currentUser?.plan !== "premium") {
+    if (scope === "PJ" && !canUseBusinessArea(req.currentUser?.plan)) {
       res.status(403).json({ error: "A área Minha empresa está disponível apenas no plano Premium" });
       return false;
     }
@@ -696,7 +703,7 @@ Descrição: ${description}${scheduledNote}`;
     ];
     const pfKeywords = ["pessoal", "pf", "casa", "família", "familia", "particular"];
 
-    if (userPlan !== "premium") return "PF";
+    if (!canUseBusinessArea(userPlan)) return "PF";
 
     const tokens = normalized.split(/\s+/);
     if (tokens.includes("pj")) return "PJ";
@@ -729,7 +736,7 @@ Descrição: ${description}${scheduledNote}`;
     messages: ConversationMessage[],
     userPlan: string
   ): "PF" | "PJ" | null => {
-    if (userPlan !== "premium") {
+    if (!canUseBusinessArea(userPlan)) {
       return "PF";
     }
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -751,7 +758,7 @@ Descrição: ${description}${scheduledNote}`;
 
   const ensureAccountTypeInMemory = (state: ConversationState, userPlan: string) => {
     if (!state.memory.accountType) {
-      if (userPlan !== "premium") {
+      if (!canUseBusinessArea(userPlan)) {
         state.memory.accountType = "PF";
       }
     }
@@ -811,7 +818,7 @@ Descrição: ${description}${scheduledNote}`;
         state.memory.accountType = detectedAccountType;
       }
     }
-    if (!state.memory.accountType && userPlan === "premium" && state.memory.description) {
+    if (!state.memory.accountType && canUseBusinessArea(userPlan) && state.memory.description) {
       const desc = state.memory.description.toLowerCase();
       const inferred = detectAccountTypeFromText(desc, userPlan);
       if (inferred) {
@@ -1575,7 +1582,7 @@ type AiInterpretationResult =
       });
     }
 
-    if (plan === "premium" && !hasPJ) {
+    if (canUseBusinessArea(plan) && !hasPJ) {
       await storage.createAccount({
         userId,
         name: "Minha empresa",
@@ -1707,12 +1714,27 @@ type AiInterpretationResult =
 
   function premiumRequired(req: any, res: any, next: any) {
     const user = req.currentUser;
-    if (!user || user.plan !== "premium") {
+    if (!user || !canUseAdvancedPdf(user.plan)) {
       return res.status(403).json({ error: "Recurso disponível apenas no plano Premium" });
     }
     next();
   }
 
+  function proPdfRequired(req: any, res: any, next: any) {
+    const user = req.currentUser;
+    if (!user || !canUseBasicPdf(user.plan)) {
+      return res.status(403).json({ error: "Relatório básico disponível apenas no plano Pro" });
+    }
+    next();
+  }
+
+  function aiReportsRequired(req: any, res: any, next: any) {
+    const user = req.currentUser;
+    if (!user || !canUseAiReports(user.plan)) {
+      return res.status(403).json({ error: "Recurso disponÃ­vel apenas no plano Premium" });
+    }
+    next();
+  }
 
   registerStatementImportRoutes({
     app,
@@ -2019,7 +2041,7 @@ type AiInterpretationResult =
   app.get("/api/accounts", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
       const accounts = await storage.getAccountsByUserId(req.session.userId);
-      const filtered = req.currentUser?.plan === "premium"
+      const filtered = canUseBusinessArea(req.currentUser?.plan)
         ? accounts
         : accounts.filter((account) => account.type !== "pj");
       res.json(filtered);
@@ -2032,7 +2054,7 @@ type AiInterpretationResult =
       await ensureDefaultAccounts(req.session.userId, req.currentUser.plan);
       const accounts = await storage.getAccountsByUserId(req.session.userId);
       // Filtrar contas PJ para usuários não-premium
-      const filtered = req.currentUser?.plan === "premium"
+      const filtered = canUseBusinessArea(req.currentUser?.plan)
         ? accounts
         : accounts.filter((account) => account.type !== "pj");
       res.json(filtered);
@@ -2048,7 +2070,7 @@ type AiInterpretationResult =
       if (!account || account.userId !== req.session.userId) {
         return res.status(404).json({ error: "Conta não encontrada" });
       }
-      if (account.type === "pj" && req.currentUser?.plan !== "premium") {
+      if (account.type === "pj" && !canUseBusinessArea(req.currentUser?.plan)) {
         return res.status(403).json({ error: "Contas da área Minha empresa disponíveis apenas no plano Premium" });
       }
       res.json(account);
@@ -2069,7 +2091,7 @@ type AiInterpretationResult =
         userId: req.session.userId,
       };
 
-      if (validatedData.type === "pj" && req.currentUser?.plan !== "premium") {
+      if (validatedData.type === "pj" && !canUseBusinessArea(req.currentUser?.plan)) {
         return res.status(403).json({ 
           error: "Contas da área Minha empresa disponíveis apenas no plano Premium",
           message: "Para cadastrar contas na área Minha empresa, você precisa fazer upgrade para o plano Premium. Clique no botão 'Fazer Upgrade' para ativar esse recurso."
@@ -2093,7 +2115,7 @@ type AiInterpretationResult =
       if (!account || account.userId !== req.session.userId) {
         return res.status(404).json({ error: "Conta não encontrada" });
       }
-      if (account.type === "pj" && req.currentUser?.plan !== "premium") {
+      if (account.type === "pj" && !canUseBusinessArea(req.currentUser?.plan)) {
         return res.status(403).json({ error: "Contas da área Minha empresa disponíveis apenas no plano Premium" });
       }
 
@@ -2116,7 +2138,7 @@ type AiInterpretationResult =
       if (!account || account.userId !== req.session.userId) {
         return res.status(404).json({ error: "Conta não encontrada" });
       }
-      if (account.type === "pj" && req.currentUser?.plan !== "premium") {
+      if (account.type === "pj" && !canUseBusinessArea(req.currentUser?.plan)) {
         return res.status(403).json({ error: "Contas da área Minha empresa disponíveis apenas no plano Premium" });
       }
 
@@ -2150,7 +2172,7 @@ type AiInterpretationResult =
       if (!account || account.userId !== req.session.userId) {
         return res.status(404).json({ error: "Conta não encontrada" });
       }
-      if (account.type === "pj" && req.currentUser?.plan !== "premium") {
+      if (account.type === "pj" && !canUseBusinessArea(req.currentUser?.plan)) {
         return res.status(403).json({ error: "Transações da área Minha empresa disponíveis apenas no plano Premium" });
       }
 
@@ -2173,7 +2195,7 @@ type AiInterpretationResult =
         return res.status(404).json({ error: "Conta não encontrada" });
       }
       const requestedAccountType = normalizeAccountType(req.body?.accountType ?? (account.type === "pj" ? "PJ" : "PF"));
-      if (requestedAccountType === "PJ" && req.currentUser?.plan !== "premium") {
+      if (requestedAccountType === "PJ" && !canUseBusinessArea(req.currentUser?.plan)) {
         return res.status(403).json({ error: "Transações da área Minha empresa disponíveis apenas no plano Premium" });
       }
 
@@ -2204,7 +2226,7 @@ type AiInterpretationResult =
       if (!transactionAccount) {
         return res.status(404).json({ error: "Conta não encontrada" });
       }
-      if (transactionAccount?.type === "pj" && req.currentUser?.plan !== "premium") {
+      if (transactionAccount?.type === "pj" && !canUseBusinessArea(req.currentUser?.plan)) {
         return res.status(403).json({ error: "Transações da área Minha empresa disponíveis apenas no plano Premium" });
       }
 
@@ -2212,7 +2234,7 @@ type AiInterpretationResult =
       const parsedUpdates = updateTransactionSchema.parse(req.body);
       if (parsedUpdates.accountType) {
         parsedUpdates.accountType = normalizeAccountType(parsedUpdates.accountType);
-        if (parsedUpdates.accountType === "PJ" && req.currentUser?.plan !== "premium") {
+        if (parsedUpdates.accountType === "PJ" && !canUseBusinessArea(req.currentUser?.plan)) {
           return res.status(403).json({ error: "Transações da área Minha empresa disponíveis apenas no plano Premium" });
         }
       }
@@ -2237,7 +2259,7 @@ type AiInterpretationResult =
       if (!transactionAccount) {
         return res.status(404).json({ error: "Conta não encontrada" });
       }
-      if (transactionAccount?.type === "pj" && req.currentUser?.plan !== "premium") {
+      if (transactionAccount?.type === "pj" && !canUseBusinessArea(req.currentUser?.plan)) {
         return res.status(403).json({ error: "Transações da área Minha empresa disponíveis apenas no plano Premium" });
       }
 
@@ -2459,7 +2481,7 @@ type AiInterpretationResult =
         accountType: normalizeAccountType(req.body?.accountType),
         expectedDate: req.body?.expectedDate,
       });
-      if (parsed.accountType === "PJ" && req.currentUser?.plan !== "premium") {
+      if (parsed.accountType === "PJ" && !canUseBusinessArea(req.currentUser?.plan)) {
         return res.status(403).json({ error: "Valores previstos da área Minha empresa disponíveis apenas no plano Premium" });
       }
       const futureTx = await storage.createFutureTransaction({
@@ -2573,7 +2595,7 @@ type AiInterpretationResult =
     }
   });
 
-  app.post("/api/ai/report", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
+  app.post("/api/ai/report", requireAuth, requireActiveBilling, aiReportsRequired, async (req: any, res) => {
     try {
       const { period } = req.body || {};
       if (!period || typeof period !== "string" || !/^\d{4}-\d{2}$/.test(period)) {
@@ -2614,7 +2636,7 @@ type AiInterpretationResult =
     }
   });
 
-  app.post("/api/ai/insights", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
+  app.post("/api/ai/insights", requireAuth, requireActiveBilling, aiReportsRequired, async (req: any, res) => {
     try {
       const scope = parseAccountScope(req.body?.type ?? req.query?.type);
       const prefs = await storage.getUserReportPreferences(req.session.userId);
@@ -2626,7 +2648,7 @@ type AiInterpretationResult =
     }
   });
 
-  app.get("/api/ai/report/settings", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
+  app.get("/api/ai/report/settings", requireAuth, requireActiveBilling, aiReportsRequired, async (req: any, res) => {
     try {
       const existingSettings = await storage.getUserReportPreferences(req.session.userId);
       const settings = existingSettings || 
@@ -2647,7 +2669,7 @@ type AiInterpretationResult =
     }
   });
 
-  app.put("/api/ai/report/settings", requireAuth, requireActiveBilling, premiumRequired, async (req: any, res) => {
+  app.put("/api/ai/report/settings", requireAuth, requireActiveBilling, aiReportsRequired, async (req: any, res) => {
     try {
       const payload = insertUserReportPreferenceSchema.partial().parse({
         userId: req.session.userId,
@@ -3223,16 +3245,12 @@ res.json({ success: true });
 
   // ===== EXPORT ROUTES =====
 
-  app.post("/api/export/pro", requireAuth, requireActiveBilling, async (req: any, res) => {
+  app.post("/api/export/pro", requireAuth, requireActiveBilling, proPdfRequired, async (req: any, res) => {
     try {
       const user = req.currentUser || (await storage.getUser(req.session.userId));
       if (!user) {
         return res.status(404).json({ error: "Usuário não encontrado" });
       }
-      if (!["pro", "premium"].includes(user.plan)) {
-        return res.status(403).json({ error: "Disponível apenas para planos Pro ou Premium" });
-      }
-
       const scope = parseAccountScope(req.body?.type ?? req.query?.type);
       if (!ensureScopeAccess(scope, req, res)) {
         return;
@@ -3362,7 +3380,7 @@ app.post("/api/checkout/create", requireAuth, async (req: any, res) => {
     const rawPlan = req.body?.plan?.toString().toLowerCase();
     const mode = req.body?.mode === "upgrade" ? "upgrade" : "trial";
 
-    if (!["pro", "premium"].includes(rawPlan)) {
+    if (!(rawPlan && rawPlan in BILLING_PLANS)) {
       return res.status(400).json({ error: "Plano inválido. Use: pro | premium" });
     }
 
@@ -3371,19 +3389,16 @@ app.post("/api/checkout/create", requireAuth, async (req: any, res) => {
       return res.status(404).json({ error: "Usuário não encontrado" });
     }
 
-    const productId =
-      rawPlan === "premium"
-        ? process.env.CAKTO_PRODUCT_PREMIUM_ID || process.env.CAKTO_PLAN_PREMIUM_ID
-        : process.env.CAKTO_PRODUCT_PRO_ID || process.env.CAKTO_PLAN_PRO_ID;
+    const planConfig = BILLING_PLANS[rawPlan as keyof typeof BILLING_PLANS];
+    const productId = planConfig.checkout.productEnvKeys
+      .map((envKey) => process.env[envKey])
+      .find(Boolean);
 
     if (!productId) {
       return res.status(500).json({ error: "IDs dos produtos da Cakto ausentes no .env" });
     }
 
-    const directCheckoutUrl =
-      rawPlan === "premium"
-        ? process.env.CAKTO_CHECKOUT_PREMIUM_URL
-        : process.env.CAKTO_CHECKOUT_PRO_URL;
+    const directCheckoutUrl = process.env[planConfig.checkout.checkoutUrlEnvKey];
 
     let checkoutUrl = (directCheckoutUrl || "").trim();
 
@@ -3400,6 +3415,8 @@ app.post("/api/checkout/create", requireAuth, async (req: any, res) => {
       checkoutUrl,
       plan: rawPlan,
       mode,
+      price: planConfig.priceLabel,
+      planName: planConfig.name,
     });
   } catch (err) {
     console.error("[CAKTO CHECKOUT ERROR]", err);

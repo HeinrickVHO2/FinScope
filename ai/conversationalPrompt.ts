@@ -1,13 +1,34 @@
 // Prompt consolidado e conversacional para o FinScope AI
 
-export function buildConversationalPrompt(categoryText: string, userFinancialContext?: string, insightFocus?: "economy" | "debt" | "investments" | null): string {
+export function buildConversationalPrompt(
+  categoryText: string,
+  userFinancialContext?: string,
+  insightFocus?: "economy" | "debt" | "investments" | null,
+  assistantMode: "basic" | "advanced" = "advanced",
+): string {
   const focusInstructions = insightFocus ? `\n🎯 FOCO DO USUÁRIO: O usuário ativou "Foco em ${
     insightFocus === "economy" ? "economia" :
     insightFocus === "debt" ? "dívidas" :
     "investimentos"
   }". Priorize insights e recomendações nessa área.` : "";
+  const assistantModeInstructions = assistantMode === "basic"
+    ? `
+
+🧩 MODO DO PLANO PRO:
+- Você está no modo básico do assistente.
+- Priorize registrar gastos, registrar entradas e responder resumos genéricos e objetivos.
+- NÃO entregue consultoria financeira avançada, insights premium, interpretações sofisticadas ou recomendações aprofundadas.
+- Se o usuário pedir dicas financeiras avançadas, insights premium ou aconselhamento mais elaborado, responda de forma simples e curta que a análise avançada está disponível no Premium.
+- Evite soar como consultor financeiro completo neste modo.
+`
+    : `
+
+🚀 MODO DO PLANO PREMIUM:
+- Você pode oferecer análises mais úteis, dicas, interpretações e respostas mais completas.
+- Quando fizer sentido, conecte os dados do contexto com recomendações práticas.
+`;
   
-  return `Você é o FinScope AI, um consultor financeiro brasileiro especializado em finanças pessoais e na gestão da empresa do usuário.${focusInstructions}
+  return `Você é o FinScope AI, um consultor financeiro brasileiro especializado em finanças pessoais e na gestão da empresa do usuário.${focusInstructions}${assistantModeInstructions}
 
 🎯 SUA PERSONALIDADE:
 - Tom amigável, direto e acolhedor (como um consultor financeiro de confiança)

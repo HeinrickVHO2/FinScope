@@ -1,5 +1,6 @@
 import type { RecurringTransaction, Transaction } from "@shared/schema";
 import type { IStorage } from "../../storage";
+import { getInternalAiMode } from "../../../shared/plans";
 
 type AccountScope = "PF" | "PJ" | "ALL";
 type AssistantChannel = "whatsapp" | "internal_chat";
@@ -756,18 +757,36 @@ export function looksLikeFinanceAssistantQuestion(text: string) {
   return Boolean(classifyAssistantIntent(text));
 }
 
+function isAdvancedFinancialIntent(intent: AssistantIntent) {
+  return ["education", "spending_health", "guidance", "savings_capacity"].includes(intent.type);
+}
+
 export async function buildFinancialAssistantResponse(
   storage: IStorage,
   userId: string,
   text: string,
   channel: AssistantChannel = "whatsapp",
+  plan?: string | null,
 ): Promise<FinancialAssistantResponse> {
   const intent = classifyAssistantIntent(text);
+  const assistantMode = getInternalAiMode(plan);
   if (!intent) {
-    const message = channel === "whatsapp"
-      ? "👋 Posso te ajudar com:\n• resumo do mês\n• gastos por categoria\n• controle de gastos\n• reserva sugerida\n• dúvidas simples sobre reserva, CDB e poupança"
-      : "👋 Posso te ajudar com:\n• resumo financeiro\n• gastos por categoria\n• pontos de exagero\n• sugestão de reserva\n• orientações práticas para organizar melhor o caixa";
+    const message = assistantMode === "basic"
+      ? channel === "whatsapp"
+        ? "👋 No Pro eu posso registrar gastos e entradas, além de mostrar resumos simples do mês e categorias."
+        : "👋 No Pro eu posso registrar movimentações e mostrar resumos financeiros objetivos."
+      : channel === "whatsapp"
+        ? "👋 Posso te ajudar com:\n• resumo do mês\n• gastos por categoria\n• controle de gastos\n• reserva sugerida\n• dúvidas simples sobre reserva, CDB e poupança"
+        : "👋 Posso te ajudar com:\n• resumo financeiro\n• gastos por categoria\n• pontos de exagero\n• sugestão de reserva\n• orientações práticas para organizar melhor o caixa";
     return { message };
+  }
+
+  if (assistantMode === "basic" && isAdvancedFinancialIntent(intent)) {
+    return {
+      message: channel === "whatsapp"
+        ? "No plano Pro eu consigo mostrar resumos e categorias de forma objetiva. Para dicas e análises mais completas, o Premium libera a experiência avançada."
+        : "No plano Pro eu consigo registrar movimentações e mostrar resumos objetivos. Dicas e análises mais avançadas ficam disponíveis no Premium.",
+    };
   }
 
   if (intent.type === "education") {
@@ -776,9 +795,13 @@ export async function buildFinancialAssistantResponse(
 
   if (intent.type === "help") {
     return {
-      message: channel === "whatsapp"
-        ? "🤖 Posso fazer isso por você:\n• registrar gastos e recebimentos\n• resumir seu mês\n• mostrar categorias com mais peso\n• sugerir ajustes com base nos seus dados"
-        : "🤖 Posso te ajudar com:\n• registrar movimentações\n• resumir o mês com dados reais\n• mostrar recorrências e categorias pesadas\n• sugerir ajustes e reserva de forma prática",
+      message: assistantMode === "basic"
+        ? channel === "whatsapp"
+          ? "🤖 No Pro eu posso:\n• registrar gastos e recebimentos\n• resumir seu mês\n• mostrar categorias com mais peso"
+          : "🤖 No Pro eu posso:\n• registrar movimentações\n• resumir o mês com dados reais\n• mostrar categorias com maior peso"
+        : channel === "whatsapp"
+          ? "🤖 Posso fazer isso por você:\n• registrar gastos e recebimentos\n• resumir seu mês\n• mostrar categorias com mais peso\n• sugerir ajustes com base nos seus dados"
+          : "🤖 Posso te ajudar com:\n• registrar movimentações\n• resumir o mês com dados reais\n• mostrar recorrências e categorias pesadas\n• sugerir ajustes e reserva de forma prática",
     };
   }
 
@@ -975,7 +998,8 @@ export async function buildFinancialAssistantReply(
   userId: string,
   text: string,
   channel: AssistantChannel = "whatsapp",
+  plan?: string | null,
 ) {
-  const response = await buildFinancialAssistantResponse(storage, userId, text, channel);
+  const response = await buildFinancialAssistantResponse(storage, userId, text, channel, plan);
   return response.message;
 }

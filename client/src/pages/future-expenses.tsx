@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
+import { canUseBusinessArea } from "@shared/plans";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -106,7 +107,7 @@ export default function FutureExpensesPage() {
   const { toast } = useToast();
   const [scopeFilter, setScopeFilter] = useState<Scope>("PF");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
-  const isPremium = user?.plan === "premium";
+  const isPremium = canUseBusinessArea(user?.plan);
 
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
