@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,17 +9,34 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { ArrowLeft, Menu } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
 type FinScopeHeaderProps = {
   backHref?: string;
   backLabel?: string;
 };
 
+const publicLinks = [
+  { href: "/recursos", label: "Recursos" },
+  { href: "/faq", label: "FAQ" },
+  { href: "/sobre", label: "Sobre" },
+  { href: "/blog", label: "Blog" },
+  { href: "/contato", label: "Contato" },
+] as const;
+
 export function FinScopeHeader({ backHref, backLabel = "Voltar" }: FinScopeHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, isLoading, logout } = useAuth();
   const showBackLink = Boolean(backHref);
   const linkClass = "hover:text-primary transition-colors";
   const navClass = "hidden md:flex items-center gap-6 text-sm font-medium text-slate-700";
+  const homeHref = user ? "/dashboard" : "/";
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+  const handleLogout = async () => {
+    closeMobileMenu();
+    await logout();
+  };
 
   return (
     <header
@@ -40,9 +57,8 @@ export function FinScopeHeader({ backHref, backLabel = "Voltar" }: FinScopeHeade
             </Link>
           )}
 
-          {/* Logo */}
-          <Link href="/">
-            <div className="flex items-center gap-3 cursor-pointer">
+          <Link href={homeHref}>
+            <div className="flex cursor-pointer items-center gap-3">
               <img
                 src="/logo.png"
                 alt="FinScope"
@@ -52,36 +68,39 @@ export function FinScopeHeader({ backHref, backLabel = "Voltar" }: FinScopeHeade
           </Link>
         </div>
 
-        {/* Desktop nav */}
         <nav className={navClass}>
-          <Link href="/dashboard" className={linkClass}>
+          <Link href={homeHref} className={linkClass}>
             Início
           </Link>
-          <Link href="/recursos" className={linkClass}>
-            Recursos
-          </Link>
-          <Link href="/faq" className={linkClass}>
-            FAQ
-          </Link>
-          <Link href="/sobre" className={linkClass}>
-            Sobre
-          </Link>
-          <Link href="/blog" className={linkClass}>
-            Blog
-          </Link>
-          <Link href="/contato" className={linkClass}>
-            Contato
-          </Link>
+          {publicLinks.map((item) => (
+            <Link key={item.href} href={item.href} className={linkClass}>
+              {item.label}
+            </Link>
+          ))}
 
-          <Link href="/login" className={linkClass}>
-            Acessar
-          </Link>
-          <Link href="/signup">
-            <Button>Cadastre-se</Button>
-          </Link>
+          {!isLoading && (
+            user ? (
+              <>
+                <Link href="/dashboard" className={linkClass}>
+                  Painel
+                </Link>
+                <Button type="button" variant="outline" onClick={handleLogout}>
+                  Sair
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className={linkClass}>
+                  Acessar
+                </Link>
+                <Link href="/signup">
+                  <Button>Cadastre-se</Button>
+                </Link>
+              </>
+            )
+          )}
         </nav>
 
-        {/* Mobile nav */}
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild className="md:hidden">
             <Button variant="ghost" size="icon">
@@ -99,78 +118,72 @@ export function FinScopeHeader({ backHref, backLabel = "Voltar" }: FinScopeHeade
               </SheetTitle>
             </SheetHeader>
 
-            <nav
-              className="flex flex-col gap-4 mt-8 text-base font-medium text-slate-700"
-            >
-              <Link href="/dashboard">
+            <nav className="mt-8 flex flex-col gap-4 text-base font-medium text-slate-700">
+              <Link href={homeHref}>
                 <span
                   className={`block py-2 transition-colors ${linkClass}`}
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={closeMobileMenu}
                 >
                   Início
                 </span>
               </Link>
-              <Link href="/recursos">
-                <span 
-                  className={`block py-2 transition-colors ${linkClass}`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Recursos
-                </span>
-              </Link>
-              <Link href="/faq">
-                <span 
-                  className={`block py-2 transition-colors ${linkClass}`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  FAQ
-                </span>
-              </Link>
-              <Link href="/sobre">
-                <span 
-                  className={`block py-2 transition-colors ${linkClass}`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Sobre
-                </span>
-              </Link>
-              <Link href="/blog">
-                <span 
-                  className={`block py-2 transition-colors ${linkClass}`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Blog
-                </span>
-              </Link>
-              <Link href="/contato">
-                <span 
-                  className={`block py-2 transition-colors ${linkClass}`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Contato
-                </span>
-              </Link>
 
-              <div className="border-t pt-4 mt-2 space-y-3">
-                <Link href="/login">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start"
-                    onClick={() => setMobileMenuOpen(false)}
+              {publicLinks.map((item) => (
+                <Link key={item.href} href={item.href}>
+                  <span
+                    className={`block py-2 transition-colors ${linkClass}`}
+                    onClick={closeMobileMenu}
                   >
-                    Acessar
-                  </Button>
+                    {item.label}
+                  </span>
                 </Link>
+              ))}
 
-                <Link href="/signup">
-                  <Button
-                    className="w-full justify-start"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Cadastre-se
-                  </Button>
-                </Link>
-              </div>
+              {!isLoading && (
+                <div className="mt-2 space-y-3 border-t pt-4">
+                  {user ? (
+                    <>
+                      <Link href="/dashboard">
+                        <Button
+                          className="w-full justify-start"
+                          onClick={closeMobileMenu}
+                        >
+                          Painel
+                        </Button>
+                      </Link>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={handleLogout}
+                      >
+                        Sair
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Link href="/login">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={closeMobileMenu}
+                        >
+                          Acessar
+                        </Button>
+                      </Link>
+
+                      <Link href="/signup">
+                        <Button
+                          className="w-full justify-start"
+                          onClick={closeMobileMenu}
+                        >
+                          Cadastre-se
+                        </Button>
+                      </Link>
+                    </>
+                  )}
+                </div>
+              )}
             </nav>
           </SheetContent>
         </Sheet>

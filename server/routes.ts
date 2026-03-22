@@ -161,6 +161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/contact", async (req, res) => {
     const { name, email, message } = req.body || {};
+    const fallbackEmail = process.env.CONTACT_RECIPIENT || process.env.MAIL_USER || "contato@finscope.com.br";
 
     if (!name || !email || !message) {
       return res.status(400).json({ error: "Todos os campos são obrigatórios." });
@@ -175,7 +176,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("[CONTACT] Erro ao enviar mensagem:", error);
-      res.status(500).json({ error: "Não foi possível enviar sua mensagem agora." });
+      const errorMessage = error instanceof Error ? error.message : String(error || "");
+      const isTimeout = /timeout/i.test(errorMessage) || (error as any)?.command === "CONN";
+
+      res.status(isTimeout ? 503 : 500).json({
+        error: isTimeout
+          ? "Nosso servidor de email está indisponível no momento. Tente novamente em instantes ou envie para contato@finscope.com.br."
+          : "Não foi possível enviar sua mensagem agora.",
+        fallbackEmail,
+      });
     }
   });
 

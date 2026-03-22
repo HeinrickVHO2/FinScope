@@ -1,15 +1,48 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
 import { FinScopeHeader } from "@/components/site/FinScopeHeader";
 import { FinScopeFooter } from "@/components/site/FinScopeFooter";
-import { motion } from "framer-motion";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+
+const DEFAULT_SUPPORT_EMAIL = "contato@finscope.com.br";
+
+function buildMailtoHref(email: string, name: string, senderEmail: string, message: string) {
+  const subject = encodeURIComponent(`Contato FinScope - ${name || "Suporte"}`);
+  const body = encodeURIComponent(
+    [
+      name ? `Nome: ${name}` : "",
+      senderEmail ? `Email: ${senderEmail}` : "",
+      "",
+      message,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
+
+  return `mailto:${email}?subject=${subject}&body=${body}`;
+}
 
 export default function ContatoPage() {
+  const { user } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [fallbackEmail, setFallbackEmail] = useState(DEFAULT_SUPPORT_EMAIL);
+
+  useEffect(() => {
+    if (!user) return;
+    setName((current) => current || user.fullName || "");
+    setEmail((current) => current || user.email || "");
+  }, [user]);
+
+  const mailtoHref = useMemo(
+    () => buildMailtoHref(fallbackEmail, name, email, message),
+    [email, fallbackEmail, message, name],
+  );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -21,6 +54,7 @@ export default function ContatoPage() {
 
     setStatus("loading");
     setErrorMessage("");
+
     try {
       const response = await apiFetch("/api/contact", {
         method: "POST",
@@ -29,13 +63,15 @@ export default function ContatoPage() {
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "Não foi possível enviar sua mensagem.");
+        const data = await response.json().catch(() => ({} as { error?: string; fallbackEmail?: string }));
+        if (data.fallbackEmail) {
+          setFallbackEmail(data.fallbackEmail);
+        }
+        throw new Error(data.error || "Nao foi possivel enviar sua mensagem.");
       }
 
       setStatus("success");
-      setName("");
-      setEmail("");
+      setErrorMessage("");
       setMessage("");
     } catch (error) {
       setStatus("error");
@@ -47,24 +83,24 @@ export default function ContatoPage() {
     <div className="min-h-screen bg-white text-slate-900">
       <FinScopeHeader />
 
-      <main className="max-w-4xl mx-auto px-4 py-24 space-y-16">
+      <main className="mx-auto max-w-4xl space-y-16 px-4 py-24">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-4"
+          className="space-y-4 text-center"
         >
           <h1 className="text-4xl font-poppins font-bold">Fale com a gente</h1>
-          <p className="text-slate-600 max-w-lg mx-auto">
-            Tem dúvidas, sugestões ou precisa de ajuda? Nosso time está pronto para te ouvir.
+          <p className="mx-auto max-w-lg text-slate-600">
+            Tem duvidas, sugestoes ou precisa de ajuda? Nosso time esta pronto para te ouvir.
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 gap-10">
-          <form onSubmit={handleSubmit} className="space-y-4 p-6 border rounded-2xl shadow-sm bg-white">
+        <div className="grid gap-10 md:grid-cols-2">
+          <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
             <div>
               <label className="text-sm font-medium">Seu nome</label>
               <input
-                className="w-full border rounded-lg p-2 mt-1"
+                className="mt-1 w-full rounded-lg border p-2"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -75,7 +111,7 @@ export default function ContatoPage() {
               <label className="text-sm font-medium">Seu e-mail</label>
               <input
                 type="email"
-                className="w-full border rounded-lg p-2 mt-1"
+                className="mt-1 w-full rounded-lg border p-2"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -85,7 +121,7 @@ export default function ContatoPage() {
             <div>
               <label className="text-sm font-medium">Mensagem</label>
               <textarea
-                className="w-full border rounded-lg p-2 mt-1 h-32"
+                className="mt-1 h-32 w-full rounded-lg border p-2"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 required
@@ -95,27 +131,39 @@ export default function ContatoPage() {
             {status === "success" && (
               <p className="text-sm text-green-600">Mensagem enviada! Vamos responder em breve.</p>
             )}
+
             {status === "error" && (
-              <p className="text-sm text-red-600">{errorMessage || "Ocorreu um erro ao enviar sua mensagem."}</p>
+              <div className="space-y-3">
+                <p className="text-sm text-red-600">
+                  {errorMessage || "Ocorreu um erro ao enviar sua mensagem."}
+                </p>
+                <a href={mailtoHref}>
+                  <Button type="button" variant="outline">
+                    Enviar pelo seu e-mail
+                  </Button>
+                </a>
+              </div>
             )}
 
             <button
               type="submit"
               disabled={status === "loading"}
-              className="px-4 py-2 bg-primary text-white rounded-lg shadow hover:shadow-md transition disabled:opacity-60"
+              className="rounded-lg bg-primary px-4 py-2 text-white shadow transition hover:shadow-md disabled:opacity-60"
             >
               {status === "loading" ? "Enviando..." : "Enviar mensagem"}
             </button>
           </form>
 
           <div className="space-y-4 text-slate-700">
-            <div className="p-4 rounded-xl border bg-muted/40">
+            <div className="rounded-xl border bg-muted/40 p-4">
               <p className="text-sm text-muted-foreground">Email</p>
-              <p className="font-semibold">contato@finscope.com.br</p>
+              <a href={`mailto:${fallbackEmail}`} className="font-semibold hover:text-primary">
+                {fallbackEmail}
+              </a>
             </div>
-            <div className="p-4 rounded-xl border bg-muted/40">
+            <div className="rounded-xl border bg-muted/40 p-4">
               <p className="text-sm text-muted-foreground">Tempo de resposta</p>
-              <p className="font-semibold">Até 6 horas úteis</p>
+              <p className="font-semibold">Ate 6 horas uteis</p>
             </div>
             <p className="text-sm">
               Quer sugerir melhorias? Fale com a gente. O produto evolui com base no que os clientes mais precisam.
