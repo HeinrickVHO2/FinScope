@@ -1780,7 +1780,15 @@ type AiInterpretationResult =
       });
 
       const resetLink = `${process.env.APP_URL}/reset-password?token=${token}`;
-      await sendResetEmail(email, resetLink);
+      try {
+        await sendResetEmail(email, resetLink);
+      } catch (mailError) {
+        console.error("[RESET EMAIL] Erro ao enviar email:", mailError);
+        await supabase.from("password_reset_tokens").delete().eq("token", token);
+        return res.status(503).json({
+          error: "Nosso servico de email esta indisponivel no momento. Tente novamente em instantes.",
+        });
+      }
 
       return res.json({ success: true });
     } catch (error) {

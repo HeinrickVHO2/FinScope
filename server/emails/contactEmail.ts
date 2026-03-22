@@ -1,4 +1,4 @@
-import { createTransporter } from "./transporter";
+import { sendMailWithFallback } from "./transporter";
 
 function escapeHtml(value: string) {
   return value
@@ -18,7 +18,6 @@ export async function sendContactEmail({
   email: string;
   message: string;
 }) {
-  const transporter = createTransporter();
   const ownerEmail = process.env.CONTACT_RECIPIENT || process.env.MAIL_USER || "contato@finscope.com.br";
   const senderEmail = process.env.MAIL_FROM || process.env.MAIL_USER || ownerEmail;
   const safeName = escapeHtml(name);
@@ -42,7 +41,7 @@ export async function sendContactEmail({
     message,
   ].join("\n");
 
-  await transporter.sendMail({
+  await sendMailWithFallback({
     from: `"FinScope Site" <${senderEmail}>`,
     to: ownerEmail,
     replyTo: email,
