@@ -4,6 +4,7 @@ export type StatementDirection = "credit" | "debit";
 export type ReconciliationStatus =
   | "pending_review"
   | "matched"
+  | "importing"
   | "imported"
   | "duplicate"
   | "conflict"

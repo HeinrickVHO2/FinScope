@@ -230,64 +230,80 @@ export class StatementImportService {
       throw new Error("Essa importação ainda está sendo analisada.");
     }
 
-    const account = await this.storage.getAccount(upload.accountId);
-    if (!account || account.userId !== params.userId) {
-      throw new Error("A conta escolhida para essa importação não está disponível.");
+    const confirmationStarted = await this.repository.tryStartImportConfirmation(upload.id, params.userId);
+    if (!confirmationStarted) {
+      throw new Error("Essa importação já está sendo confirmada. Atualize a página em instantes.");
     }
 
-    const entries = await this.repository.getEntriesByUpload(upload.id, params.userId);
-    const importable = entries.filter((entry) => {
-      if (entry.reconciliationStatus === "ignored") return false;
-      if (entry.reconciliationStatus === "imported") return false;
-      if (entry.reconciliationStatus === "pending_review") return true;
-      return Boolean(params.includePendingReview) && entry.reconciliationStatus === "conflict";
-    });
+    try {
+      const account = await this.storage.getAccount(upload.accountId);
+      if (!account || account.userId !== params.userId) {
+        throw new Error("A conta escolhida para essa importação não está disponível.");
+      }
 
-    let importedCount = 0;
-    const accountType = account.type?.toLowerCase() === "pj" ? "PJ" : "PF";
-
-    for (const entry of importable) {
-      const type = entry.direction === "credit" ? "entrada" : "saida";
-      const transaction = await this.storage.createTransaction({
-        userId: params.userId,
-        accountId: upload.accountId,
-        description: entry.originalDescription,
-        type,
-        amount: entry.amount,
-        category: categoryFromDescription(entry.originalDescription, type),
-        date: new Date(entry.transactionDate),
-        accountType,
-        source: "statement_import",
+      const entries = await this.repository.getEntriesByUpload(upload.id, params.userId);
+      const importable = entries.filter((entry) => {
+        if (entry.reconciliationStatus === "ignored") return false;
+        if (entry.reconciliationStatus === "imported") return false;
+        if (entry.reconciliationStatus === "pending_review") return true;
+        return Boolean(params.includePendingReview) && entry.reconciliationStatus === "conflict";
       });
 
-      await this.repository.markEntryImported({
-        entryId: entry.id,
-        userId: params.userId,
-        createdTransactionId: transaction.id,
+      let importedCount = 0;
+      const accountType = account.type?.toLowerCase() === "pj" ? "PJ" : "PF";
+
+      for (const entry of importable) {
+        const type = entry.direction === "credit" ? "entrada" : "saida";
+        const transaction = await this.storage.createTransaction({
+          userId: params.userId,
+          accountId: upload.accountId,
+          description: entry.originalDescription,
+          type,
+          amount: entry.amount,
+          category: categoryFromDescription(entry.originalDescription, type),
+          date: new Date(entry.transactionDate),
+          accountType,
+          source: "statement_import",
+        });
+
+        await this.repository.markEntryImported({
+          entryId: entry.id,
+          userId: params.userId,
+          createdTransactionId: transaction.id,
+        });
+
+        importedCount += 1;
+      }
+
+      const refreshedEntries = await this.repository.getEntriesByUpload(upload.id, params.userId);
+      const summary = summarize(refreshedEntries);
+
+      await this.repository.updateUpload(upload.id, {
+        processingStatus: "completed",
+        summary,
+        errorMessage: null,
       });
 
-      importedCount += 1;
+      await this.repository.appendLog({
+        uploadId: upload.id,
+        userId: params.userId,
+        level: "info",
+        event: "import_confirmed",
+        message: "Importação confirmada e transações persistidas",
+        metadata: {
+          importedCount,
+        },
+      });
+
+      return { importedCount };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Não foi possível concluir a importação.";
+      await this.repository.updateUpload(upload.id, {
+        processingStatus: "completed",
+        errorMessage: message,
+      });
+      throw error;
     }
-
-    const refreshedEntries = await this.repository.getEntriesByUpload(upload.id, params.userId);
-    const summary = summarize(refreshedEntries);
-
-    await this.repository.updateUpload(upload.id, {
-      summary,
-    });
-
-    await this.repository.appendLog({
-      uploadId: upload.id,
-      userId: params.userId,
-      level: "info",
-      event: "import_confirmed",
-      message: "Importação confirmada e transações persistidas",
-      metadata: {
-        importedCount,
-      },
-    });
-
-    return { importedCount };
   }
 
   private async processUpload(uploadId: string): Promise<void> {

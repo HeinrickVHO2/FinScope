@@ -2829,6 +2829,11 @@ app.post("/api/investments/goals", requireAuth, requireActiveBilling, async (req
     return res.status(400).json({ error: "targetAmount inválido" });
   }
 
+  const investment = await storage.getInvestment(investmentId);
+  if (!investment || investment.userId !== userId) {
+    return res.status(404).json({ error: "Investimento nÃ£o encontrado" });
+  }
+
   console.log("[GOAL] Saving goal:", {
     userId,
     investmentId,
@@ -2849,7 +2854,12 @@ app.delete("/api/investments/goals/:investmentId", requireAuth, requireActiveBil
   const userId = req.session.userId;
   if (!userId) return res.status(401).json({ error: "Não autenticado" });
 
-  await storage.deleteInvestmentGoal(req.params.investmentId);
+  const investment = await storage.getInvestment(req.params.investmentId);
+  if (!investment || investment.userId !== userId) {
+    return res.status(404).json({ error: "Investimento nÃ£o encontrado" });
+  }
+
+  await storage.deleteInvestmentGoal(req.params.investmentId, userId);
 
 res.json({ success: true });
 });
@@ -3135,7 +3145,7 @@ res.json({ success: true });
         return res.status(404).json({ error: "Investimento não encontrado" });
       }
 
-      await storage.deleteInvestmentGoal(req.params.id);
+      await storage.deleteInvestmentGoal(req.params.id, req.session.userId);
       res.json({ success: true });
     } catch (error) {
       res.status(400).json({ error: (error as Error).message });
@@ -3231,8 +3241,10 @@ res.json({ success: true });
   // Update user plan
   app.patch("/api/user/plan", requireAuth, requireActiveBilling, async (req: any, res) => {
     try {
-      const { plan } = req.body;
-      if (!["pro", "premium"].includes(plan)) {
+      return res.status(403).json({
+        error: "AlteraÃ§Ã£o direta de plano foi desabilitada. Use o fluxo oficial de checkout e webhook de billing.",
+      });
+      /* if (!["pro", "premium"].includes(plan)) {
         return res.status(400).json({ error: "Plano inválido" });
       }
 
@@ -3254,7 +3266,7 @@ res.json({ success: true });
         billingStatus: updated.billingStatus,
         createdAt: updated.createdAt,
       };
-      res.json(userWithoutPassword);
+      res.json(userWithoutPassword); */
     } catch (error) {
       res.status(400).json({ error: (error as Error).message });
     }

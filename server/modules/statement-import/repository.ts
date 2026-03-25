@@ -8,7 +8,7 @@ import type {
   StatementImportSummary,
 } from "./types";
 
-export type UploadProcessingStatus = "queued" | "processing" | "completed" | "failed";
+export type UploadProcessingStatus = "queued" | "processing" | "completed" | "importing" | "failed";
 export type UploadStatus = "received" | "validated" | "rejected";
 
 export interface StatementUploadRecord {
@@ -166,6 +166,26 @@ export class StatementImportRepository {
     if (error) {
       throw new Error(error.message || "Erro ao atualizar upload");
     }
+  }
+
+  async tryStartImportConfirmation(uploadId: string, userId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from("bank_statement_uploads")
+      .update({
+        processing_status: "importing",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", uploadId)
+      .eq("user_id", userId)
+      .eq("processing_status", "completed")
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message || "Erro ao iniciar confirmação da importação");
+    }
+
+    return Boolean(data?.id);
   }
 
   async createEntries(uploadId: string, userId: string, entries: Array<NormalizedStatementEntry & ReconciliationResult>): Promise<void> {

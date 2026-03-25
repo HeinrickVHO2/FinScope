@@ -110,7 +110,7 @@ export interface IStorage {
   // Investment goal operations
   getInvestmentGoal(investmentId: string): Promise<InvestmentGoal | undefined>;
   createOrUpdateInvestmentGoal(goal: InsertInvestmentGoal): Promise<InvestmentGoal>;
-  deleteInvestmentGoal(investmentId: string): Promise<boolean>;
+  deleteInvestmentGoal(investmentId: string, userId: string): Promise<boolean>;
 
   // Investment transaction operations
   getInvestmentTransactionsByUserId(userId: string): Promise<InvestmentTransaction[]>;

@@ -870,7 +870,15 @@ export class SupabaseStorage implements IStorage {
 
   async createOrUpdateInvestmentGoal(goal: InsertInvestmentGoal): Promise<InvestmentGoal> {
     console.log("[GOAL RECEBIDO]", goal);
+    const investment = await this.getInvestment(goal.investmentId);
+    if (!investment || investment.userId !== goal.userId) {
+      throw new Error("Investimento não encontrado");
+    }
+
     const existing = await this.getInvestmentGoal(goal.investmentId);
+    if (existing && existing.userId !== goal.userId) {
+      throw new Error("Meta não encontrada");
+    }
 
     if (existing) {
       const updateData: any = {
@@ -884,6 +892,7 @@ export class SupabaseStorage implements IStorage {
         .from("investment_goals")
         .update(updateData)
         .eq("investment_id", goal.investmentId)
+        .eq("user_id", goal.userId)
         .select()
         .single();
 
@@ -926,11 +935,12 @@ export class SupabaseStorage implements IStorage {
     };
   }
 
-  async deleteInvestmentGoal(investmentId: string): Promise<boolean> {
+  async deleteInvestmentGoal(investmentId: string, userId: string): Promise<boolean> {
     const { error } = await supabase
       .from("investment_goals")
       .delete()
-      .eq("investment_id", investmentId);
+      .eq("investment_id", investmentId)
+      .eq("user_id", userId);
 
     return !error;
   }
