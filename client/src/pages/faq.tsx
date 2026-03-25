@@ -8,7 +8,7 @@ export default function FAQPage() {
   const faqs = [
     {
       q: "Tenho garantia ao contratar o FinScope?",
-      a: "Sim. Você paga, usa sem limitações e tem 10 dias para pedir reembolso total se achar que o FinScope não faz sentido para você.",
+      a: "Sim. Você paga, usa sem limitações e tem 14 dias para pedir reembolso total se achar que o FinScope não faz sentido para você.",
     },
     {
       q: "Posso usar tanto para vida pessoal quanto para minha empresa?",
@@ -36,7 +36,7 @@ export default function FAQPage() {
     },
     {
       q: "Consigo testar os recursos antes de contratar?",
-      a: "Todo novo cliente tem 10 dias de garantia. Nesse período, você pode explorar o plano contratado sem risco. No Premium, isso inclui a área Minha empresa, o Agent de WhatsApp e os relatórios avançados.",
+      a: "Todo novo cliente tem 14 dias de garantia. Nesse período, você pode explorar o plano contratado sem risco. No Premium, isso inclui a área Minha empresa, o Agent de WhatsApp e os relatórios avançados.",
     },
     {
       q: "Como o suporte funciona na prática?",

@@ -189,7 +189,7 @@ export function BillingCheckoutSection({
                 <Clock3 className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="font-semibold text-primary">Garantia total de 10 dias</p>
+                <p className="font-semibold text-primary">Garantia total de 14 dias</p>
                 <p className="text-muted-foreground">
                   Se o FinScope não fizer sentido para você dentro desse período, devolvemos 100% do valor.
                 </p>

@@ -139,9 +139,9 @@ export default function CaktoCheckoutModal({
                 <Clock3 className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="font-semibold text-primary">Garantia total de 10 dias</p>
+                <p className="font-semibold text-primary">Garantia total de 14 dias</p>
                 <p className="text-muted-foreground">
-                  Se o FinScope não fizer sentido para você dentro de 10 dias, devolvemos 100% do valor sem perguntas.
+                  Se o FinScope não fizer sentido para você dentro de 14 dias, devolvemos 100% do valor sem perguntas.
                 </p>
               </div>
             </div>
@@ -294,7 +294,7 @@ export default function CaktoCheckoutModal({
                     Após confirmar o pagamento, clique em <strong>Verificar pagamento</strong> para atualizar o status.
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Sua assinatura continua com 10 dias de garantia para solicitar reembolso integral.
+                    Sua assinatura continua com 14 dias de garantia para solicitar reembolso integral.
                   </p>
                 </div>
               </div>

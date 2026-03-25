@@ -31,7 +31,7 @@ export function FinalCTASection() {
             </Button>
           </Link>
         </div>
-        <p className="text-sm text-slate-500">Checkout com 10 dias de garantia total.</p>
+        <p className="text-sm text-slate-500">Checkout com 14 dias de garantia total.</p>
       </div>
     </section>
   );

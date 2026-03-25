@@ -104,7 +104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(express.json({ limit: "12mb" }));
   app.use(express.urlencoded({ extended: true, limit: "12mb" }));
-  const GUARANTEE_DAYS = Number(process.env.BILLING_GUARANTEE_DAYS || "10");
+  const GUARANTEE_DAYS = Number(process.env.BILLING_GUARANTEE_DAYS || "14");
   const GUARANTEE_WINDOW_MS = GUARANTEE_DAYS * 24 * 60 * 60 * 1000;
 
   // Trust proxy - required for cookies to work behind Replit's proxy

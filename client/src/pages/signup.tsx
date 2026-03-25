@@ -57,7 +57,7 @@ export default function SignupPage() {
       
       toast({
         title: "Conta criada com sucesso",
-        description: "Agora falta só escolher seu plano para liberar a plataforma. Você tem 10 dias de garantia.",
+        description: "Agora falta só escolher seu plano para liberar a plataforma. Você tem 14 dias de garantia.",
       });
       
       setIsCheckoutOpen(true);
