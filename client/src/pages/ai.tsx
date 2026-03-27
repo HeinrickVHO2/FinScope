@@ -34,7 +34,7 @@ export default function AIClientPage() {
           headers: { Accept: "application/json" },
         });
         if (!response.ok) {
-          throw new Error("Não foi possível carregar o histórico");
+          throw new Error("Nao foi possivel carregar o historico");
         }
         const clone = response.clone();
         let data: any = null;
@@ -42,7 +42,7 @@ export default function AIClientPage() {
           data = await clone.json();
         } catch {
           const text = await response.text();
-          throw new Error(text || "Histórico retornou formato inesperado");
+          throw new Error(text || "Historico retornou formato inesperado");
         }
         if (Array.isArray(data?.messages)) {
           setMessages(
@@ -52,12 +52,12 @@ export default function AIClientPage() {
               content: item.content,
               payload: item.payload ?? null,
               createdAt: item.createdAt,
-            }))
+            })),
           );
         }
       } catch (error) {
         toast({
-          title: "Histórico indisponível",
+          title: "Historico indisponivel",
           description: (error as Error).message,
           variant: "destructive",
         });
@@ -92,7 +92,7 @@ export default function AIClientPage() {
       const tempBotMessage: ChatMessage = {
         id: `temp-bot-${Date.now()}`,
         role: "assistant",
-        content: "Estou organizando isso para você...",
+        content: "Estou organizando isso para voce...",
         createdAt: new Date().toISOString(),
         payload: null,
         status: "pending",
@@ -112,7 +112,7 @@ export default function AIClientPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Não foi possível enviar a mensagem." }));
+        const errorData = await response.json().catch(() => ({ error: "Nao foi possivel enviar a mensagem." }));
         throw new Error(errorData.error || "Erro ao enviar mensagem.");
       }
 
@@ -131,22 +131,20 @@ export default function AIClientPage() {
               return userMessage;
             }
             return message;
-          })
+          }),
         );
 
-        // Processar ações silenciosamente (sem mostrar JSON)
         const actions = data?.data?.actions || [];
         if (actions.length > 0) {
           for (const action of actions) {
             if (action.type === "transaction" && action.data) {
-              console.log("[AI Action] Transação criada:", action.data);
+              console.log("[AI Action] Transacao criada:", action.data);
             } else if (action.type === "future_bill" && action.data) {
               console.log("[AI Action] Conta futura criada:", action.data);
             } else if (action.type === "goal" && action.data) {
               console.log("[AI Action] Meta criada:", action.data);
             }
           }
-          // Invalidar cache para sincronizar abas
           window.dispatchEvent(new CustomEvent("ai-action-completed", { detail: { actions } }));
         }
       }
@@ -161,10 +159,10 @@ export default function AIClientPage() {
             };
           }
           return message;
-        })
+        }),
       );
       toast({
-        title: "Não foi possível enviar sua mensagem",
+        title: "Nao foi possivel enviar sua mensagem",
         description: (error as Error).message,
         variant: "destructive",
       });
@@ -185,10 +183,9 @@ export default function AIClientPage() {
         <div>
           <h1 className="text-3xl font-bold font-poppins">Assistente com IA</h1>
           <p className="text-muted-foreground mt-2 max-w-2xl">
-            Me conte suas movimentações e eu ajudo a registrar tudo. Posso anotar gastos, metas e contas futuras para você.
+            Me conte suas movimentacoes e eu ajudo a registrar tudo. O padrao e a conta pessoal. Para lancar na empresa, mencione isso explicitamente e tenha sua conta PJ criada antes em PJ/Minha Empresa.
           </p>
         </div>
-
       </div>
 
       <Card className="flex flex-col h-[70vh] overflow-hidden border-primary/10 shadow-sm">
@@ -198,7 +195,7 @@ export default function AIClientPage() {
               <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
                 <Sparkles className="h-5 w-5" />
               </div>
-              <p>Carregando histórico…</p>
+              <p>Carregando historico...</p>
             </div>
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full gap-3">
@@ -208,7 +205,7 @@ export default function AIClientPage() {
               <div>
                 <p className="font-medium">Converse comigo</p>
                 <p className="text-sm">
-                  Exemplos: “Gastei 50 reais no mercado hoje” ou “Preciso pagar 120 de luz no dia 10”.
+                  Exemplos: "Gastei 50 reais no mercado hoje" ou "Recebi 1200 na empresa". Se voce nao falar nada, eu registro na conta pessoal.
                 </p>
               </div>
             </div>
@@ -223,11 +220,11 @@ export default function AIClientPage() {
                     "max-w-[80%] rounded-2xl px-4 py-3 shadow-sm text-sm",
                     message.role === "user"
                       ? "bg-primary text-primary-foreground rounded-br-sm"
-                      : "bg-background border border-border rounded-bl-sm"
+                      : "bg-background border border-border rounded-bl-sm",
                   )}
                 >
                   <div className="flex items-center gap-2 text-xs uppercase tracking-wide mb-1 opacity-70">
-                    {message.role === "user" ? "Você" : "FinScope IA"}
+                    {message.role === "user" ? "Voce" : "FinScope IA"}
                     <span>·</span>
                     <span>{formatTime(message.createdAt)}</span>
                     {message.status === "pending" && (
@@ -281,7 +278,7 @@ export default function AIClientPage() {
 
         <form onSubmit={handleSend} className="border-t bg-background p-4 flex items-center gap-3">
           <Input
-            placeholder="Ex.: Recebi 3.500 de salário"
+            placeholder="Ex.: Recebi 3.500 de salario"
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
             className="flex-1"

@@ -1,10 +1,11 @@
 import type { User } from "@shared/schema";
 import { storage } from "../server/storage";
 import { supabase } from "../server/supabase";
-import type { FinancialContext } from "./buildFinancialContext";
 import { inferExpenseCategory } from "../server/modules/shared/expenseClassifier";
+import { resolveAccountForScope, type AccountScope } from "../server/modules/shared/financialMessagePolicy";
+import type { FinancialContext } from "./buildFinancialContext";
 
-type AccountKind = "PF" | "PJ";
+type AccountKind = AccountScope;
 
 export interface AgentAction {
   type: "transaction" | "future_bill" | "goal";
@@ -24,20 +25,24 @@ export interface AgentActionResult {
 export async function executeAgentActions(
   user: User,
   actions: AgentAction[],
-  context: FinancialContext
+  context: FinancialContext,
 ): Promise<AgentActionResult[]> {
   const results: AgentActionResult[] = [];
+
   for (const action of actions) {
     try {
       if (action.type === "transaction") {
-        const result = await handleTransactionAction(user, action.data, context);
-        results.push(result);
-      } else if (action.type === "future_bill") {
-        const result = await handleFutureBillAction(user, action.data, context);
-        results.push(result);
-      } else if (action.type === "goal") {
-        const result = await handleGoalAction(user, action.data, context);
-        results.push(result);
+        results.push(await handleTransactionAction(user, action.data, context));
+        continue;
+      }
+
+      if (action.type === "future_bill") {
+        results.push(await handleFutureBillAction(user, action.data, context));
+        continue;
+      }
+
+      if (action.type === "goal") {
+        results.push(await handleGoalAction(user, action.data, context));
       }
     } catch (error) {
       results.push({
@@ -46,28 +51,24 @@ export async function executeAgentActions(
         type: action.type,
         entityId: null,
         entityName: action.data?.description || action.data?.title || "desconhecido",
-        message: (error as Error).message || "Não foi possível executar esta ação.",
+        message: (error as Error).message || "Nao foi possivel executar esta acao.",
         data: null,
       });
     }
   }
+
   return results;
 }
 
 async function handleTransactionAction(user: User, payload: any, context: FinancialContext): Promise<AgentActionResult> {
   const amount = toNumber(payload.amount);
   if (amount <= 0) {
-    throw new Error("Precisamos de um valor positivo para registrar a transação.");
+    throw new Error("Precisamos de um valor positivo para registrar a transacao.");
   }
 
   const accountType = normalizeAccountType(payload.account_type, user.plan);
-  const accounts = await ensureAccounts(user.id, user.plan);
-  const targetAccount = findAccountForType(accounts, accountType);
-  if (!targetAccount) {
-    throw new Error("Não encontrei uma conta compatível para lançar esta transação.");
-  }
-
-  const description = (payload.description || payload.title || "Transação FinScope").trim();
+  const targetAccount = await resolveTargetAccount(user.id, accountType);
+  const description = (payload.description || payload.title || "Transacao FinScope").trim();
   const normalizedDesc = normalizeText(description);
   const txType = String(payload.type || "").toLowerCase() === "income" ? "entrada" : "saida";
   const shouldUpdateExisting = payload.updateExisting === true || payload.update_existing === true;
@@ -132,6 +133,7 @@ async function handleFutureBillAction(user: User, payload: any, context: Financi
   }
 
   const accountType = normalizeAccountType(payload.account_type, user.plan);
+  await resolveTargetAccount(user.id, accountType);
   const description = (payload.description || payload.title || "Conta futura").trim();
   const normalizedDesc = normalizeText(description);
   const dueDate = parseDate(payload.dueDate || payload.date);
@@ -167,7 +169,7 @@ async function handleFutureBillAction(user: User, payload: any, context: Financi
       .single();
 
     if (error) {
-      throw new Error(error.message || "Não consegui atualizar esta conta futura.");
+      throw new Error(error.message || "Nao consegui atualizar esta conta futura.");
     }
 
     await upsertFutureExpense(user.id, description, amount, dueDate, accountType, payload.category);
@@ -207,10 +209,10 @@ async function handleGoalAction(user: User, payload: any, context: FinancialCont
   const target = toNumber(payload.target_value ?? payload.targetAmount ?? deposit);
   const investmentType = (payload.investment_type || guessInvestmentType(title)).toLowerCase();
   const deadline = payload.dueDate || payload.deadline;
-
   const targetAmount = target > 0 ? target : deposit > 0 ? deposit : 0;
+
   if (targetAmount <= 0) {
-    throw new Error("Preciso saber o quanto você pretende juntar para criar essa meta.");
+    throw new Error("Preciso saber o quanto voce pretende juntar para criar essa meta.");
   }
 
   let investment = findSimilarInvestment(context.activeInvestments, title, investmentType);
@@ -227,7 +229,7 @@ async function handleGoalAction(user: User, payload: any, context: FinancialCont
       .single();
 
     if (error) {
-      throw new Error(error.message || "Não consegui criar o investimento.");
+      throw new Error(error.message || "Nao consegui criar o investimento.");
     }
     investment = data;
   } else if (deposit > 0) {
@@ -240,7 +242,7 @@ async function handleGoalAction(user: User, payload: any, context: FinancialCont
       .single();
 
     if (error) {
-      throw new Error(error.message || "Não consegui atualizar o investimento.");
+      throw new Error(error.message || "Nao consegui atualizar o investimento.");
     }
     investment = data;
   }
@@ -267,17 +269,21 @@ async function handleGoalAction(user: User, payload: any, context: FinancialCont
   };
 }
 
-async function ensureAccounts(userId: string, plan: string) {
+async function resolveTargetAccount(userId: string, accountType: AccountKind) {
+  const accounts = await ensureAccounts(userId);
+  const resolution = resolveAccountForScope(accounts, accountType, accountType === "PJ");
+  if (!resolution.ok) {
+    throw new Error(resolution.message);
+  }
+  return resolution.account;
+}
+
+async function ensureAccounts(userId: string) {
   const accounts = await storage.getAccountsByUserId(userId);
   const hasPF = accounts.some((acc) => acc.type?.toLowerCase() === "pf");
-  const hasPJ = accounts.some((acc) => acc.type?.toLowerCase() === "pj");
 
   if (!hasPF) {
     await storage.createAccount({ userId, name: "Conta pessoal", type: "pf", initialBalance: 0 });
-  }
-
-  if (plan === "premium" && !hasPJ) {
-    await storage.createAccount({ userId, name: "Minha empresa", type: "pj", initialBalance: 0 });
   }
 
   return storage.getAccountsByUserId(userId);
@@ -289,7 +295,7 @@ async function upsertFutureExpense(
   amount: number,
   dueDate: Date,
   accountType: AccountKind,
-  category?: string
+  category?: string,
 ) {
   const normalizedTitle = normalizeText(title);
   const inferredCategory = category || inferExpenseCategory(title) || "Outros";
@@ -325,18 +331,11 @@ async function upsertFutureExpense(
   });
 }
 
-function findAccountForType(accounts: any[], type: AccountKind) {
-  return (
-    accounts.find((acc) => acc.type?.toLowerCase() === type.toLowerCase()) ||
-    accounts.find((acc) => acc.type?.toLowerCase() === "pf")
-  );
-}
-
 function findSimilarInvestment(investments: any[], title: string, type: string) {
   const normalized = normalizeText(title);
-  return (investments || []).find((inv) => {
-    const sameType = (inv.type || "").toLowerCase() === type.toLowerCase();
-    const sameName = normalizeText(inv.name || "") === normalized;
+  return (investments || []).find((investment) => {
+    const sameType = (investment.type || "").toLowerCase() === type.toLowerCase();
+    const sameName = normalizeText(investment.name || "") === normalized;
     return sameType || sameName;
   });
 }
@@ -353,6 +352,7 @@ function parseDate(value?: string): Date {
   if (!value) {
     return new Date();
   }
+
   const calendarMatch = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (calendarMatch) {
     return new Date(
@@ -367,6 +367,7 @@ function parseDate(value?: string): Date {
       ),
     );
   }
+
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
     return new Date();
@@ -401,15 +402,14 @@ function guessCategory(description: string, txType: string): string {
     return inferExpenseCategory(description) || "Outros";
   }
   if (txType === "entrada") {
-    if (lower.includes("sal") || lower.includes("folha")) return "Salário";
-    if (lower.includes("pix") || lower.includes("transfer")) return "Transferências";
+    if (lower.includes("sal") || lower.includes("folha")) return "Salario";
+    if (lower.includes("pix") || lower.includes("transfer")) return "Transferencias";
     return "Renda extra";
   }
 
-  if (lower.includes("mercado") || lower.includes("ifood") || lower.includes("super")) return "Alimentação";
-  if (lower.includes("luz") || lower.includes("energia") || lower.includes("água") || lower.includes("agua"))
-    return "Luz / Água";
-  if (lower.includes("aluguel") || lower.includes("aluguel")) return "Aluguel";
+  if (lower.includes("mercado") || lower.includes("ifood") || lower.includes("super")) return "Alimentacao";
+  if (lower.includes("luz") || lower.includes("energia") || lower.includes("agua")) return "Luz / Agua";
+  if (lower.includes("aluguel")) return "Aluguel";
   if (lower.includes("stream") || lower.includes("netflix") || lower.includes("spotify")) return "Streaming";
   if (lower.includes("soft") || lower.includes("sas") || lower.includes("assinatura")) return "Software";
   if (lower.includes("taxa") || lower.includes("imposto") || lower.includes("dar")) return "Impostos";
@@ -421,7 +421,7 @@ function guessInvestmentType(text: string): string {
   const lower = text.toLowerCase();
   if (lower.includes("cdb")) return "cdb";
   if (lower.includes("emerg")) return "reserva_emergencia";
-  if (lower.includes("fundo") || lower.includes("ação") || lower.includes("vari")) return "renda_variavel";
+  if (lower.includes("fundo") || lower.includes("acao") || lower.includes("vari")) return "renda_variavel";
   if (lower.includes("fixa") || lower.includes("tesouro") || lower.includes("selic")) return "renda_fixa";
   return "reserva_emergencia";
 }

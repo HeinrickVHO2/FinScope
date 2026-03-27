@@ -21,6 +21,13 @@ import { PuppeteerWhatsAppVisualRenderer, type WhatsAppVisualRenderer } from "./
 import { createDefaultOcrProvider, type OcrProvider } from "./ocr";
 import { AssistantOrchestrator } from "../shared/assistantOrchestrator";
 import { inferExpenseCategory } from "../shared/expenseClassifier";
+import {
+  detectExplicitAccountScope,
+  getSocialAcknowledgementReply,
+  isSocialOnlyMessage,
+  looksLikeFinancialMutationMessage,
+  resolveAccountForText,
+} from "../shared/financialMessagePolicy";
 import { buildWhatsAppConversationUrl, normalizePhone } from "./phone";
 import { canUseWhatsAppAgent } from "../../../shared/plans";
 import type { InboundMessageRecord, WhatsAppRepository } from "./repository";
@@ -39,6 +46,7 @@ type AccountResolution = {
   selectedAccount: Account | null;
   accountOptions: Account[];
   selectionReason: string | null;
+  blockedMessage?: string | null;
 };
 
 function formatCurrencyBRL(value: number) {
@@ -80,11 +88,11 @@ function detectConfirmationIntent(text?: string): "confirm" | "cancel" | null {
 
   if (!normalized) return null;
 
-  const confirms = ["sim", "ok", "confirmo", "pode confirmar", "pode registrar", "salva", "registrar", "registre", "registra", "confirma"];
+  const confirms = ["sim", "confirmo", "pode confirmar", "pode registrar", "salva", "registrar", "registre", "registra", "confirma"];
   const cancels = ["nao", "não", "cancela", "cancelar", "desconsidera", "descarta"];
 
-  if (confirms.some((item) => normalized === item || normalized.includes(item))) return "confirm";
-  if (cancels.some((item) => normalized === item || normalized.includes(item))) return "cancel";
+  if (confirms.includes(normalized)) return "confirm";
+  if (cancels.includes(normalized)) return "cancel";
   return null;
 }
 
@@ -97,11 +105,7 @@ function looksLikeGreeting(text?: string) {
 }
 
 function detectAccountScopeHint(text?: string): "PF" | "PJ" | null {
-  const normalized = normalizeText(text);
-  if (!normalized) return null;
-  if (/\bpj\b|empresa|empresarial|negocio|cnpj/.test(normalized)) return "PJ";
-  if (/\bpf\b|pessoal|particular/.test(normalized)) return "PF";
-  return null;
+  return detectExplicitAccountScope(text);
 }
 
 function hasMixedAccountTypes(accounts: Account[]) {
@@ -771,6 +775,23 @@ export class WhatsAppAgentService {
         return this.handleAssistantReply(inbound, user, orchestrated.reply, "assistant_orchestrated", orchestrated.payload ?? null);
       }
 
+      if (isSocialOnlyMessage(sanitizedEvent.text || "")) {
+        await this.repository.updateInboundMessage({
+          id: inbound.id,
+          status: "assistant_answered",
+          extractedPayload: { mode: "social_ack" },
+        });
+        await this.appendInboundProcessingLog({
+          inboundMessageId: inbound.id,
+          userId: user.id,
+          level: "info",
+          event: "social_message_answered",
+          message: "Mensagem social tratada sem gerar novo contexto transacional.",
+        });
+        await this.sendReplyToInbound(inbound, getSocialAcknowledgementReply());
+        return { status: "assistant_answered" };
+      }
+
       if (looksLikeFinanceAssistantQuestion(sanitizedEvent.text || "")) {
         this.logInternal("info", "branch_assistant_message", "Mensagem classificada como pergunta financeira.", {
           inboundMessageId: inbound.id,
@@ -1075,6 +1096,30 @@ export class WhatsAppAgentService {
     const normalizedDescription = normalizeDescriptionForMatching(intent.description);
     const suppressed = await this.isSuppressedPattern(user.id, normalizedDescription);
     const resolution = await this.resolveAccountForMessage(user.id, event.text || "");
+    if (resolution.blockedMessage) {
+      await this.repository.updateInboundMessage({
+        id: inbound.id,
+        status: "assistant_answered",
+        confidenceScore: intent.confidence,
+        extractedPayload: {
+          mode: "transaction_blocked",
+          blockedReason: resolution.selectionReason,
+        },
+      });
+      await this.appendInboundProcessingLog({
+        inboundMessageId: inbound.id,
+        userId: user.id,
+        level: "warn",
+        event: "transaction_blocked_missing_account",
+        message: "Lancamento bloqueado por conta obrigatoria inexistente.",
+        metadata: {
+          selectionReason: resolution.selectionReason,
+          confidence: intent.confidence,
+        },
+      });
+      await this.sendReplyToInbound(inbound, resolution.blockedMessage);
+      return { status: "assistant_answered" };
+    }
     const needsClarification = intent.confidence < WHATSAPP_CONFIRMATION_THRESHOLD;
     this.logInternal("info", "transaction_decision_context", "Contexto de decisao do fluxo transacional calculado.", {
       inboundMessageId: inbound.id,
@@ -1581,54 +1626,22 @@ export class WhatsAppAgentService {
   private async resolveAccountForMessage(userId: string, text: string): Promise<AccountResolution> {
     const accounts = await this.storage.getAccountsByUserId(userId);
     if (!accounts.length) throw new Error("Cadastre uma conta antes de usar o WhatsApp.");
-
-    const normalized = normalizeText(text);
-    const scopeHint = detectAccountScopeHint(text);
-    const scoped = scopeHint ? accounts.filter((account) => account.type.toUpperCase() === scopeHint) : accounts;
-    const directMatch = scoped.find((account) => normalized.includes(normalizeText(account.name)));
-
-    if (directMatch) {
-      return { selectedAccount: directMatch, accountOptions: scoped, selectionReason: "direct_name_match" };
-    }
-    if (scoped.length === 1) {
-      return { selectedAccount: scoped[0], accountOptions: scoped, selectionReason: "single_account_after_scope" };
-    }
-
-    const preferredDefaults = scoped.filter((account) => isPreferredDefaultAccount(account));
-    if (preferredDefaults.length === 1) {
-      return {
-        selectedAccount: preferredDefaults[0],
-        accountOptions: scoped,
-        selectionReason: "principal_name_hint",
-      };
-    }
-
-    if (!scopeHint && hasMixedAccountTypes(scoped)) {
+    const resolution = resolveAccountForText(accounts, text);
+    if (!resolution.ok) {
       return {
         selectedAccount: null,
-        accountOptions: scoped,
-        selectionReason: "ambiguous_scope_between_pf_pj",
+        accountOptions: resolution.availableAccounts,
+        selectionReason: resolution.reason,
+        blockedMessage: resolution.message,
       };
     }
 
-    const transactions = await this.storage.getTransactionsByUserId(userId, "ALL");
-    const recentTransactions = transactions
-      .filter((transaction) => scoped.some((account) => account.id === transaction.accountId))
-      .sort((left, right) => right.date.getTime() - left.date.getTime());
-
-    const recentPreferredAccount = recentTransactions
-      .map((transaction) => scoped.find((account) => account.id === transaction.accountId) || null)
-      .find((account): account is Account => Boolean(account));
-
-    if (recentPreferredAccount) {
-      return {
-        selectedAccount: recentPreferredAccount,
-        accountOptions: scoped,
-        selectionReason: scopeHint ? "recent_history_in_scope" : "recent_history_default",
-      };
-    }
-
-    return { selectedAccount: null, accountOptions: scoped, selectionReason: "ambiguous_account_selection" };
+    return {
+      selectedAccount: resolution.account,
+      accountOptions: resolution.availableAccounts,
+      selectionReason: resolution.reason,
+      blockedMessage: null,
+    };
   }
 
   private async resolveAccountByCandidate(userId: string, candidate: CandidateRecord, accountId?: string) {

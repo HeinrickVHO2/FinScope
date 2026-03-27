@@ -22,6 +22,13 @@ import {
   buildFinancialAssistantReply,
   looksLikeFinanceAssistantQuestion,
 } from "../server/modules/shared/financialAssistant";
+import {
+  detectExplicitAccountScope,
+  getMissingBusinessAccountMessage,
+  getSocialAcknowledgementReply,
+  isSocialOnlyMessage,
+  looksLikeFinancialMutationMessage,
+} from "../server/modules/shared/financialMessagePolicy";
 import { storage } from "../server/storage";
 import { AssistantOrchestrator } from "../server/modules/shared/assistantOrchestrator";
 import { resolveModelForText } from "../server/modules/shared/modelRouter";
@@ -72,8 +79,8 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
 
   let effectiveContent = content;
   const pendingBaseMessage = session.pendingTransactionMessage || session.lastUserMessage;
-  const explicitAccountType = supportsBusinessArea ? detectAccountTypeFromText(content) : "PF";
-  let resolvedAccountType = explicitAccountType ?? (shouldReuseLastAccountType(content) ? session.lastAccountType : null);
+  const explicitAccountType = supportsBusinessArea ? detectExplicitAccountScope(content) : "PF";
+  let resolvedAccountType: "PF" | "PJ" = explicitAccountType ?? "PF";
 
   if (!supportsBusinessArea && session.awaitingAccountType) {
     updateSessionMemory(userId, {
@@ -82,8 +89,28 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     });
   }
 
+  if (!session.awaitingTransactionAmount && !session.awaitingAccountType && isSocialOnlyMessage(content)) {
+    const reply = getSocialAcknowledgementReply();
+    updateSessionMemory(userId, {
+      pendingTransactionMessage: null,
+      awaitingAccountType: false,
+      awaitingTransactionAmount: false,
+    });
+    const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", reply, {
+      model: modelSelection,
+      mode: "social_ack",
+    });
+    addConversationContext(userId, "assistant", reply);
+    return {
+      userMessage: mapHistoryToResponse(userMessageRow),
+      assistantMessage: mapHistoryToResponse(assistantMessageRow),
+      actions: [],
+      payload: { model: modelSelection, mode: "social_ack" },
+    };
+  }
+
   if (session.awaitingTransactionAmount) {
-    const inferred = explicitAccountType ?? session.lastAccountType ?? detectAccountTypeFromText(pendingBaseMessage) ?? "PF";
+    const inferred = explicitAccountType ?? session.lastAccountType ?? detectExplicitAccountScope(pendingBaseMessage) ?? "PF";
     const baseMessage = pendingBaseMessage || content;
 
     if (!hasMonetaryAmount(content)) {
@@ -114,23 +141,7 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
   }
 
   if (supportsBusinessArea && session.awaitingAccountType) {
-    const answerType = detectAccountTypeFromText(content) ?? detectAccountTypeFromAnswer(content);
-    if (!answerType) {
-      const question = "Isso é da sua conta pessoal ou da sua empresa?";
-      const assistantQuestion = await saveChatHistoryMessage(userId, "assistant", question);
-      addConversationContext(userId, "assistant", question);
-      updateSessionMemory(userId, {
-        awaitingAccountType: true,
-        pendingTransactionMessage: pendingBaseMessage || null,
-      });
-      return {
-        userMessage: mapHistoryToResponse(userMessageRow),
-        assistantMessage: mapHistoryToResponse(assistantQuestion),
-        actions: [],
-        payload: { model: modelSelection },
-      };
-    }
-
+    const answerType = detectExplicitAccountScope(content) ?? detectAccountTypeFromAnswer(content) ?? "PF";
     resolvedAccountType = answerType;
     effectiveContent = mergeTransactionMessage(pendingBaseMessage || content, null, answerType);
     updateSessionMemory(userId, {
@@ -158,6 +169,31 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
   }
 
   modelSelection = resolveModelForText(effectiveContent);
+
+  if (resolvedAccountType === "PJ" && looksLikeFinancialMutationMessage(effectiveContent)) {
+    const accounts = await storage.getAccountsByUserId(userId);
+    const hasBusinessAccount = accounts.some((account) => String(account.type || "").toUpperCase() === "PJ");
+    if (!hasBusinessAccount) {
+      const reply = getMissingBusinessAccountMessage();
+      updateSessionMemory(userId, {
+        pendingTransactionMessage: null,
+        awaitingAccountType: false,
+        awaitingTransactionAmount: false,
+        lastAccountType: "PF",
+      });
+      const assistantMessageRow = await saveChatHistoryMessage(userId, "assistant", reply, {
+        model: modelSelection,
+        mode: "missing_pj_account",
+      });
+      addConversationContext(userId, "assistant", reply);
+      return {
+        userMessage: mapHistoryToResponse(userMessageRow),
+        assistantMessage: mapHistoryToResponse(assistantMessageRow),
+        actions: [],
+        payload: { model: modelSelection, mode: "missing_pj_account" },
+      };
+    }
+  }
 
   const orchestrated = await assistantOrchestrator.handleMessage({
     userId,
@@ -203,22 +239,6 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     };
   }
 
-  if (supportsBusinessArea && !resolvedAccountType && looksLikeTransactionStatement(effectiveContent)) {
-    const question = "Isso é da sua conta pessoal ou da sua empresa?";
-    updateSessionMemory(userId, {
-      awaitingAccountType: true,
-      pendingTransactionMessage: effectiveContent,
-    });
-    const assistantQuestion = await saveChatHistoryMessage(userId, "assistant", question);
-    addConversationContext(userId, "assistant", question);
-    return {
-      userMessage: mapHistoryToResponse(userMessageRow),
-      assistantMessage: mapHistoryToResponse(assistantQuestion),
-      actions: [],
-      payload: { model: modelSelection },
-    };
-  }
-
   if (looksLikeTransactionStatement(effectiveContent) && !hasMonetaryAmount(effectiveContent)) {
     const question = "Qual foi o valor dessa transação?";
     const assistantQuestion = await saveChatHistoryMessage(userId, "assistant", question);
@@ -242,7 +262,10 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
     awaitingAccountType: false,
     awaitingTransactionAmount: false,
   });
-  const financialContext = await buildFinancialContext(userId, resolvedAccountType || "ALL");
+  const financialContext = await buildFinancialContext(
+    userId,
+    looksLikeFinancialMutationMessage(effectiveContent) ? resolvedAccountType : "ALL",
+  );
 
   const conversationalPrompt = buildConversationalPrompt("", financialContext?.asPrompt || "", insightFocus ?? null, internalAiMode);
 
@@ -291,7 +314,11 @@ export async function processAgentChat(req: ChatRequest): Promise<ChatResponse> 
 
   let actionResults: AgentActionResult[] = [];
   if (aiResponse.actions && Array.isArray(aiResponse.actions) && aiResponse.status !== "clarify") {
-    actionResults = await executeAgentActions(user, aiResponse.actions, financialContext);
+    const sanitizedActions = applyStructuredActionScope(aiResponse.actions, resolvedAccountType);
+    const safeActions = looksLikeFinancialMutationMessage(effectiveContent)
+      ? sanitizedActions
+      : sanitizedActions.filter((action) => action.type !== "transaction" && action.type !== "future_bill");
+    actionResults = await executeAgentActions(user, safeActions, financialContext);
     const lastSuccess = actionResults.find((result) => result.success);
     if (lastSuccess) {
       const intention = mapResultTypeToIntention(lastSuccess.type);
@@ -337,21 +364,6 @@ function mapHistoryToResponse(row: ChatHistoryRow) {
   };
 }
 
-function detectAccountTypeFromText(text: string | undefined | null): "PF" | "PJ" | null {
-  if (!text) return null;
-  const normalized = text.toLowerCase();
-  const pjKeywords = ["empresa", "pj", "cnpj", "cliente", "nota fiscal", "emiti", "fornecedor", "contrato", "mei", "negocio", "faturamento", "fatura"];
-  const pfKeywords = ["pessoal", "casa", "familia", "cartao", "mercado", "aluguel", "minha vida", "salario"];
-
-  if (pjKeywords.some((kw) => normalized.includes(kw))) {
-    return "PJ";
-  }
-  if (pfKeywords.some((kw) => normalized.includes(kw))) {
-    return "PF";
-  }
-  return null;
-}
-
 function detectAccountTypeFromAnswer(text: string): "PF" | "PJ" | null {
   const normalized = text.toLowerCase().trim();
   if (!normalized) return null;
@@ -362,14 +374,6 @@ function detectAccountTypeFromAnswer(text: string): "PF" | "PJ" | null {
     return "PF";
   }
   return null;
-}
-
-function shouldReuseLastAccountType(text: string | undefined | null) {
-  if (!text) return false;
-  const normalized = text.toLowerCase().trim();
-  if (!normalized) return false;
-
-  return !/\b(recebi|ganhei|gastei|paguei|comprei|vendi|faturei|pix|entrou|saiu|transferi|depositei|saquei)\b/.test(normalized);
 }
 
 function looksLikeTransactionStatement(text: string | undefined | null) {
@@ -420,4 +424,19 @@ function extractAccountTypeFromResult(result: AgentActionResult): "PF" | "PJ" | 
   const accountType = data.accountType || data.account_type;
   if (!accountType) return null;
   return String(accountType).toUpperCase() === "PJ" ? "PJ" : "PF";
+}
+
+function applyStructuredActionScope(actions: Array<{ type: string; data?: Record<string, any> }>, accountType: "PF" | "PJ") {
+  return actions.map((action) => {
+    if ((action.type === "transaction" || action.type === "future_bill") && action.data) {
+      return {
+        ...action,
+        data: {
+          ...action.data,
+          account_type: accountType,
+        },
+      };
+    }
+    return action;
+  });
 }

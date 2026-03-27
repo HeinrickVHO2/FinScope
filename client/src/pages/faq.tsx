@@ -1,50 +1,54 @@
-import { FinScopeHeader } from "@/components/site/FinScopeHeader";
 import { FinScopeFooter } from "@/components/site/FinScopeFooter";
+import { FinScopeHeader } from "@/components/site/FinScopeHeader";
+import { ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
 
 export default function FAQPage() {
   const faqs = [
     {
       q: "Tenho garantia ao contratar o FinScope?",
-      a: "Sim. Você paga, usa sem limitações e tem 14 dias para pedir reembolso total se achar que o FinScope não faz sentido para você.",
+      a: "Sim. Voce paga, usa sem limitacoes e tem 14 dias para pedir reembolso total se achar que o FinScope nao faz sentido para voce.",
     },
     {
       q: "Posso usar tanto para vida pessoal quanto para minha empresa?",
-      a: "Sim, o FinScope separa sua conta pessoal da área Minha empresa dentro do mesmo painel.",
+      a: "Sim. Por padrao, os lancamentos do assistente vao para a conta pessoal. Para registrar na empresa, voce precisa mencionar isso explicitamente e ja ter criado sua conta PJ na area Minha Empresa.",
+    },
+    {
+      q: "Como o assistente decide entre conta pessoal e empresa?",
+      a: "O padrao do FinScope e sempre a conta pessoal. O assistente so registra na empresa quando voce escreve algo como \"na empresa\" ou \"na conta PJ\". Se a conta PJ ainda nao existir, o lancamento empresarial e bloqueado ate voce criar essa conta na area PJ/Minha Empresa.",
     },
     {
       q: "Como funciona o planejamento de contas futuras?",
-      a: "Você cadastra cada despesa prevista, como boletos, assinaturas e impostos, e o FinScope mostra o impacto disso no saldo. Depois, basta marcar o que já foi pago ou o que atrasou para manter tudo em dia.",
+      a: "Voce cadastra cada despesa prevista, como boletos, assinaturas e impostos, e o FinScope mostra o impacto disso no saldo. Depois, basta marcar o que ja foi pago ou o que atrasou para manter tudo em dia.",
     },
     {
       q: "O sistema calcula quanto dinheiro vai sobrar?",
-      a: "Sim. A Previsão de Caixa considera saldo atual, receitas previstas e contas futuras para mostrar o dinheiro livre esperado e a economia recomendada.",
+      a: "Sim. A Previsao de Caixa considera saldo atual, receitas previstas e contas futuras para mostrar o dinheiro livre esperado e a economia recomendada.",
     },
     {
-      q: "Existe integração com bancos?",
-      a: "Estamos preparando o módulo de Open Finance. Enquanto isso, você importa CSV ou cadastra via automações Premium.",
+      q: "Existe integracao com bancos?",
+      a: "Estamos preparando o modulo de Open Finance. Enquanto isso, voce importa CSV ou cadastra via automacoes Premium.",
     },
     {
-      q: "Posso automatizar a categorização?",
-      a: "No Premium você cria regras automáticas que identificam palavras-chave e classificam as transações sozinhas.",
+      q: "Posso automatizar a categorizacao?",
+      a: "No Premium voce cria regras automaticas que identificam palavras-chave e classificam as transacoes sozinhas.",
     },
     {
       q: "O FinScope funciona no celular?",
-      a: "Sim. A aplicação foi desenhada para ser responsiva e funcionar tanto no desktop quanto em smartphones, sem necessidade de download de app.",
+      a: "Sim. A aplicacao foi desenhada para ser responsiva e funcionar tanto no desktop quanto em smartphones, sem necessidade de download de app.",
     },
     {
       q: "Consigo testar os recursos antes de contratar?",
-      a: "Todo novo cliente tem 14 dias de garantia. Nesse período, você pode explorar o plano contratado sem risco. No Premium, isso inclui a área Minha empresa, o Agent de WhatsApp e os relatórios avançados.",
+      a: "Todo novo cliente tem 14 dias de garantia. Nesse periodo, voce pode explorar o plano contratado sem risco. No Premium, isso inclui a area Minha empresa, o Agent de WhatsApp e os relatorios avancados.",
     },
     {
-      q: "Como o suporte funciona na prática?",
-      a: "Além do e-mail contato@finscope.com.br, você recebe tutoriais dentro do app e atualizações constantes. Responderemos em até 6 horas úteis.",
+      q: "Como o suporte funciona na pratica?",
+      a: "Alem do e-mail contato@finscope.com.br, voce recebe tutoriais dentro do app e atualizacoes constantes. Responderemos em ate 6 horas uteis.",
     },
     {
-      q: "O plano Premium vale a pena se eu já uso o Pro?",
-      a: "Sim, principalmente se você quer menos trabalho manual, Agent de WhatsApp, relatórios mais completos e a área Minha empresa no mesmo fluxo. Hoje o Premium custa R$ 39,90/mês, ou menos de R$ 1,33 por dia.",
+      q: "O plano Premium vale a pena se eu ja uso o Pro?",
+      a: "Sim, principalmente se voce quer menos trabalho manual, Agent de WhatsApp, relatorios mais completos e a area Minha empresa no mesmo fluxo. Hoje o Premium custa R$ 39,90/mes, ou menos de R$ 1,33 por dia.",
     },
   ];
 
@@ -62,7 +66,7 @@ export default function FAQPage() {
         >
           <h1 className="text-4xl font-poppins font-bold">Perguntas Frequentes</h1>
           <p className="mx-auto max-w-xl text-slate-600">
-            Veja respostas para as dúvidas mais comuns sobre o FinScope.
+            Veja respostas para as duvidas mais comuns sobre o FinScope.
           </p>
         </motion.div>
 

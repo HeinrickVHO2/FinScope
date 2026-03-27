@@ -476,6 +476,35 @@ test("WhatsAppAgentService auto creates transaction for high confidence messages
   assert.match(messenger.sentMessages.at(-1)?.text || "", /Registrei/i);
 });
 
+test("WhatsAppAgentService does not create a duplicate transaction after a social acknowledgement", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const first = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-social-first",
+    text: "recebi 3000",
+  }));
+  const second = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-social-second",
+    text: "obrigado",
+  }));
+
+  assert.equal(first.status, "auto_created_pending_review");
+  assert.equal(second.status, "assistant_answered");
+  assert.equal(storage.createTransactionCalls, 1);
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /movimentacao/i);
+});
+
 test("WhatsAppAgentService processes the real whatsapp phrases used in the current flow", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();
@@ -537,6 +566,107 @@ test("WhatsAppAgentService auto creates and replies for a direct market expense 
   assert.equal(storage.createTransactionCalls, 1);
   assert.equal(storage.transactions.get("tx-1")?.source, "whatsapp_agent");
   assert.match(messenger.sentMessages.at(-1)?.text || "", /Registrei/i);
+});
+
+test("WhatsAppAgentService registers an explicit business transaction in the PJ account when it exists", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const parser = buildParser([{
+    kind: "income",
+    amount: 1200,
+    description: "Recebimento empresa",
+    merchant: "Cliente",
+    categorySuggestion: "Receita",
+    transactionDate: new Date("2026-03-15T00:00:00.000Z"),
+    confidence: 0.95,
+    missingFields: [],
+  }]);
+  storage.accounts = [
+    {
+      id: "acc-pf",
+      userId: "user-1",
+      name: "Conta pessoal",
+      type: "pf",
+      businessCategory: null,
+      initialBalance: "0",
+      createdAt: new Date(),
+    },
+    {
+      id: "acc-pj",
+      userId: "user-1",
+      name: "Minha empresa",
+      type: "pj",
+      businessCategory: null,
+      initialBalance: "0",
+      createdAt: new Date(),
+    },
+  ];
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    parser: parser as any,
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-company-explicit",
+    text: "recebi 1200 na empresa",
+  }));
+
+  assert.equal(result.status, "auto_created_pending_review");
+  assert.equal(storage.transactions.get("tx-1")?.accountId, "acc-pj");
+  assert.equal(storage.transactions.get("tx-1")?.accountType, "PJ");
+});
+
+test("WhatsAppAgentService blocks explicit business transactions when the PJ account does not exist", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const parser = buildParser([{
+    kind: "income",
+    amount: 1200,
+    description: "Recebimento empresa",
+    merchant: "Cliente",
+    categorySuggestion: "Receita",
+    transactionDate: new Date("2026-03-15T00:00:00.000Z"),
+    confidence: 0.95,
+    missingFields: [],
+  }]);
+  storage.accounts = [
+    {
+      id: "acc-pf",
+      userId: "user-1",
+      name: "Conta pessoal",
+      type: "pf",
+      businessCategory: null,
+      initialBalance: "0",
+      createdAt: new Date(),
+    },
+  ];
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    parser: parser as any,
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-company-missing-account",
+    text: "recebi 1200 na empresa",
+  }));
+
+  assert.equal(result.status, "assistant_answered");
+  assert.equal(storage.createTransactionCalls, 0);
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /conta PJ cadastrada|Minha Empresa/i);
 });
 
 test("WhatsAppAgentService asks for confirmation for medium confidence messages and confirms in chat", async () => {
@@ -622,6 +752,46 @@ test("WhatsAppAgentService treats 'registre' as a confirmation reply", async () 
   assert.equal(second.status, "confirmed_via_whatsapp");
   assert.equal(storage.createTransactionCalls, 1);
   assert.match(messenger.sentMessages.at(-1)?.text || "", /Confirmado/i);
+});
+
+test("WhatsAppAgentService does not treat a vague 'ok' reply as confirmation", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const parser = buildParser([{
+    kind: "expense",
+    amount: 18,
+    description: "Lanche",
+    merchant: "Padaria",
+    categorySuggestion: "Alimentacao",
+    transactionDate: new Date("2026-03-15T00:00:00.000Z"),
+    confidence: 0.78,
+    missingFields: [],
+  }]);
+  const service = new WhatsAppAgentService(repository as any, storage as any, {
+    parser: parser as any,
+    messenger: messenger as any,
+  });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const first = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-ok-1",
+    text: "paguei 18 no lanche",
+  }));
+  const second = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-ok-2",
+    text: "ok",
+  }));
+
+  assert.equal(first.status, "awaiting_user_confirmation");
+  assert.equal(second.status, "awaiting_user_confirmation");
+  assert.equal(storage.createTransactionCalls, 0);
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /responda/i);
 });
 
 test("WhatsAppAgentService asks for more details for low confidence messages", async () => {
@@ -1668,7 +1838,7 @@ test("WhatsAppAgentService updates the pending candidate account when the user c
   assert.match(messenger.sentMessages.at(-1)?.text || "", /Carteira PF/i);
 });
 
-test("WhatsAppAgentService auto creates transaction with multiple accounts of the same scope when recent history indicates the likely account", async () => {
+test("WhatsAppAgentService defaults to the first personal account when multiple PF accounts exist and the message does not define scope", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();
   const messenger = new FakeMessenger();
@@ -1742,11 +1912,11 @@ test("WhatsAppAgentService auto creates transaction with multiple accounts of th
 
   assert.equal(result.status, "auto_created_pending_review");
   assert.equal(storage.createTransactionCalls, 2);
-  assert.equal(storage.transactions.get("tx-2")?.accountId, "acc-2");
-  assert.equal(repository.candidates.get("candidate-1")?.evidence?.accountSelectionReason, "recent_history_default");
+  assert.equal(storage.transactions.get("tx-2")?.accountId, "acc-1");
+  assert.equal(repository.candidates.get("candidate-1")?.evidence?.accountSelectionReason, "default_personal_account");
 });
 
-test("WhatsAppAgentService asks for account selection when PF and PJ exist and the message does not define scope", async () => {
+test("WhatsAppAgentService defaults to the personal account when PF and PJ exist and the message does not define scope", async () => {
   const repository = new FakeRepository();
   const storage = new FakeStorage();
   const messenger = new FakeMessenger();
@@ -1809,10 +1979,11 @@ test("WhatsAppAgentService asks for account selection when PF and PJ exist and t
     text: "paguei 27 de uber",
   }));
 
-  assert.equal(result.status, "awaiting_account_selection");
-  assert.equal(storage.createTransactionCalls, 1);
-  assert.equal(repository.candidates.get("candidate-1")?.evidence?.accountSelectionReason, "ambiguous_scope_between_pf_pj");
-  assert.match(messenger.sentMessages.at(-1)?.text || "", /em qual conta devo lançar/i);
+  assert.equal(result.status, "auto_created_pending_review");
+  assert.equal(storage.createTransactionCalls, 2);
+  assert.equal(storage.transactions.get("tx-2")?.accountId, "acc-1");
+  assert.equal(repository.candidates.get("candidate-1")?.evidence?.accountSelectionReason, "default_personal_account");
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /Lançamento registrado/i);
 });
 
 test("WhatsAppAgentService falls back to pending confirmation when auto transaction persistence fails", async () => {
@@ -1849,7 +2020,7 @@ test("WhatsAppAgentService falls back to pending confirmation when auto transact
   assert.equal(result.status, "awaiting_user_confirmation");
   assert.equal(storage.createTransactionCalls, 0);
   assert.equal(repository.candidates.get("candidate-1")?.status, "awaiting_user_confirmation");
-  assert.match(messenger.sentMessages.at(-1)?.text || "", /nao consegui registrar automaticamente agora/i);
+  assert.match(messenger.sentMessages.at(-1)?.text || "", /não consegui registrar automaticamente agora/i);
 });
 
 test("WhatsAppAgentService updates and removes auto created review transactions", async () => {
@@ -1857,69 +2028,89 @@ test("WhatsAppAgentService updates and removes auto created review transactions"
   const storage = new FakeStorage();
   const messenger = new FakeMessenger();
   const service = new WhatsAppAgentService(repository as any, storage as any, { messenger: messenger as any });
+  const restoreGetUser = patchMethod(
+    storage as any,
+    "getUser",
+    (async (userId: string) => ({
+      id: userId,
+      email: "user@example.com",
+      password: "hashed",
+      fullName: "Teste",
+      plan: "premium",
+      trialStart: null,
+      trialEnd: null,
+      caktoSubscriptionId: "sub-1",
+      billingStatus: "active",
+      createdAt: new Date(),
+    })) as any,
+  );
 
-  const transaction = await storage.createTransaction({
-    userId: "user-1",
-    accountId: "acc-1",
-    description: "Compra no mercado",
-    type: "saida",
-    amount: 84.3,
-    category: "Alimentacao",
-    date: new Date("2026-03-15T00:00:00.000Z"),
-    accountType: "PF",
-    source: "whatsapp_agent",
-  });
+  try {
+    const transaction = await storage.createTransaction({
+      userId: "user-1",
+      accountId: "acc-1",
+      description: "Compra no mercado",
+      type: "saida",
+      amount: 84.3,
+      category: "Alimentacao",
+      date: new Date("2026-03-15T00:00:00.000Z"),
+      accountType: "PF",
+      source: "whatsapp_agent",
+    });
 
-  repository.candidates.set("candidate-1", {
-    id: "candidate-1",
-    user_id: "user-1",
-    inbound_message_id: "in-1",
-    proposed_type: "expense",
-    amount: 84.3,
-    currency: "BRL",
-    description: "Compra no mercado",
-    merchant_name: "Supermercado Central",
-    category_suggestion: "Alimentacao",
-    transaction_date: "2026-03-15T00:00:00.000Z",
-    confidence_score: 0.9,
-    status: "auto_created_pending_review",
-    evidence: { selectedAccountId: "acc-1", selectedAccountLabel: "Conta Principal PF" },
-    persisted_transaction_id: transaction.id,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  });
-  repository.inboundMessages.set("in-1", {
-    id: "in-1",
-    providerMessageId: "provider-review",
-    userId: "user-1",
-    fromPhone: "+5511999999999",
-    type: "text",
-    status: "auto_created_pending_review",
-    textBody: "mercado 84,30",
-    extractedPayload: null,
-    receivedAt: new Date().toISOString(),
-  });
+    repository.candidates.set("candidate-1", {
+      id: "candidate-1",
+      user_id: "user-1",
+      inbound_message_id: "in-1",
+      proposed_type: "expense",
+      amount: 84.3,
+      currency: "BRL",
+      description: "Compra no mercado",
+      merchant_name: "Supermercado Central",
+      category_suggestion: "Alimentacao",
+      transaction_date: "2026-03-15T00:00:00.000Z",
+      confidence_score: 0.9,
+      status: "auto_created_pending_review",
+      evidence: { selectedAccountId: "acc-1", selectedAccountLabel: "Conta Principal PF" },
+      persisted_transaction_id: transaction.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    repository.inboundMessages.set("in-1", {
+      id: "in-1",
+      providerMessageId: "provider-review",
+      userId: "user-1",
+      fromPhone: "+5511999999999",
+      type: "text",
+      status: "auto_created_pending_review",
+      textBody: "mercado 84,30",
+      extractedPayload: null,
+      receivedAt: new Date().toISOString(),
+    });
 
-  const updated = await service.updateReviewTransaction({
-    userId: "user-1",
-    candidateId: "candidate-1",
-    patch: {
-      description: "Compra de supermercado",
-      amount: 80,
-      category: "Supermercado",
-      date: new Date("2026-03-16T00:00:00.000Z"),
-    },
-  });
+    const updated = await service.updateReviewTransaction({
+      userId: "user-1",
+      candidateId: "candidate-1",
+      patch: {
+        description: "Compra de supermercado",
+        amount: 80,
+        category: "Supermercado",
+        date: new Date("2026-03-16T00:00:00.000Z"),
+      },
+    });
 
-  assert.equal(updated.transaction?.description, "Compra de supermercado");
-  assert.equal(repository.candidates.get("candidate-1")?.status, "reviewed_corrected");
+    assert.equal(updated.transaction?.description, "Compra de supermercado");
+    assert.equal(repository.candidates.get("candidate-1")?.status, "reviewed_corrected");
 
-  const removed = await service.removeReviewTransaction({
-    userId: "user-1",
-    candidateId: "candidate-1",
-  });
+    const removed = await service.removeReviewTransaction({
+      userId: "user-1",
+      candidateId: "candidate-1",
+    });
 
-  assert.equal(removed.removed, true);
-  assert.equal(storage.deleteTransactionCalls, 1);
-  assert.equal(repository.candidates.get("candidate-1")?.status, "reviewed_removed");
+    assert.equal(removed.removed, true);
+    assert.equal(storage.deleteTransactionCalls, 1);
+    assert.equal(repository.candidates.get("candidate-1")?.status, "reviewed_removed");
+  } finally {
+    restoreGetUser();
+  }
 });

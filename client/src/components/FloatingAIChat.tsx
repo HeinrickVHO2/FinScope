@@ -191,7 +191,7 @@ export function FloatingAIChat() {
                 Assistente com IA
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Registre gastos, receitas e contas futuras sem sair da tela.
+                O padrao e a conta pessoal. Para lancar na empresa, mencione isso explicitamente.
               </p>
             </div>
             <Button

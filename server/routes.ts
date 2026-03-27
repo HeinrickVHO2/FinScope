@@ -1580,22 +1580,12 @@ type AiInterpretationResult =
   async function ensureDefaultAccounts(userId: string, plan: string) {
     const accounts = await storage.getAccountsByUserId(userId);
     const hasPF = accounts.some((account) => account.type?.toLowerCase() === "pf");
-    const hasPJ = accounts.some((account) => account.type?.toLowerCase() === "pj");
 
     if (!hasPF) {
       await storage.createAccount({
         userId,
         name: "Conta pessoal",
         type: "pf",
-        initialBalance: 0,
-      });
-    }
-
-    if (canUseBusinessArea(plan) && !hasPJ) {
-      await storage.createAccount({
-        userId,
-        name: "Minha empresa",
-        type: "pj",
         initialBalance: 0,
       });
     }
