@@ -63,6 +63,24 @@ test("parseAssistantRouteIntent identifica meta, aporte e lembrete", () => {
     initialContribution: 4200,
   });
 
+  const debtGoalWithBank = parseAssistantRouteIntent("Quero pagar uma divida de 5 mil reais no santander, ja tenho 2 mil reais guardado");
+  assert.deepEqual(debtGoalWithBank, {
+    type: "create_goal",
+    title: "divida",
+    targetValue: 5000,
+    initialContribution: 2000,
+  });
+
+  const investmentWithTarget = parseAssistantRouteIntent("Guardei 5 mil reais em um CDB do itau, minha meta e ter 23 mil nesse cdb");
+  assert.deepEqual(investmentWithTarget, {
+    type: "upsert_investment",
+    title: "CDB do itau",
+    investmentType: "cdb",
+    depositAmount: 5000,
+    targetValue: 23000,
+    explicitNew: false,
+  });
+
   const reminder = parseAssistantRouteIntent("Boleto do carro todo dia 12, R$ 1300");
   assert.deepEqual(reminder, {
     type: "create_reminder",

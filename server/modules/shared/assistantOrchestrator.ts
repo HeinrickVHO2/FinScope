@@ -3,7 +3,8 @@ import { CategoryLimitService } from "./categoryLimitService";
 import { buildStructuredFinancialSummary } from "./financialAssistant";
 import { buildFinancialSummaryPayload, formatFinancialSummaryText, type FinancialSummaryPayload } from "./financialSummaryService";
 import { GoalService } from "./goalService";
-import { looksLikeAssistantOrchestratorMessage, parseAssistantRouteIntent, type SummaryIntentFocus } from "./intentRouter";
+import { resolveAccountForText } from "./financialMessagePolicy";
+import { looksLikeAssistantOrchestratorMessage, parseAssistantRouteIntent, type AssistantInvestmentType, type SummaryIntentFocus } from "./intentRouter";
 import { resolveModelForIntent, type ModelSelection } from "./modelRouter";
 import { canUseAdvancedInternalAi } from "../../../shared/plans";
 
@@ -47,6 +48,73 @@ function formatTopicBlocks(sections: Array<{ title: string; body: string | null 
 
 function toNumber(value: string | number | null | undefined) {
   return Number(Number(value || 0).toFixed(2));
+}
+
+function normalizeEntityName(value: string) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function defaultInvestmentTitle(type: AssistantInvestmentType) {
+  if (type === "cdb") return "CDB";
+  if (type === "renda_fixa") return "Renda fixa";
+  if (type === "renda_variavel") return "Renda variavel";
+  return "Reserva de emergencia";
+}
+
+function isGenericInvestmentTitle(title: string, type: AssistantInvestmentType) {
+  return normalizeEntityName(title) === normalizeEntityName(defaultInvestmentTitle(type));
+}
+
+function findAssistantInvestmentMatch(
+  investments: Array<{ id: string; name: string; type: string }>,
+  title: string,
+  type: AssistantInvestmentType,
+  explicitNew = false,
+) {
+  if (explicitNew) return null;
+
+  const normalizedTitle = normalizeEntityName(title);
+  const exactName = investments.find((investment) => normalizeEntityName(investment.name) === normalizedTitle);
+  if (exactName) return exactName;
+
+  const sameType = investments.filter((investment) => normalizeEntityName(investment.type) === normalizeEntityName(type));
+  if (sameType.length === 1 && isGenericInvestmentTitle(title, type)) {
+    return sameType[0];
+  }
+
+  return null;
+}
+
+function buildInvestmentUiPayload(params: {
+  title: string;
+  investmentType: AssistantInvestmentType;
+  currentAmount: number;
+  targetValue?: number | null;
+}): AgentUiPayload {
+  return {
+    type: "investment_progress",
+    title: params.title,
+    route: "/investments",
+    view: "investments",
+    cards: [
+      { label: "Tipo", value: params.investmentType },
+      { label: "Investido", value: params.currentAmount },
+      ...(params.targetValue ? [{ label: "Meta", value: params.targetValue }] : []),
+    ],
+    progress: params.targetValue
+      ? {
+          current: params.currentAmount,
+          target: params.targetValue,
+          remaining: Math.max(0, Number((params.targetValue - params.currentAmount).toFixed(2))),
+          percentage: Number(((params.currentAmount / Math.max(1, params.targetValue)) * 100).toFixed(2)),
+        }
+      : undefined,
+  };
 }
 
 function resolveNextDueDate(dayOfMonth: number, reference = new Date()) {
@@ -580,6 +648,88 @@ export class AssistantOrchestrator {
             goal: item.goal ?? null,
           })),
         },
+        model: modelSelection,
+      });
+    }
+
+    if (intent.type === "upsert_investment") {
+      const accounts = await this.storage.getAccountsByUserId(params.userId);
+      if (!accounts.length) {
+        throw new Error("Cadastre uma conta antes de registrar investimentos.");
+      }
+
+      const accountResolution = resolveAccountForText(accounts, params.text);
+      if (!accountResolution.ok || !accountResolution.account) {
+        throw new Error(accountResolution.message || "Nao consegui definir a conta de origem do investimento.");
+      }
+
+      const existingInvestments = await this.storage.getInvestmentsByUserId(params.userId);
+      const matchedInvestment = findAssistantInvestmentMatch(
+        existingInvestments as Array<{ id: string; name: string; type: string }>,
+        intent.title,
+        intent.investmentType,
+        intent.explicitNew,
+      );
+
+      const investment = matchedInvestment
+        ? matchedInvestment
+        : await this.storage.createInvestment({
+            userId: params.userId,
+            name: intent.title,
+            type: intent.investmentType,
+          });
+
+      let currentAmount = toNumber((investment as any).currentAmount);
+      let transaction: any = null;
+
+      if (intent.depositAmount && intent.depositAmount > 0) {
+        transaction = await this.storage.createInvestmentTransaction({
+          userId: params.userId,
+          investmentId: investment.id,
+          sourceAccountId: accountResolution.account.id,
+          amount: intent.depositAmount,
+          type: "deposit",
+          date: new Date(),
+          note: "Aporte via assistente",
+        });
+        currentAmount = Number((currentAmount + intent.depositAmount).toFixed(2));
+      }
+
+      const investmentGoal = intent.targetValue && intent.targetValue > 0
+        ? await this.storage.createOrUpdateInvestmentGoal({
+            userId: params.userId,
+            investmentId: investment.id,
+            targetAmount: intent.targetValue,
+          })
+        : null;
+
+      const detailLines = [
+        `Investimento: ${investment.name}`,
+        ...(intent.depositAmount ? [`Aporte: ${formatCurrency(intent.depositAmount)}`] : []),
+        ...(investmentGoal ? [`Meta: ${formatCurrency(toNumber(investmentGoal.targetAmount))}`] : []),
+        `Saldo investido: ${formatCurrency(currentAmount)}`,
+      ];
+
+      return buildResponse({
+        intent: "investments.upsert",
+        action: matchedInvestment ? "update_investment" : "create_investment",
+        message: `📈 Investimento registrado\n\n${bulletLines(detailLines)}`,
+        data: {
+          route: "/investments",
+          view: "investments",
+          investment: {
+            ...investment,
+            currentAmount: String(currentAmount),
+          },
+          transaction,
+          goal: investmentGoal,
+        },
+        uiPayload: buildInvestmentUiPayload({
+          title: investment.name,
+          investmentType: intent.investmentType,
+          currentAmount,
+          targetValue: investmentGoal ? toNumber(investmentGoal.targetAmount) : intent.targetValue ?? null,
+        }),
         model: modelSelection,
       });
     }

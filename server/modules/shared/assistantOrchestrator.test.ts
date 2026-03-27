@@ -6,9 +6,28 @@ import { GoalService } from "./goalService";
 
 function buildFakeStorage() {
   const reminders: any[] = [];
+  const accounts = [
+    {
+      id: "acc-1",
+      userId: "user-1",
+      name: "Conta pessoal",
+      type: "pf",
+      businessCategory: null,
+      initialBalance: "0",
+      createdAt: new Date(),
+    },
+  ];
+  const investments: any[] = [];
+  const investmentGoals = new Map<string, any>();
+  const investmentTransactions: any[] = [];
 
   return {
     reminders,
+    investments,
+    investmentTransactions,
+    async getAccountsByUserId() {
+      return accounts;
+    },
     async getTransactionsByUserId() {
       return [
         {
@@ -63,6 +82,45 @@ function buildFakeStorage() {
           { type: "reserva_emergencia", amount: 1700, goal: 5000 },
         ],
       };
+    },
+    async getInvestmentsByUserId() {
+      return investments;
+    },
+    async createInvestment(payload: any) {
+      const investment = {
+        id: `inv-${investments.length + 1}`,
+        userId: payload.userId,
+        name: payload.name,
+        type: payload.type,
+        currentAmount: "0",
+        createdAt: new Date(),
+      };
+      investments.push(investment);
+      return investment;
+    },
+    async createInvestmentTransaction(payload: any) {
+      const investment = investments.find((item) => item.id === payload.investmentId);
+      if (!investment) throw new Error("Investimento nao encontrado no mock");
+      investment.currentAmount = String(Number(investment.currentAmount || 0) + Number(payload.amount || 0));
+      const transaction = {
+        id: `inv-tx-${investmentTransactions.length + 1}`,
+        ...payload,
+        createdAt: new Date(),
+      };
+      investmentTransactions.push(transaction);
+      return transaction;
+    },
+    async createOrUpdateInvestmentGoal(payload: any) {
+      const record = {
+        id: investmentGoals.get(payload.investmentId)?.id || `inv-goal-${investmentGoals.size + 1}`,
+        userId: payload.userId,
+        investmentId: payload.investmentId,
+        targetAmount: String(payload.targetAmount),
+        targetDate: payload.targetDate ?? null,
+        createdAt: new Date(),
+      };
+      investmentGoals.set(payload.investmentId, record);
+      return record;
     },
   };
 }
@@ -124,6 +182,7 @@ test("AssistantOrchestrator responde resumo e status de limites", async () => {
       userId: "user-1",
       text: "como estao meus limites de gastos?",
       channel: "whatsapp",
+      plan: "premium",
     });
     assert.equal(limits.handled, true);
     assert.match(limits.reply || "", /Seus limites ativos/i);
@@ -272,6 +331,29 @@ test("AssistantOrchestrator cria meta, registra aporte e lista metas com payload
   }
 });
 
+test("AssistantOrchestrator interpreta investimento novo sem transformar em aporte de meta", async () => {
+  const storage = buildFakeStorage();
+  const orchestrator = new AssistantOrchestrator(storage as any);
+
+  const response = await orchestrator.handleMessage({
+    userId: "user-1",
+    text: "Guardei 5 mil reais em um CDB do itau, minha meta e ter 23 mil nesse cdb",
+    channel: "whatsapp",
+    plan: "pro",
+  });
+
+  assert.equal(response.handled, true);
+  assert.equal(response.intent, "investments.upsert");
+  assert.equal((response.payload as any)?.data?.route, "/investments");
+  assert.equal((response.payload as any)?.data?.investment?.name, "CDB do itau");
+  assert.equal((response.payload as any)?.data?.investment?.type, "cdb");
+  assert.equal((response.payload as any)?.data?.goal?.targetAmount, "23000");
+  assert.equal(storage.investments[0]?.currentAmount, "5000");
+  assert.equal(storage.investmentTransactions[0]?.amount, 5000);
+  assert.match(response.reply || "", /23\.000,00|23000/i);
+  assert.match(response.reply || "", /5\.000,00|5000/i);
+});
+
 test("AssistantOrchestrator mantém bloqueio de orientação avançada no plano Pro", async () => {
   const orchestrator = new AssistantOrchestrator(buildFakeStorage() as any);
 
@@ -312,10 +394,11 @@ test("AssistantOrchestrator cria lembrete, marca como pago, resume investimentos
     userId: "user-1",
     text: "como estao meus investimentos?",
     channel: "internal_chat",
+    plan: "premium",
   });
   assert.equal(investments.handled, true);
   assert.equal((investments.payload as any)?.data?.route, "/investments");
-  assert.match(investments.reply || "", /investidos/i);
+  assert.match(investments.reply || "", /investimentos|total investido/i);
 
   const switchView = await orchestrator.handleMessage({
     userId: "user-1",
@@ -383,6 +466,7 @@ test("AssistantOrchestrator usa dados da conta para dicas financeiras com payloa
     userId: "user-1",
     text: "me de dicas para economizar",
     channel: "whatsapp",
+    plan: "premium",
   });
 
   assert.equal(guidance.handled, true);

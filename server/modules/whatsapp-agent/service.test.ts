@@ -176,6 +176,9 @@ class FakeStorage {
   public failCreateTransaction = false;
   public transactions = new Map<string, any>();
   public futureExpenses = new Map<string, any>();
+  public investments = new Map<string, any>();
+  public investmentGoals = new Map<string, any>();
+  public investmentTransactions = new Map<string, any>();
   public createFutureExpenseCalls = 0;
   public accounts = [
     {
@@ -327,6 +330,53 @@ class FakeStorage {
 
   async getFutureTransactions() {
     return [];
+  }
+
+  async getInvestmentsByUserId(userId: string) {
+    return Array.from(this.investments.values()).filter((item) => item.userId === userId);
+  }
+
+  async createInvestment(payload: any) {
+    const investment = {
+      id: `inv-${this.investments.size + 1}`,
+      userId: payload.userId,
+      name: payload.name,
+      type: payload.type,
+      currentAmount: "0",
+      createdAt: new Date(),
+    };
+    this.investments.set(investment.id, investment);
+    return investment;
+  }
+
+  async createInvestmentTransaction(payload: any) {
+    const investment = this.investments.get(payload.investmentId);
+    if (!investment) {
+      throw new Error("Investimento nao encontrado no mock");
+    }
+
+    investment.currentAmount = String(Number(investment.currentAmount || 0) + Number(payload.amount || 0));
+    const transaction = {
+      id: `inv-tx-${this.investmentTransactions.size + 1}`,
+      ...payload,
+      createdAt: new Date(),
+    };
+    this.investmentTransactions.set(transaction.id, transaction);
+    return transaction;
+  }
+
+  async createOrUpdateInvestmentGoal(payload: any) {
+    const existing = Array.from(this.investmentGoals.values()).find((item) => item.investmentId === payload.investmentId) || null;
+    const goal = {
+      id: existing?.id || `inv-goal-${this.investmentGoals.size + 1}`,
+      userId: payload.userId,
+      investmentId: payload.investmentId,
+      targetAmount: String(payload.targetAmount),
+      targetDate: payload.targetDate ?? null,
+      createdAt: existing?.createdAt || new Date(),
+    };
+    this.investmentGoals.set(goal.id, goal);
+    return goal;
   }
 
   async getInvestmentsSummary() {
@@ -1223,6 +1273,35 @@ test("WhatsAppAgentService interpreta objetivo de quitar divida como meta com ap
     restoreCreateGoal();
     restoreAddContribution();
   }
+});
+
+test("WhatsAppAgentService interpreta investimento novo com meta propria sem reaproveitar a ultima meta", async () => {
+  const repository = new FakeRepository();
+  const storage = new FakeStorage();
+  const messenger = new FakeMessenger();
+  const service = new WhatsAppAgentService(repository as any, storage as any, { messenger: messenger as any });
+
+  await repository.saveVerifiedBinding({
+    userId: "user-1",
+    phone: "+5511999999999",
+    provider: "mock",
+  });
+
+  const result = await service.processInboundEvent(buildBaseEvent({
+    providerMessageId: "provider-new-investment-target",
+    text: "Guardei 5 mil reais em um CDB do itau, minha meta e ter 23 mil nesse cdb",
+  }));
+
+  assert.equal(result.status, "assistant_answered");
+  assert.equal(storage.investments.size, 1);
+  assert.equal(storage.investmentTransactions.size, 1);
+  assert.equal(storage.investmentGoals.size, 1);
+  assert.equal(storage.investments.get("inv-1")?.name, "CDB do itau");
+  assert.equal(storage.investments.get("inv-1")?.type, "cdb");
+  assert.equal(storage.investments.get("inv-1")?.currentAmount, "5000");
+  assert.equal(Array.from(storage.investmentGoals.values())[0]?.targetAmount, "23000");
+  assert.match(messenger.sentMessages[0]?.text || "", /Investimento registrado/i);
+  assert.match(messenger.sentMessages[0]?.text || "", /23\.000,00|23000/i);
 });
 
 test("WhatsAppAgentService envia grafico ao resumir metas no WhatsApp", async () => {

@@ -8,12 +8,26 @@ export type SummaryIntentFocus =
   | "largest_expense"
   | "increase_reason";
 
+export type AssistantInvestmentType =
+  | "reserva_emergencia"
+  | "cdb"
+  | "renda_fixa"
+  | "renda_variavel";
+
 export type AssistantRouteIntent =
   | { type: "summary"; periodKey: SummaryPeriodKey; focus: SummaryIntentFocus }
   | { type: "financial_guidance" }
   | { type: "limits_status" }
   | { type: "upsert_limit"; category: string; amount: number; scope: "PF" | "PJ" | "ALL" }
   | { type: "investments_summary" }
+  | {
+      type: "upsert_investment";
+      title: string;
+      investmentType: AssistantInvestmentType;
+      depositAmount?: number;
+      targetValue?: number;
+      explicitNew?: boolean;
+    }
   | { type: "switch_financial_view"; view: "goals" | "investments" }
   | { type: "create_goal"; title: string; targetValue: number; initialContribution?: number }
   | { type: "add_goal_contribution"; amount: number }
@@ -50,6 +64,17 @@ function stripLeadingArticle(value: string) {
   return value.replace(/^(um|uma|o|a|os|as)\s+/i, "").trim();
 }
 
+function cleanExtractedTitle(value: string) {
+  return stripLeadingArticle(
+    value
+      .replace(/\b(?:no valor|valor|preciso|quero|tenho|ja tenho|j[aá] tenho|ja juntei|j[aá] juntei|ja guardei|j[aá] guardei)\b.*$/i, "")
+      .replace(/\bde\s+(?:r\$\s*)?\d[\d.,]*(?:\s*(?:reais?|rs|k|mil|milhao|milhoes))?/i, "")
+      .replace(/[,.!?;:]+$/g, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+}
+
 function parseGoalTitle(rawText: string) {
   const patterns = [
     /meta\s+para\s+(.+?)(?:,| no valor| valendo| preciso| quero| tenho| por\s+\d| de\s+\d|$)/i,
@@ -64,7 +89,8 @@ function parseGoalTitle(rawText: string) {
     const match = rawText.match(pattern);
     if (match?.[1]) {
       const value = stripLeadingArticle(match[1].trim());
-      if (value) return value;
+      const cleaned = cleanExtractedTitle(value);
+      if (cleaned) return cleaned;
     }
   }
 
@@ -95,6 +121,7 @@ function parseGoalTargetValue(rawText: string) {
     /preciso de\s+([^!?\n]+)/i,
     /objetivo de\s+([^!?\n]+)/i,
     /meta de\s+([^!?\n]+)/i,
+    /(?:pagar|quitar)\s+(?:uma\s+|a\s+)?[^!?\n,]*?\bde\s+([^!?\n]+)/i,
     /quero comprar .*?\bde\s+([^!?\n]+)/i,
     /para comprar .*?\bde\s+([^!?\n]+)/i,
     /para .*?\bde\s+([^!?\n]+)/i,
@@ -107,7 +134,7 @@ function parseGoalTargetValue(rawText: string) {
     if (amount) return amount;
   }
 
-  return parseMonetaryAmountFromNaturalLanguage(rawText);
+  return parseFirstCurrencyLikeAmount(rawText) ?? parseMonetaryAmountFromNaturalLanguage(rawText);
 }
 
 function parseGoalInitialContribution(rawText: string) {
@@ -128,6 +155,90 @@ function parseGoalInitialContribution(rawText: string) {
   }
 
   return null;
+}
+
+function detectInvestmentType(normalized: string): AssistantInvestmentType | null {
+  if (/\b(cdb|certificado de deposito bancario)\b/.test(normalized)) return "cdb";
+  if (/\b(renda fixa|lci|lca|tesouro direto|tesouro selic)\b/.test(normalized)) return "renda_fixa";
+  if (/\b(renda variavel|acoes|acao|etf|fii|fundo imobiliario|bolsa)\b/.test(normalized)) return "renda_variavel";
+  if (/\b(reserva de emergencia|fundo de emergencia|emergencia)\b/.test(normalized)) return "reserva_emergencia";
+  return null;
+}
+
+function defaultInvestmentTitle(type: AssistantInvestmentType) {
+  if (type === "cdb") return "CDB";
+  if (type === "renda_fixa") return "Renda fixa";
+  if (type === "renda_variavel") return "Renda variavel";
+  return "Reserva de emergencia";
+}
+
+function looksLikeInvestmentIntent(normalized: string) {
+  const investmentType = detectInvestmentType(normalized);
+  if (!investmentType) return false;
+
+  return /\b(guardei|guardar|investi|investir|aportei|aporte|apliquei|aplicar|depositei|depositar|coloquei|colocar|pus|separei|meta|objetivo|pretendo|quero ter|quero chegar|tenho investido|tenho aplicado)\b/.test(normalized);
+}
+
+function parseInvestmentTargetValue(rawText: string) {
+  const patterns = [
+    /minha meta\s+(?:e|é)\s+ter\s+([^!?\n]+)/i,
+    /meta\s+(?:e|é)\s+ter\s+([^!?\n]+)/i,
+    /objetivo\s+(?:e|é)\s+ter\s+([^!?\n]+)/i,
+    /pretendo\s+(?:juntar|ter|chegar(?:\s+em)?)\s+([^!?\n]+)/i,
+    /quero\s+ter\s+([^!?\n]+)/i,
+    /quero\s+chegar(?:\s+em)?\s+([^!?\n]+)/i,
+    /meta\s+de\s+([^!?\n]+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = rawText.match(pattern);
+    if (!match?.[1]) continue;
+    const amount = parseFirstCurrencyLikeAmount(match[1]) ?? parseMonetaryAmountFromNaturalLanguage(match[1]);
+    if (amount) return amount;
+  }
+
+  return null;
+}
+
+function parseInvestmentDepositAmount(rawText: string, normalized: string) {
+  const depositPatterns = [
+    /(?:ja tenho|j[aá] tenho)\s+(.+?)(?:\s+(?:em|no|na|num|numa)\s+[^!?\n]+)?$/i,
+    /(?:guardei|investi|aportei|apliquei|depositei|coloquei|pus|separei)\s+(.+?)(?:\s+(?:em|no|na|num|numa)\s+[^!?\n]+)?$/i,
+  ];
+
+  const targetCue = rawText.search(/(?:minha meta\s+(?:e|é)|meta\s+(?:e|é)|objetivo\s+(?:e|é)|pretendo|quero\s+ter|quero\s+chegar)/i);
+  const leadingText = targetCue > 0 ? rawText.slice(0, targetCue) : rawText;
+
+  for (const pattern of depositPatterns) {
+    const match = leadingText.match(pattern);
+    if (!match?.[1]) continue;
+    const amount = parseFirstCurrencyLikeAmount(match[1]) ?? parseMonetaryAmountFromNaturalLanguage(match[1]);
+    if (amount) return amount;
+  }
+
+  if (/\b(guardei|investi|aportei|apliquei|depositei|coloquei|pus|separei)\b/.test(normalized)) {
+    return parseFirstCurrencyLikeAmount(leadingText) ?? parseMonetaryAmountFromNaturalLanguage(leadingText);
+  }
+
+  return null;
+}
+
+function parseInvestmentTitle(rawText: string, type: AssistantInvestmentType) {
+  const patterns = [
+    /\b(cdb(?:\s+(?:do|da|de)\s+[^,.;!\n]+)?)/i,
+    /\b(renda fixa(?:\s+(?:do|da|de)\s+[^,.;!\n]+)?)/i,
+    /\b(renda variavel(?:\s+(?:do|da|de)\s+[^,.;!\n]+)?)/i,
+    /\b(reserva de emergencia(?:\s+(?:do|da|de)\s+[^,.;!\n]+)?)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = rawText.match(pattern);
+    if (!match?.[1]) continue;
+    const cleaned = cleanExtractedTitle(match[1]);
+    if (cleaned) return cleaned;
+  }
+
+  return defaultInvestmentTitle(type);
 }
 
 function parseLimitCategory(rawText: string) {
@@ -328,6 +439,24 @@ export function parseAssistantRouteIntent(text: string): AssistantRouteIntent | 
     }
   }
 
+  if (looksLikeInvestmentIntent(normalized)) {
+    const investmentType = detectInvestmentType(normalized);
+    if (investmentType) {
+      const targetValue = parseInvestmentTargetValue(text);
+      const depositAmount = parseInvestmentDepositAmount(text, normalized);
+      if (targetValue || depositAmount) {
+        return {
+          type: "upsert_investment",
+          title: parseInvestmentTitle(text, investmentType),
+          investmentType,
+          ...(depositAmount ? { depositAmount } : {}),
+          ...(targetValue ? { targetValue } : {}),
+          explicitNew: /\b(novo|nova)\b/.test(normalized),
+        };
+      }
+    }
+  }
+
   if (looksLikeGoalIntent(normalized)) {
     const targetValue = parseGoalTargetValue(text);
     if (targetValue) {
@@ -341,7 +470,7 @@ export function parseAssistantRouteIntent(text: string): AssistantRouteIntent | 
     }
   }
 
-  if (/ja guardei|guardei|aportei|adicionei .* meta|separei .* meta/.test(normalized)) {
+  if (!looksLikeInvestmentIntent(normalized) && /ja guardei|guardei|aportei|adicionei .* meta|separei .* meta/.test(normalized)) {
     const amount = parseMonetaryAmountFromNaturalLanguage(text);
     if (amount) return { type: "add_goal_contribution", amount };
   }
