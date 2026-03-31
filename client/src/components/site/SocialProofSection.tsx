@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Star, Quote, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -10,104 +11,100 @@ import { useAuth } from "@/lib/auth";
 const testimonials = [
   {
     name: "Juliana, autonoma",
-    quote:
-      "Agora eu sei para onde meu dinheiro estava indo. No fim do mes, fico mais tranquila para decidir.",
-    focus: "Mais clareza no dia a dia",
+    quote: "Antes eu so sentia culpa no fim do mes. Agora eu bato o olho e entendo o que realmente aconteceu.",
+    focus: "Clareza para decidir sem ansiedade",
     image: JulianaImage,
   },
   {
     name: "Rafael, pequeno negocio",
-    quote:
-      "Consegui enxergar meus gastos do mes com clareza e separar melhor o que e pessoal e o que e do negocio.",
-    focus: "Organizacao entre PF e negocio",
+    quote: "Consegui separar melhor o que era pessoal e o que era da empresa. Isso sozinho ja tirou um peso enorme.",
+    focus: "Menos mistura, mais controle",
     image: RafaelImage,
   },
   {
     name: "Camila, marketing",
-    quote:
-      "Passei a planejar melhor e gastar com mais consciencia. Minhas contas ficaram muito mais organizadas.",
-    focus: "Planejamento mais leve",
+    quote: "Passei a perceber meus excessos antes. Parei de descobrir o problema so quando o saldo apertava.",
+    focus: "Correcao mais rapida do mes",
     image: CamilaImage,
   },
+];
+
+const reassurancePoints = [
+  "Leitura simples para quem nao aguenta mais planilha",
+  "Mais tranquilidade para enxergar o mes sem drama",
+  "Mais clareza entre o que pesa e o que realmente importa",
 ];
 
 export function SocialProofSection() {
   const { user } = useAuth();
   const ctaHref = user ? "/dashboard" : "/signup";
-  const ctaLabel = user ? "Ir para o painel" : "Cadastre-se";
+  const ctaLabel = user ? "Ir para meu painel" : "Comecar meu controle agora";
 
   return (
-    <section className="border-t border-slate-200 bg-gradient-to-b from-slate-50 via-white to-slate-50 py-16 text-slate-900">
+    <section className="border-t border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] py-16 text-slate-900 md:py-20">
       <div className="mx-auto max-w-6xl space-y-10 px-4">
-        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-3">
-            <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Resultados reais</p>
-            <h2 className="font-poppins text-3xl font-bold md:text-4xl">Quem usa, aprova</h2>
-            <p className="max-w-2xl text-slate-600">
-              Historias de quem ganhou mais clareza para acompanhar o mes e tomar decisoes com calma.
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-4">
+            <Badge className="w-fit border-0 bg-emerald-100 text-emerald-900">Resultados percebidos</Badge>
+            <h2 className="font-poppins text-3xl font-bold leading-tight md:text-4xl">
+              Quando voce finalmente enxerga, fica mais facil mudar.
+            </h2>
+            <p className="max-w-2xl text-base leading-relaxed text-slate-600 md:text-lg">
+              O beneficio mais citado nao e um grafico bonito. E a sensacao de parar de adivinhar o que aconteceu com o dinheiro.
             </p>
           </div>
+
           <Link href={ctaHref}>
-            <Button className="bg-primary text-white shadow-sm hover:bg-primary/90">
+            <Button className="min-h-12 rounded-xl bg-slate-950 px-6 text-white hover:bg-slate-900">
               {ctaLabel}
-              <ArrowRight className="ml-2 h-4 w-4" />
+              <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
-          <Card className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm md:col-span-2 md:p-7">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1 text-amber-400">
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <Star key={index} className="h-5 w-5 fill-current" />
-                  ))}
+        <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+          <Card className="rounded-[30px] border border-slate-200 bg-slate-950 p-7 text-white shadow-[0_22px_60px_rgba(15,23,42,0.18)]">
+            <div className="flex items-center gap-2 text-amber-300">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Star key={index} className="h-5 w-5 fill-current" />
+              ))}
+            </div>
+
+            <p className="mt-5 text-2xl font-semibold leading-snug md:text-3xl">
+              "Eu preciso disso" acontece quando a pessoa percebe o quanto custa continuar no escuro.
+            </p>
+
+            <div className="mt-6 grid gap-3">
+              {reassurancePoints.map((point) => (
+                <div key={point} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-sm leading-relaxed text-slate-200">{point}</p>
                 </div>
-                <p className="text-lg font-semibold text-slate-900">Feedback positivo de usuarios</p>
-              </div>
-              <p className="text-sm leading-relaxed text-slate-600">
-                O retorno mais comum e simples: mais controle da rotina e menos duvidas sobre o dinheiro no fim do mes.
-              </p>
-              <div className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-base font-semibold text-slate-900">Mais clareza</p>
-                  <p className="text-slate-600">Visao do que entrou, saiu e do que ainda precisa pagar.</p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-base font-semibold text-slate-900">Mais organizacao</p>
-                  <p className="text-slate-600">Planejamento mensal com prioridades mais definidas.</p>
-                </div>
-              </div>
+              ))}
             </div>
           </Card>
 
-          {testimonials.map((testimonial) => (
-            <Card
-              key={testimonial.name}
-              className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm transition-shadow hover:shadow-md"
-            >
-              <div className="flex items-center gap-3">
-                {testimonial.image ? (
+          <div className="grid gap-4">
+            {testimonials.map((testimonial) => (
+              <Card
+                key={testimonial.name}
+                className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.06)]"
+              >
+                <div className="flex items-center gap-3">
                   <img
                     src={testimonial.image}
                     alt={testimonial.name}
-                    className="h-10 w-10 rounded-full border border-slate-200 object-cover"
+                    className="h-11 w-11 rounded-full border border-slate-200 object-cover"
                   />
-                ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
-                    {testimonial.name[0]}
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">{testimonial.name}</p>
+                    <p className="text-xs text-slate-500">{testimonial.focus}</p>
                   </div>
-                )}
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{testimonial.name}</p>
-                  <p className="text-xs text-slate-500">{testimonial.focus}</p>
                 </div>
-              </div>
-              <Quote className="h-5 w-5 text-primary" />
-              <p className="text-sm leading-relaxed text-slate-700">{testimonial.quote}</p>
-            </Card>
-          ))}
+                <Quote className="mt-4 h-5 w-5 text-sky-700" />
+                <p className="mt-3 text-sm leading-relaxed text-slate-700">{testimonial.quote}</p>
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
     </section>

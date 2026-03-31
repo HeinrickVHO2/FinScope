@@ -1,94 +1,122 @@
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Check, Shield, Timer } from "lucide-react";
+import { ArrowRight, Brain, CheckCircle2, Clock3, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
-const microClaims = [
-  { icon: Shield, label: "Seguranca e privacidade" },
-  { icon: Timer, label: "Comece sem complicacao" },
-  { icon: Check, label: "Voce no controle" },
+const trustSignals = [
+  { icon: Brain, label: "IA que organiza seus gastos sem planilha" },
+  { icon: ShieldCheck, label: "Checkout com 14 dias de garantia" },
+  { icon: Clock3, label: "Comece em poucos minutos" },
+];
+
+const heroBullets = [
+  "Descubra para onde seu dinheiro esta escapando antes do fim do mes apertar",
+  "Separe vida pessoal e negocio sem montar uma rotina complicada",
+  "Veja saldo, despesas e proximos impactos em uma tela facil de entender",
 ];
 
 export function HeroSection() {
   const { user } = useAuth();
   const primaryHref = user ? "/dashboard" : "/signup";
-  const secondaryHref = user ? "/settings" : "/login";
-  const primaryLabel = user ? "Ir para o painel" : "Cadastre-se";
-  const secondaryLabel = user ? "Ver configuracoes" : "Acessar";
+  const secondaryHref = user ? "/dashboard" : "/login";
+  const primaryLabel = user ? "Abrir meu painel" : "Quero ver para onde meu dinheiro vai";
+  const secondaryLabel = user ? "Ver meus numeros agora" : "Ja tenho conta";
 
   return (
-    <section className="relative overflow-hidden bg-white text-slate-900">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.08),_transparent_35%)]" />
-      <div className="absolute inset-y-0 right-0 w-[40%] bg-[radial-gradient(circle_at_center,_rgba(37,99,235,0.05),_transparent_45%)]" />
+    <section className="relative overflow-hidden bg-[linear-gradient(180deg,#f8fbff_0%,#f6f2ea_52%,#ffffff_100%)] text-slate-900">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(14,116,144,0.14),_transparent_34%)]" />
+      <div className="absolute right-0 top-0 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,_rgba(59,130,246,0.18),_transparent_62%)] blur-3xl" />
 
-      <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pb-12 pt-16 md:pb-20 md:pt-20 lg:grid-cols-2">
+      <div className="relative mx-auto grid max-w-6xl gap-10 px-4 pb-14 pt-10 md:pb-20 md:pt-14 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
         <div className="space-y-6">
-          <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary">
-            Controle financeiro sem complicacao
+          <Badge className="w-fit border-0 bg-amber-100 px-3 py-1.5 text-amber-900 shadow-sm">
+            Pare de perder dinheiro no escuro
           </Badge>
 
           <div className="space-y-4">
-            <h1 className="font-poppins text-4xl font-bold leading-tight text-slate-900 md:text-5xl">
-              Organize seu mes com clareza, metas e leitura financeira no mesmo painel.
+            <h1 className="max-w-2xl font-poppins text-4xl font-bold leading-tight text-slate-950 md:text-5xl lg:text-6xl">
+              Voce trabalha, recebe e mesmo assim termina o mes sem entender para onde o dinheiro foi.
             </h1>
-            <p className="max-w-xl text-lg leading-relaxed text-slate-600">
-              O FinScope reune visao geral, resumo inteligente, assistente com IA e organizacao da rotina
-              financeira em uma experiencia direta para voce acompanhar e decidir melhor.
+            <p className="max-w-xl text-lg leading-relaxed text-slate-700 md:text-xl">
+              O FinScope mostra o que esta pesando no seu bolso, organiza sua rotina com IA e devolve
+              clareza para voce agir antes do problema crescer.
             </p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link href={primaryHref}>
-              <Button size="lg" className="w-full sm:w-auto">
+              <Button size="lg" className="min-h-12 w-full rounded-xl bg-slate-950 px-6 text-base text-white hover:bg-slate-900 sm:w-auto">
                 {primaryLabel}
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
-            <Link href={secondaryHref}>
+
+            {user ? (
+              <Link href={secondaryHref}>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="min-h-12 w-full rounded-xl border-slate-300 px-6 text-base text-slate-900 sm:w-auto"
+                >
+                  {secondaryLabel}
+                </Button>
+              </Link>
+            ) : (
               <Button
+                asChild
                 size="lg"
                 variant="outline"
-                className="w-full border-primary/30 text-primary hover:bg-primary/5 sm:w-auto"
+                className="min-h-12 w-full rounded-xl border-slate-300 px-6 text-base text-slate-900 sm:w-auto"
               >
-                {secondaryLabel}
+                <a href="#prova">Ver a prova visual</a>
               </Button>
-            </Link>
+            )}
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            {microClaims.map((claim) => (
+          <p className="text-sm font-medium text-slate-600">
+            Sem planilha. Sem adivinhacao. Sem deixar o controle para depois.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            {trustSignals.map((signal) => (
               <div
-                key={claim.label}
-                className="flex items-center gap-2 rounded-full border border-primary/10 bg-primary/5 px-3 py-2 text-sm"
+                key={signal.label}
+                className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_50px_rgba(15,23,42,0.06)] backdrop-blur"
               >
-                <claim.icon className="h-4 w-4 text-primary" />
-                <span className="text-slate-700">{claim.label}</span>
+                <signal.icon className="mb-3 h-5 w-5 text-sky-700" />
+                <p className="text-sm font-medium leading-relaxed text-slate-700">{signal.label}</p>
               </div>
             ))}
-          </div>
-
-          <div className="flex flex-wrap gap-6 text-sm text-slate-600">
-            <div>
-              <p className="font-semibold text-slate-900">Painel limpo</p>
-              <p>Saldo, receitas, despesas e fluxo no mesmo contexto</p>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-900">Resumo inteligente</p>
-              <p>Leitura pratica do mes com IA e menos trabalho manual</p>
-            </div>
           </div>
         </div>
 
         <div className="relative">
-          <div className="absolute -inset-8 bg-gradient-to-br from-primary/10 via-white to-transparent blur-3xl" />
+          <div className="absolute inset-x-8 top-8 h-24 rounded-full bg-sky-200/40 blur-3xl" />
 
-          <div className="relative overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.12)]">
+          <div className="relative overflow-hidden rounded-[32px] border border-white/80 bg-white/90 p-3 shadow-[0_28px_90px_rgba(15,23,42,0.14)] backdrop-blur">
+            <div className="absolute left-5 top-5 z-10 rounded-2xl border border-rose-200 bg-white/95 px-4 py-3 shadow-lg">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-500">Sinal de alerta</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">Voce nao precisa descobrir excessos so quando o saldo aperta.</p>
+            </div>
+
             <img
               src="/landing/dashboard-1.png"
-              alt="Visao geral do FinScope com resumo financeiro e resumo inteligente do mes"
-              className="h-full w-full object-cover object-left-top"
+              alt="Painel do FinScope com resumo financeiro, saldo do mes e analise inteligente"
+              className="h-full w-full rounded-[24px] object-cover object-left-top"
             />
+
+            <div className="absolute bottom-5 left-5 right-5 rounded-[24px] border border-slate-200 bg-white/96 p-4 shadow-xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">O que muda com FinScope</p>
+              <div className="mt-3 grid gap-2.5">
+                {heroBullets.map((bullet) => (
+                  <div key={bullet} className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                    <p className="text-sm leading-relaxed text-slate-700">{bullet}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>

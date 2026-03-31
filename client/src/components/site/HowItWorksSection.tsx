@@ -1,69 +1,98 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Link2, Sparkles, Gauge, ArrowRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowRight, Bot, Eye, Radar, Sparkles } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 
+const solutionCards = [
+  {
+    title: "Veja o vazamento antes que ele vire problema",
+    description: "O painel deixa claro o que esta entrando, saindo e onde o dinheiro esta escapando com mais frequencia.",
+    icon: Eye,
+  },
+  {
+    title: "Deixe a IA reduzir o trabalho manual",
+    description: "FinScope ajuda a organizar gastos e categorias sem transformar seu controle financeiro em mais uma tarefa cansativa.",
+    icon: Bot,
+  },
+  {
+    title: "Tome decisoes com mais calma e menos impulso",
+    description: "Com leitura simples do mes, voce enxerga o que cortar, o que manter e o que merece atencao agora.",
+    icon: Radar,
+  },
+];
+
 const steps = [
-  {
-    title: "Adicione suas contas e gastos",
-    description: "Registre suas movimentacoes em poucos passos e mantenha tudo no mesmo lugar.",
-    icon: Link2,
-  },
-  {
-    title: "Organize por categorias",
-    description: "Veja com clareza quanto voce gastou em cada tipo de despesa no mes.",
-    icon: Sparkles,
-  },
-  {
-    title: "Acompanhe seu mes com clareza",
-    description: "Visualize saldo, metas e proximos compromissos para decidir melhor.",
-    icon: Gauge,
-  },
+  "Registre seus movimentos ou use a IA para acelerar o processo",
+  "Entenda o que pesa no seu mes sem somar tudo na mao",
+  "Aja com clareza antes do dinheiro apertar",
 ];
 
 export function HowItWorksSection() {
   const { user } = useAuth();
   const ctaHref = user ? "/dashboard" : "/signup";
-  const ctaLabel = user ? "Ir para o painel" : "Cadastre-se";
+  const ctaLabel = user ? "Ver meu painel" : "Quero minha leitura financeira";
 
   return (
-    <section className="bg-white py-16 text-slate-900">
-      <div className="mx-auto max-w-6xl space-y-8 px-4">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-3">
-            <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Como funciona</p>
-            <h2 className="font-poppins text-3xl font-bold md:text-4xl">
-              Clareza total em tres passos simples
+    <section id="como-funciona" className="bg-white py-16 text-slate-900 md:py-20">
+      <div className="mx-auto max-w-6xl space-y-10 px-4">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-4">
+            <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-900">
+              A solucao
+            </Badge>
+            <h2 className="max-w-3xl font-poppins text-3xl font-bold leading-tight md:text-4xl">
+              O FinScope transforma confusao financeira em clareza que voce consegue usar hoje.
             </h2>
-            <p className="max-w-2xl text-slate-600">
-              Um fluxo simples para voce entender seu dinheiro e manter uma rotina financeira mais organizada.
+            <p className="max-w-2xl text-base leading-relaxed text-slate-600 md:text-lg">
+              Em vez de despejar graficos soltos, o FinScope mostra o que importa agora, automatiza parte da rotina
+              e deixa evidente qual decisao traz mais alivio para o seu bolso.
             </p>
           </div>
+
           <Link href={ctaHref}>
-            <Button className="bg-primary text-white hover:bg-primary/90">
+            <Button className="min-h-12 rounded-xl bg-slate-950 px-6 text-white hover:bg-slate-900">
               {ctaLabel}
-              <ArrowRight className="ml-2 h-4 w-4" />
+              <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          {steps.map((step, index) => (
+          {solutionCards.map((card) => (
             <Card
-              key={step.title}
-              className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm transition-shadow hover:shadow-md"
+              key={card.title}
+              className="rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-6 shadow-[0_14px_36px_rgba(15,23,42,0.06)]"
             >
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary">
-                  <step.icon className="h-6 w-6" />
-                </div>
-                <span className="text-sm text-slate-500">Passo {index + 1}</span>
+              <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-100 text-sky-800">
+                <card.icon className="h-5 w-5" />
               </div>
-              <h3 className="mb-2 text-xl font-semibold">{step.title}</h3>
-              <p className="text-sm leading-relaxed text-slate-600">{step.description}</p>
+              <h3 className="text-xl font-semibold leading-snug text-slate-950">{card.title}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">{card.description}</p>
             </Card>
           ))}
+        </div>
+
+        <div className="rounded-[30px] border border-slate-200 bg-[#f6f2ea] p-6 md:p-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-white">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Em 3 movimentos</p>
+              <p className="text-xl font-semibold text-slate-950">Um fluxo simples para quem tem pouca paciencia e pouco tempo.</p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            {steps.map((step, index) => (
+              <div key={step} className="rounded-2xl border border-white/80 bg-white/80 p-5 shadow-sm">
+                <p className="text-sm font-semibold text-sky-800">Passo {index + 1}</p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-700">{step}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>

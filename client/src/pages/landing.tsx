@@ -12,14 +12,14 @@ import { FinalCTASection } from "@/components/site/FinalCTASection";
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900">
-      <FinScopeHeader />
+      <FinScopeHeader landingMode />
       <main className="flex flex-col gap-0 bg-white">
         <HeroSection />
         <PainSolutionSection />
         <HowItWorksSection />
-        <SocialProofSection />
-        <DifferentialsSection />
         <DemoSection />
+        <DifferentialsSection />
+        <SocialProofSection />
         <PricingSection />
         <FinalCTASection />
       </main>
