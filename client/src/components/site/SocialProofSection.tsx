@@ -71,7 +71,7 @@ export function SocialProofSection() {
             </div>
 
             <p className="mt-5 text-2xl font-semibold leading-snug md:text-3xl">
-              "Eu preciso disso" acontece quando a pessoa percebe o quanto custa continuar no escuro.
+              Quem passa a enxergar melhor o dinheiro sente mais calma para decidir e mais controle no dia a dia.
             </p>
 
             <div className="mt-6 grid gap-3">
