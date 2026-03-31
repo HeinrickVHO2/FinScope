@@ -20,8 +20,8 @@ const publicLinks = [
 ] as const;
 
 const landingLinks = [
-  { href: "#como-funciona", label: "Solucao" },
-  { href: "#prova", label: "Prova visual" },
+  { href: "#como-funciona", label: "Solução" },
+  { href: "#prova", label: "Como funciona" },
   { href: "#planos", label: "Planos" },
 ] as const;
 
@@ -31,7 +31,7 @@ export function FinScopeHeader({ backHref, backLabel = "Voltar", landingMode = f
   const showBackLink = Boolean(backHref);
   const homeHref = user ? "/dashboard" : "/";
   const primaryHref = user ? "/dashboard" : "/signup";
-  const primaryLabel = user ? "Abrir painel" : "Comecar agora";
+  const primaryLabel = user ? "Abrir painel" : "Começar agora";
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
@@ -75,7 +75,7 @@ export function FinScopeHeader({ backHref, backLabel = "Voltar", landingMode = f
             className={mobile ? "w-full justify-start" : "text-slate-700"}
             onClick={mobile ? closeMobileMenu : undefined}
           >
-            Ja tenho conta
+            Já tenho conta
           </Button>
         </Link>
         <Link href={primaryHref}>
@@ -120,7 +120,7 @@ export function FinScopeHeader({ backHref, backLabel = "Voltar", landingMode = f
           ) : (
             <>
               <Link href={homeHref} className="transition-colors hover:text-primary">
-                Inicio
+                Início
               </Link>
               {publicLinks.map((item) => (
                 <Link key={item.href} href={item.href} className="transition-colors hover:text-primary">
@@ -164,7 +164,7 @@ export function FinScopeHeader({ backHref, backLabel = "Voltar", landingMode = f
                 <>
                   <Link href={homeHref}>
                     <span className="block py-2 transition-colors hover:text-primary" onClick={closeMobileMenu}>
-                      Inicio
+                      Início
                     </span>
                   </Link>
 

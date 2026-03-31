@@ -5,32 +5,32 @@ import { Bot, Briefcase, LayoutDashboard, MessageCircleMore, Sparkles, Workflow 
 const differentiators = [
   {
     title: "IA que reduz atrito",
-    description: "Voce nao precisa classificar tudo manualmente para ter uma leitura util do mes.",
+    description: "Você não precisa classificar tudo manualmente para ter uma leitura útil do mês.",
     icon: Bot,
   },
   {
     title: "Clareza sem excesso visual",
-    description: "O painel foi pensado para mostrar o que pesa agora, nao para soterrar voce com informacao.",
+    description: "O painel foi pensado para mostrar o que pesa agora, não para soterrar você com informação.",
     icon: LayoutDashboard,
   },
   {
-    title: "Pessoal e negocio no mesmo contexto",
-    description: "Entenda as duas rotinas sem perder a nocao do que esta sobrando de verdade.",
+    title: "Pessoal e negócio no mesmo contexto",
+    description: "Entenda as duas rotinas sem perder a noção do que está sobrando de verdade.",
     icon: Briefcase,
   },
   {
     title: "WhatsApp para continuar no fluxo real",
-    description: "Quando abrir o app nao faz sentido, o registro e a consulta podem continuar pelo chat.",
+    description: "Quando abrir o app não faz sentido, o registro e a consulta podem continuar pelo chat.",
     icon: MessageCircleMore,
   },
   {
     title: "Planejado versus realizado",
-    description: "Voce compara intencao com realidade e ajusta antes do mes sair do controle.",
+    description: "Você compara intenção com realidade e ajusta antes do mês sair do controle.",
     icon: Workflow,
   },
   {
-    title: "Mais simplicidade para manter o habito",
-    description: "FinScope ajuda voce a voltar todos os dias sem transformar controle financeiro em castigo.",
+    title: "Mais simplicidade para manter o hábito",
+    description: "FinScope ajuda você a voltar todos os dias sem transformar controle financeiro em castigo.",
     icon: Sparkles,
   },
 ];
@@ -41,14 +41,14 @@ export function DifferentialsSection() {
       <div className="mx-auto max-w-6xl space-y-8 px-4">
         <div className="space-y-4 text-center">
           <Badge variant="outline" className="border-amber-200 bg-white/80 text-amber-900">
-            Por que o FinScope e diferente
+            Por que o FinScope é diferente
           </Badge>
           <h2 className="mx-auto max-w-3xl font-poppins text-3xl font-bold leading-tight md:text-4xl">
-            Nao e so controle financeiro. E menos friccao para continuar no controle.
+            Não é só controle financeiro. É menos fricção para continuar no controle.
           </h2>
           <p className="mx-auto max-w-3xl text-base leading-relaxed text-slate-600 md:text-lg">
             A maioria das ferramentas pede disciplina demais logo no primeiro dia. O FinScope foi desenhado para
-            facilitar a manutencao do habito com automacao, clareza e menos trabalho repetitivo.
+            facilitar a manutenção do hábito com automação, clareza e menos trabalho repetitivo.
           </p>
         </div>
 

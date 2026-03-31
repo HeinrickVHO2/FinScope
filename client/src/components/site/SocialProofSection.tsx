@@ -10,47 +10,47 @@ import { useAuth } from "@/lib/auth";
 
 const testimonials = [
   {
-    name: "Juliana, autonoma",
-    quote: "Antes eu so sentia culpa no fim do mes. Agora eu bato o olho e entendo o que realmente aconteceu.",
+    name: "Juliana, autônoma",
+    quote: "Antes eu só sentia culpa no fim do mês. Agora eu bato o olho e entendo o que realmente aconteceu.",
     focus: "Clareza para decidir sem ansiedade",
     image: JulianaImage,
   },
   {
-    name: "Rafael, pequeno negocio",
-    quote: "Consegui separar melhor o que era pessoal e o que era da empresa. Isso sozinho ja tirou um peso enorme.",
+    name: "Rafael, pequeno negócio",
+    quote: "Consegui separar melhor o que era pessoal e o que era da empresa. Isso sozinho já tirou um peso enorme.",
     focus: "Menos mistura, mais controle",
     image: RafaelImage,
   },
   {
     name: "Camila, marketing",
-    quote: "Passei a perceber meus excessos antes. Parei de descobrir o problema so quando o saldo apertava.",
-    focus: "Correcao mais rapida do mes",
+    quote: "Passei a perceber meus excessos antes. Parei de descobrir o problema só quando o saldo apertava.",
+    focus: "Correção mais rápida do mês",
     image: CamilaImage,
   },
 ];
 
 const reassurancePoints = [
-  "Leitura simples para quem nao aguenta mais planilha",
-  "Mais tranquilidade para enxergar o mes sem drama",
+  "Leitura simples para quem não aguenta mais planilha",
+  "Mais tranquilidade para enxergar o mês sem drama",
   "Mais clareza entre o que pesa e o que realmente importa",
 ];
 
 export function SocialProofSection() {
   const { user } = useAuth();
   const ctaHref = user ? "/dashboard" : "/signup";
-  const ctaLabel = user ? "Ir para meu painel" : "Comecar meu controle agora";
+  const ctaLabel = user ? "Ir para meu painel" : "Começar meu controle agora";
 
   return (
     <section className="border-t border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] py-16 text-slate-900 md:py-20">
       <div className="mx-auto max-w-6xl space-y-10 px-4">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-4">
-            <Badge className="w-fit border-0 bg-emerald-100 text-emerald-900">Resultados percebidos</Badge>
+            <Badge className="w-fit border-0 bg-emerald-100 text-emerald-900">Histórias de clientes</Badge>
             <h2 className="font-poppins text-3xl font-bold leading-tight md:text-4xl">
-              Quando voce finalmente enxerga, fica mais facil mudar.
+              Quando você finalmente enxerga, fica mais fácil mudar.
             </h2>
             <p className="max-w-2xl text-base leading-relaxed text-slate-600 md:text-lg">
-              O beneficio mais citado nao e um grafico bonito. E a sensacao de parar de adivinhar o que aconteceu com o dinheiro.
+              O benefício mais citado não é um gráfico bonito. É a sensação de parar de adivinhar o que aconteceu com o dinheiro.
             </p>
           </div>
 

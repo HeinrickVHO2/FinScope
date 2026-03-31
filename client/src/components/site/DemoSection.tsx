@@ -6,27 +6,27 @@ import { useAuth } from "@/lib/auth";
 const proofCards = [
   {
     eyebrow: "Painel principal",
-    title: "Veja em segundos para onde o dinheiro foi e o que merece atencao agora",
+    title: "Veja em segundos para onde o dinheiro foi e o que merece atenção agora",
     description:
-      "O dashboard deixa claro o saldo, as categorias que mais pesam e a leitura do periodo sem obrigar voce a interpretar varios blocos soltos.",
+      "O dashboard deixa claro o saldo, as categorias que mais pesam e a leitura do período sem obrigar você a interpretar vários blocos soltos.",
     bullets: [
       "O que entrou, saiu e sobrou no mesmo contexto",
-      "Resumo do mes para cortar confusao e acelerar decisao",
-      "Visao rapida para revisar no celular sem cansaco",
+      "Resumo do mês para cortar confusão e acelerar decisão",
+      "Visão rápida para revisar no celular sem cansaço",
     ],
     icon: LayoutDashboard,
     imageSrc: "/landing/dashboard-1.png",
-    imageAlt: "Dashboard principal do FinScope com resumo financeiro e leitura do mes",
+    imageAlt: "Dashboard principal do FinScope com resumo financeiro e leitura do mês",
   },
   {
     eyebrow: "Assistente com IA",
     title: "Registre e entenda sua rotina sem digitar tudo do zero",
     description:
-      "A IA ajuda a transformar informacao solta em registros e respostas mais objetivas para manter seu controle funcionando no mundo real.",
+      "A IA ajuda a transformar informação solta em registros e respostas mais objetivas para manter seu controle funcionando no mundo real.",
     bullets: [
-      "Menos esforco manual no dia a dia",
+      "Menos esforço manual no dia a dia",
       "Mais velocidade para organizar gastos e metas",
-      "Leitura financeira mais facil de consultar",
+      "Leitura financeira mais fácil de consultar",
     ],
     icon: Bot,
     imageSrc: "/landing/ia-chat.png",
@@ -34,12 +34,12 @@ const proofCards = [
   },
   {
     eyebrow: "WhatsApp",
-    title: "Receba a leitura do periodo no chat quando o dia estiver corrido",
+    title: "Receba a leitura do período no chat quando o dia estiver corrido",
     description:
-      "Em vez de depender sempre de abrir outra tela, voce pode consultar resumo e continuar o fluxo direto no WhatsApp.",
+      "Em vez de depender sempre de abrir outra tela, você pode consultar resumo e continuar o fluxo direto no WhatsApp.",
     bullets: [
-      "Resumo pratico no momento em que a duvida aparece",
-      "Mais chance de manter o habito porque a friccao cai",
+      "Resumo prático no momento em que a dúvida aparece",
+      "Mais chance de manter o hábito porque a fricção cai",
       "Ideal para quem veio do improviso e precisa de praticidade",
     ],
     icon: MessageCircleMore,
@@ -65,28 +65,28 @@ export function DemoSection() {
       <div className="mx-auto max-w-6xl space-y-10 px-4">
         <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-[30px] border border-slate-200 bg-slate-50 p-6 md:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Prova visual</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Veja na prática</p>
             <h2 className="mt-3 font-poppins text-3xl font-bold leading-tight md:text-4xl">
-              Antes voce tenta adivinhar. Aqui voce enxerga.
+              Antes você tenta adivinhar. Aqui você enxerga.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-slate-600 md:text-lg">
-              A melhor forma de vender controle financeiro e mostrar a diferenca entre caos mental e visao clara.
-              O FinScope deixa essa diferenca obvia logo nas primeiras telas.
+              A melhor forma de vender controle financeiro é mostrar a diferença entre caos mental e visão clara.
+              O FinScope deixa essa diferença óbvia logo nas primeiras telas.
             </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-rose-600">Sem FinScope</p>
-              <p className="mt-3 text-xl font-semibold text-slate-950">Dinheiro espalhado. Decisao no susto.</p>
+              <p className="mt-3 text-xl font-semibold text-slate-950">Dinheiro espalhado. Decisão no susto.</p>
               <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                Conta aqui, anotacao ali, memoria falhando e o aperto chegando antes da explicacao.
+                Conta aqui, anotação ali, memória falhando e o aperto chegando antes da explicação.
               </p>
             </div>
 
             <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Com FinScope</p>
-              <p className="mt-3 text-xl font-semibold text-slate-950">Visao clara. Acao mais rapida.</p>
+              <p className="mt-3 text-xl font-semibold text-slate-950">Visão clara. Ação mais rápida.</p>
               <p className="mt-3 text-sm leading-relaxed text-slate-600">
                 Tudo em um lugar, com IA ajudando a organizar e uma leitura que faz sentido em poucos segundos.
               </p>
@@ -132,8 +132,8 @@ export function DemoSection() {
 
         <div className="flex flex-col items-center justify-between gap-4 rounded-[28px] border border-slate-200 bg-slate-950 px-6 py-8 text-center text-white md:flex-row md:text-left">
           <div>
-            <p className="text-xl font-semibold">Se a tela ja deixa o problema mais claro, imagine usando na sua rotina.</p>
-            <p className="mt-1 text-sm text-slate-300">O objetivo nao e impressionar. E fazer voce agir mais rapido.</p>
+            <p className="text-xl font-semibold">Se a tela já deixa o problema mais claro, imagine usando na sua rotina.</p>
+            <p className="mt-1 text-sm text-slate-300">O objetivo não é impressionar. É fazer você agir mais rápido.</p>
           </div>
           <Link href={ctaHref}>
             <Button className="min-h-12 rounded-xl bg-white px-6 text-slate-950 hover:bg-slate-100">

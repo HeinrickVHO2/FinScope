@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth";
 const planMatrix = [
   {
     id: "dashboard",
-    label: "Painel financeiro claro para acompanhar o mes",
+    label: "Painel financeiro claro para acompanhar o mês",
     plans: { pro: true, premium: true },
   },
   {
@@ -19,7 +19,7 @@ const planMatrix = [
   },
   {
     id: "business",
-    label: "Area de empresa para separar a operacao",
+    label: "Área de empresa para separar a operação",
     plans: { pro: false, premium: true },
   },
   {
@@ -29,7 +29,7 @@ const planMatrix = [
   },
   {
     id: "reports",
-    label: "Relatorios mais avancados e leitura mais profunda",
+    label: "Relatórios mais avançados e leitura mais profunda",
     plans: { pro: false, premium: true },
   },
 ] as const;
@@ -62,19 +62,19 @@ export function PricingSection() {
     <section id="planos" className="border-t border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] py-16 text-slate-900 md:py-20">
       <div className="mx-auto max-w-6xl space-y-8 px-4">
         <div className="space-y-4 text-center">
-          <Badge className="border-0 bg-amber-100 text-amber-900">Investimento pequeno. Impacto diario.</Badge>
+          <Badge className="border-0 bg-amber-100 text-amber-900">Investimento pequeno. Impacto diário.</Badge>
           <h2 className="mx-auto max-w-3xl font-poppins text-3xl font-bold leading-tight md:text-4xl">
-            Um gasto invisivel pode custar mais do que um mes inteiro de FinScope.
+            Um gasto invisível pode custar mais do que um mês inteiro de FinScope.
           </h2>
           <p className="mx-auto max-w-3xl text-base leading-relaxed text-slate-600 md:text-lg">
-            Aqui o valor nao esta so no preco. Esta no quanto voce deixa de perder quando finalmente enxerga e age antes.
+            Aqui o valor não está só no preço. Está no quanto você deixa de perder quando finalmente enxerga e age antes.
           </p>
         </div>
 
         <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-5 text-center shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">Percepcao de valor</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">Vale mais do que custa</p>
           <p className="mt-2 text-lg font-semibold text-slate-950">
-            Uma assinatura esquecida, uma taxa evitavel ou um excesso recorrente pode pagar esse investimento sozinho.
+            Uma assinatura esquecida, uma taxa evitável ou um excesso recorrente pode pagar esse investimento sozinho.
           </p>
         </div>
 
@@ -82,7 +82,7 @@ export function PricingSection() {
           {CHECKOUT_PLAN_OPTIONS.map((plan) => {
             const dailyLabel = plan.commercialCopy.dailyPriceLabel ?? toDailyPrice(plan.price);
             const buttonLabel =
-              plan.id === "premium" ? "Quero o controle completo" : "Comecar a enxergar meus gastos";
+              plan.id === "premium" ? "Quero o controle completo" : "Começar a enxergar meus gastos";
 
             return (
               <Card
@@ -109,9 +109,9 @@ export function PricingSection() {
                   </div>
 
                   <div className={`rounded-[26px] p-5 ${plan.recommended ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-950"}`}>
-                    <p className="text-sm uppercase tracking-[0.2em] opacity-70">Preco mensal</p>
+                    <p className="text-sm uppercase tracking-[0.2em] opacity-70">Preço mensal</p>
                     <p className="mt-2 text-4xl font-bold">{toMonthlyDisplayPrice(plan.price)}</p>
-                    <p className="mt-1 text-sm opacity-80">por mes</p>
+                    <p className="mt-1 text-sm opacity-80">por mês</p>
                     {dailyLabel ? <p className="mt-4 text-sm font-semibold">{dailyLabel}</p> : null}
                     <p className="mt-2 text-sm opacity-80">{plan.commercialCopy.priceSupport}</p>
                   </div>
@@ -119,7 +119,7 @@ export function PricingSection() {
 
                 <CardContent className="flex flex-1 flex-col gap-6 px-6 pb-6 md:px-7">
                   <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">O que voce leva</p>
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">O que você leva</p>
                     <div className="mt-4 space-y-3">
                       {planMatrix.map((item) => {
                         const enabled = item.plans[plan.id];

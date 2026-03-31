@@ -11,9 +11,9 @@ const trustSignals = [
 ];
 
 const heroBullets = [
-  "Descubra para onde seu dinheiro esta escapando antes do fim do mes apertar",
-  "Separe vida pessoal e negocio sem montar uma rotina complicada",
-  "Veja saldo, despesas e proximos impactos em uma tela facil de entender",
+  "Descubra para onde seu dinheiro está escapando antes do fim do mês apertar",
+  "Separe vida pessoal e negócio sem montar uma rotina complicada",
+  "Veja saldo, despesas e próximos impactos em uma tela fácil de entender",
 ];
 
 export function HeroSection() {
@@ -21,7 +21,7 @@ export function HeroSection() {
   const primaryHref = user ? "/dashboard" : "/signup";
   const secondaryHref = user ? "/dashboard" : "/login";
   const primaryLabel = user ? "Abrir meu painel" : "Quero ver para onde meu dinheiro vai";
-  const secondaryLabel = user ? "Ver meus numeros agora" : "Ja tenho conta";
+  const secondaryLabel = user ? "Ver meus números agora" : "Já tenho conta";
 
   return (
     <section className="relative overflow-hidden bg-[linear-gradient(180deg,#f8fbff_0%,#f6f2ea_52%,#ffffff_100%)] text-slate-900">
@@ -36,11 +36,11 @@ export function HeroSection() {
 
           <div className="space-y-4">
             <h1 className="max-w-2xl font-poppins text-4xl font-bold leading-tight text-slate-950 md:text-5xl lg:text-6xl">
-              Voce trabalha, recebe e mesmo assim termina o mes sem entender para onde o dinheiro foi.
+              Você trabalha, recebe e mesmo assim termina o mês sem entender para onde o dinheiro foi.
             </h1>
             <p className="max-w-xl text-lg leading-relaxed text-slate-700 md:text-xl">
-              O FinScope mostra o que esta pesando no seu bolso, organiza sua rotina com IA e devolve
-              clareza para voce agir antes do problema crescer.
+              O FinScope mostra o que está pesando no seu bolso, organiza sua rotina com IA e devolve
+              clareza para você agir antes do problema crescer.
             </p>
           </div>
 
@@ -69,13 +69,13 @@ export function HeroSection() {
                 variant="outline"
                 className="min-h-12 w-full rounded-xl border-slate-300 px-6 text-base text-slate-900 sm:w-auto"
               >
-                <a href="#prova">Ver a prova visual</a>
+                <a href="#prova">Ver o FinScope em ação</a>
               </Button>
             )}
           </div>
 
           <p className="text-sm font-medium text-slate-600">
-            Sem planilha. Sem adivinhacao. Sem deixar o controle para depois.
+            Sem planilha. Sem adivinhação. Sem deixar o controle para depois.
           </p>
 
           <div className="grid gap-3 sm:grid-cols-3">
@@ -94,20 +94,22 @@ export function HeroSection() {
         <div className="relative">
           <div className="absolute inset-x-8 top-8 h-24 rounded-full bg-sky-200/40 blur-3xl" />
 
-          <div className="relative overflow-hidden rounded-[32px] border border-white/80 bg-white/90 p-3 shadow-[0_28px_90px_rgba(15,23,42,0.14)] backdrop-blur">
-            <div className="absolute left-5 top-5 z-10 rounded-2xl border border-rose-200 bg-white/95 px-4 py-3 shadow-lg">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-500">Sinal de alerta</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">Voce nao precisa descobrir excessos so quando o saldo aperta.</p>
+          <div className="relative rounded-[32px] border border-white/80 bg-white/90 p-4 shadow-[0_28px_90px_rgba(15,23,42,0.14)] backdrop-blur md:p-5">
+            <div className="rounded-2xl border border-rose-200 bg-white/95 px-4 py-3 shadow-lg">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-500">Atenção</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">Você não precisa descobrir excessos só quando o saldo aperta.</p>
             </div>
 
-            <img
-              src="/landing/dashboard-1.png"
-              alt="Painel do FinScope com resumo financeiro, saldo do mes e analise inteligente"
-              className="h-full w-full rounded-[24px] object-cover object-left-top"
-            />
+            <div className="mt-4 overflow-hidden rounded-[24px] border border-slate-200 bg-white">
+              <img
+                src="/landing/dashboard-1.png"
+                alt="Painel do FinScope com resumo financeiro, saldo do mês e análise inteligente"
+                className="h-full w-full object-cover object-left-top"
+              />
+            </div>
 
-            <div className="absolute bottom-5 left-5 right-5 rounded-[24px] border border-slate-200 bg-white/96 p-4 shadow-xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">O que muda com FinScope</p>
+            <div className="mt-4 rounded-[24px] border border-slate-200 bg-white/96 p-4 shadow-xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">O que você ganha</p>
               <div className="mt-3 grid gap-2.5">
                 {heroBullets.map((bullet) => (
                   <div key={bullet} className="flex items-start gap-3">

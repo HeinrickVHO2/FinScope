@@ -5,8 +5,8 @@ import { BILLING_PLANS } from "@shared/plans";
 import { useAuth } from "@/lib/auth";
 
 const closingBullets = [
-  "Veja o que esta drenando seu dinheiro",
-  "Ganhe clareza para agir hoje, nao no fim do mes",
+  "Veja o que está drenando seu dinheiro",
+  "Ganhe clareza para agir hoje, não no fim do mês",
   "Troque improviso por um plano simples de seguir",
 ];
 
@@ -21,14 +21,14 @@ export function FinalCTASection() {
       <div className="mx-auto max-w-5xl rounded-[34px] border border-slate-200 bg-[linear-gradient(135deg,#0f172a_0%,#111827_56%,#1d4ed8_100%)] p-8 text-white shadow-[0_28px_80px_rgba(15,23,42,0.22)] md:p-12">
         <div className="grid gap-8 lg:grid-cols-[1fr_0.8fr] lg:items-center">
           <div className="space-y-5">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-200">Hora de agir</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-200">Comece hoje</p>
             <h2 className="font-poppins text-3xl font-bold leading-tight md:text-5xl">
-              Seu dinheiro nao precisa continuar sumindo sem explicacao.
+              Seu dinheiro não precisa continuar sumindo sem explicação.
             </h2>
             <p className="max-w-2xl text-base leading-relaxed text-slate-200 md:text-lg">
-              Comece com o plano que faz sentido para voce e transforme confusao em clareza. O Pro entrega
+              Comece com o plano que faz sentido para você e transforme confusão em clareza. O Pro entrega
               controle essencial por {BILLING_PLANS.pro.priceLabel}. O Premium acelera a rotina com mais
-              automacao por {BILLING_PLANS.premium.priceLabel}.
+              automação por {BILLING_PLANS.premium.priceLabel}.
             </p>
 
             <div className="grid gap-3">
@@ -62,13 +62,13 @@ export function FinalCTASection() {
                   variant="outline"
                   className="min-h-12 w-full rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10"
                 >
-                  {user ? "Voltar ao meu painel" : "Ja tenho conta"}
+                  {user ? "Voltar ao meu painel" : "Já tenho conta"}
                 </Button>
               </Link>
             </div>
 
             <p className="mt-4 text-xs leading-relaxed text-slate-300">
-              Entre, veja seus numeros com clareza e decida com menos pressao.
+              Entre, veja seus números com clareza e decida com menos pressão.
             </p>
           </div>
         </div>

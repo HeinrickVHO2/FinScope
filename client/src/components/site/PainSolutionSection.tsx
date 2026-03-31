@@ -6,18 +6,18 @@ import { useAuth } from "@/lib/auth";
 
 const painCards = [
   {
-    title: "Voce ganha, paga as contas e ainda sente que o dinheiro evaporou",
-    description: "Quando tudo passa por varios lugares, o mes termina com culpa, cansaco e zero clareza.",
+    title: "Você ganha, paga as contas e ainda sente que o dinheiro evaporou",
+    description: "Quando tudo passa por vários lugares, o mês termina com culpa, cansaço e zero clareza.",
     icon: WalletCards,
   },
   {
-    title: "O excesso so aparece quando ja ficou tarde",
-    description: "Pequenos gastos, assinaturas e saidas invisiveis viram um rombo silencioso ao longo das semanas.",
+    title: "O excesso só aparece quando já ficou tarde",
+    description: "Pequenos gastos, assinaturas e saídas invisíveis viram um rombo silencioso ao longo das semanas.",
     icon: CircleAlert,
   },
   {
-    title: "Seu financeiro vive no modo apagar incendio",
-    description: "Sem uma leitura simples, voce decide no susto, corta errado e continua sem saber o que ajustar.",
+    title: "Seu financeiro vive no modo apagar incêndio",
+    description: "Sem uma leitura simples, você decide no susto, corta errado e continua sem saber o que ajustar.",
     icon: Flame,
   },
 ];
@@ -32,20 +32,20 @@ export function PainSolutionSection() {
       <div className="mx-auto max-w-6xl space-y-10 px-4">
         <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <div className="space-y-5">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-300">O problema real</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-300">Quando o dinheiro some</p>
             <h2 className="font-poppins text-3xl font-bold leading-tight md:text-4xl">
-              Nao e falta de disciplina. E falta de visibilidade.
+              Não é falta de disciplina. É falta de visibilidade.
             </h2>
             <p className="max-w-xl text-base leading-relaxed text-slate-300 md:text-lg">
-              Quando voce nao enxerga o que esta acontecendo, sempre parece que o dinheiro some sem aviso.
-              Isso trava decisoes, atrasa metas e deixa a sensacao de que voce esta sempre correndo atras.
+              Quando você não enxerga o que está acontecendo, sempre parece que o dinheiro some sem aviso.
+              Isso trava decisões, atrasa metas e deixa a sensação de que você está sempre correndo atrás.
             </p>
 
             <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-              <p className="text-lg font-semibold text-white">O custo de nao olhar direito e alto.</p>
+              <p className="text-lg font-semibold text-white">O custo de não olhar direito é alto.</p>
               <p className="mt-2 text-sm leading-relaxed text-slate-300">
-                Uma assinatura esquecida, um excesso recorrente ou a mistura entre pessoal e negocio pode custar
-                mais do que um mes inteiro de controle financeiro.
+                Uma assinatura esquecida, um excesso recorrente ou a mistura entre pessoal e negócio pode custar
+                mais do que um mês inteiro de controle financeiro.
               </p>
             </div>
           </div>
@@ -72,9 +72,9 @@ export function PainSolutionSection() {
 
         <div className="flex flex-col gap-4 rounded-[28px] border border-amber-300/20 bg-amber-300/10 p-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xl font-semibold text-white">Voce nao precisa continuar decidindo no escuro.</p>
+            <p className="text-xl font-semibold text-white">Você não precisa continuar decidindo no escuro.</p>
             <p className="mt-1 text-sm text-slate-200">
-              O primeiro passo e simples: enxergar o que esta drenando seu dinheiro e agir antes do aperto.
+              O primeiro passo é simples: enxergar o que está drenando seu dinheiro e agir antes do aperto.
             </p>
           </div>
           <Link href={ctaHref}>
